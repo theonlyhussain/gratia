@@ -1,0 +1,32 @@
+.gradle/
+build/
+*/build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+.env
+keystore.properties
+*.jks
+*.keystore
+*.apk
+*.aab
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Private Media / Test Assets (Keep repo clean)
+private-media/
+test-media/
+user-media/
+sample-songs/
+*.mp3
+*.flac
+*.wav
+*.m4a
+*.ogg
+*.aac
+*.lrc
+
+# Reference files and cloned repositories
+reference/
