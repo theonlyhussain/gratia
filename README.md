@@ -18,8 +18,7 @@ The latest APK is available from the GitHub Releases page.
 | Provider | Status |
 |----------|--------|
 | 📱 **Local Device** | ✅ Working |
-| ☁️ **Google Drive** | 🔜 Coming soon |
-| 🔗 **Nextcloud / WebDAV** | 🔜 Coming soon |
+
 
 ## Features
 
@@ -30,7 +29,7 @@ The latest APK is available from the GitHub Releases page.
 - 📻 **Gratia Radio** — shuffle your own library
 - ❤️ **Favorites** — heart your best songs
 - 📝 **Lyrics** — add and view lyrics per song
-- 🎨 **Cosmic dark theme** — premium UI with glassmorphism and emerald accents
+- 🎨 **Cosmic dark theme** — UI with glassmorphism and emerald accents
 
 ## Building
 
@@ -60,12 +59,16 @@ Gratia does **not**:
 - Require an account
 
 All data stays on your device in a local Room database.
+## Upcomming fetures : On device AI algorithm 
+## currently working : On device AI lyrics which will scan the song and give word to word lyrics 
+## On it             : Without even draining your battry 
 
+
+## Note
+guys im currenly working and trying to make it better, maybe its not perfect but ill do my best . thaink you for understanding  
 ## Credits & Legal Notices
 
 This project includes or adapts open-source components and implementation ideas from GPLv3-licensed Android music player projects. See Open-source licenses for details.
-
-Lyrics animation behavior is inspired by [akshayjadhav4/lyrics-animation](https://github.com/akshayjadhav4/lyrics-animation), adapted for native Android Jetpack Compose.
 
 ## License
 
