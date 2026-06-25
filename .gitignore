@@ -30,3 +30,5 @@ sample-songs/
 
 # Reference files and cloned repositories
 reference/
+
+.kotlin/
