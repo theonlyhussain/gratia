@@ -95,8 +95,8 @@ fun ExpandedPlayer(
     )
 
     // Cached synced lyrics preview — only recalculate when song changes or active line changes
-    val parsedLyrics = remember(song.lyricsSynced, song.lyricsMode) {
-        if (song.lyricsMode == "synced" && !song.lyricsSynced.isNullOrBlank()) {
+    val parsedLyrics = remember(song.lyricsSynced) {
+        if (song.lyricsSynced?.isNotBlank() == true) {
             LyricsParser.parse(song.lyricsSynced)
         } else null
     }
