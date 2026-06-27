@@ -92,9 +92,9 @@ fun LyricsScreen(
 
     // Parser integration
     val lyricsRaw = when {
-        song.lyricsMode == "synced" && !song.lyricsSynced.isNullOrBlank() -> song.lyricsSynced
-        !song.lyricsPlain.isNullOrBlank() -> song.lyricsPlain
-        else -> song.lyrics
+        song.lyricsSynced?.isNotBlank() == true -> song.lyricsSynced
+        song.lyricsPlain?.isNotBlank() == true -> song.lyricsPlain
+        else -> ""
     }
 
     val parsedDocument = remember(lyricsRaw) {
