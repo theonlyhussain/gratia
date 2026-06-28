@@ -82,9 +82,9 @@ All data stays on your device in a local Room database.
 
 * On-device music recommendation system
 * On-device lyrics alignment
-* Better word-by-word synced lyrics
+* Better word-by-word synced lyrics (unstable) 
 * More stable local library scanning
-* More polished Gratia glass UI
+* More polished Gratia glass UI (unstable/can't see it) 
 
 ## Current Work
 
