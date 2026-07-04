@@ -79,7 +79,7 @@ Gratia does **not**:
 All data stays on your device in a local Room database.
 
 ## Upcoming Features
-
+* conveting this to react native -
 * On-device music recommendation system
 * On-device lyrics alignment
 * Better word-by-word synced lyrics (unstable) 
