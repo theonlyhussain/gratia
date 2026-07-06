@@ -29,7 +29,7 @@ fun LicensesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.cotton)
+            .background(GratiaTheme.colors.background)
             .statusBarsPadding()
     ) {
         // Header
@@ -48,7 +48,7 @@ fun LicensesScreen(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     modifier = Modifier.size(16.dp),
-                    tint = GratiaTheme.colors.textMuted
+                    tint = GratiaTheme.colors.textSecondary
                 )
             }
             Text(

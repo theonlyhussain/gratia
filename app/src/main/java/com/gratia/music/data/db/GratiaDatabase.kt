@@ -85,15 +85,65 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE songs ADD COLUMN skipCount INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE songs ADD COLUMN completedCount INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE songs ADD COLUMN totalListenTime INTEGER NOT NULL DEFAULT 0")
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS playlists (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT NULL,
+                coverArtUri TEXT DEFAULT NULL,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                updatedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS playlist_songs (
+                playlistId TEXT NOT NULL,
+                songId TEXT NOT NULL,
+                addedAt INTEGER NOT NULL DEFAULT 0,
+                sortOrder INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(playlistId, songId)
+            )
+        """)
+
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS collections (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT NULL,
+                coverArtUri TEXT DEFAULT NULL,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                updatedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS collection_songs (
+                collectionId TEXT NOT NULL,
+                songId TEXT NOT NULL,
+                addedAt INTEGER NOT NULL DEFAULT 0,
+                sortOrder INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(collectionId, songId)
+            )
+        """)
+    }
+}
+
 @Database(
     entities = [
         SongEntity::class,
         PlaylistEntity::class,
         PlaylistSongCrossRef::class,
+        com.gratia.music.data.model.CollectionEntity::class,
+        com.gratia.music.data.model.CollectionSongCrossRef::class,
         UserProfileEntity::class,
         ListeningEventEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class GratiaDatabase : RoomDatabase() {
@@ -101,6 +151,8 @@ abstract class GratiaDatabase : RoomDatabase() {
     abstract fun songDao(): SongDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun listeningEventDao(): ListeningEventDao
+    abstract fun playlistDao(): com.gratia.music.data.dao.PlaylistDao
+    abstract fun collectionDao(): com.gratia.music.data.dao.CollectionDao
 
     companion object {
         @Volatile
@@ -113,7 +165,7 @@ abstract class GratiaDatabase : RoomDatabase() {
                     GratiaDatabase::class.java,
                     "gratia_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build()
                 INSTANCE = instance
                 instance

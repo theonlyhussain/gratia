@@ -231,7 +231,7 @@ fun ExpandedPlayer(
                     Icon(
                         if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         null,
-                        tint = if (song.isFavorite) GratiaTheme.colors.cherryRed else Color.White.copy(alpha = 0.7f),
+                        tint = if (song.isFavorite) GratiaTheme.colors.accent else Color.White.copy(alpha = 0.7f),
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -312,7 +312,7 @@ fun ExpandedPlayer(
                     Icon(
                         Icons.Default.Shuffle,
                         null,
-                        tint = if (shuffleEnabled) GratiaTheme.colors.cherryRed else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f),
+                        tint = if (shuffleEnabled) GratiaTheme.colors.accent else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -326,7 +326,7 @@ fun ExpandedPlayer(
                             else -> Icons.Default.Repeat
                         },
                         null,
-                        tint = if (repeatMode != RepeatMode.OFF) GratiaTheme.colors.cherryRed else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f),
+                        tint = if (repeatMode != RepeatMode.OFF) GratiaTheme.colors.accent else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.6f),
                         modifier = Modifier.size(24.dp)
                     )
                 }

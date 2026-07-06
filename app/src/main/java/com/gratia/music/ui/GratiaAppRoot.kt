@@ -1,5 +1,6 @@
 package com.gratia.music.ui
 
+import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -9,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,12 +48,11 @@ import com.gratia.music.ui.components.liquidGlass
 sealed class Screen(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
     data object Home : Screen("home", "Home", Icons.Outlined.Home, Icons.Filled.Home)
     data object Search : Screen("search", "Search", Icons.Outlined.Search, Icons.Filled.Search)
-    data object Radio : Screen("radio", "Radio", Icons.Outlined.Radio, Icons.Filled.Radio)
-    data object Favorites : Screen("favorites", "Favorites", Icons.Outlined.FavoriteBorder, Icons.Filled.Favorite)
-    data object Playlists : Screen("playlists", "Playlists", Icons.Outlined.QueueMusic, Icons.Filled.QueueMusic)
+    data object Library : Screen("library", "Library", Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic)
+    data object Playlists : Screen("playlists", "Playlists", Icons.AutoMirrored.Outlined.QueueMusic, Icons.AutoMirrored.Filled.QueueMusic)
 }
 
-val bottomNavItems = listOf(Screen.Home, Screen.Search, Screen.Radio, Screen.Favorites, Screen.Playlists)
+val bottomNavItems = listOf(Screen.Home, Screen.Search, Screen.Library, Screen.Playlists)
 
 @Composable
 fun GratiaAppRoot() {
@@ -60,9 +62,21 @@ fun GratiaAppRoot() {
     val expandedPlayerOpen by playerViewModel.expandedPlayerOpen.collectAsState()
     val lyricsOverlayOpen by playerViewModel.lyricsOverlayOpen.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            containerColor = GratiaTheme.colors.cotton,
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val themeOption by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    
+    val isDark = when (themeOption) {
+        com.gratia.music.data.ThemeOption.LIGHT -> false
+        com.gratia.music.data.ThemeOption.DARK -> true
+        com.gratia.music.data.ThemeOption.SYSTEM -> isSystemDark
+    }
+
+    GratiaTheme(isDark = isDark) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                containerColor = GratiaTheme.colors.background,
             bottomBar = {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
@@ -78,7 +92,7 @@ fun GratiaAppRoot() {
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp, vertical = 16.dp)
-                            .shadow(24.dp, RoundedCornerShape(32.dp), spotColor = GratiaTheme.colors.maroon.copy(alpha = 0.15f), ambientColor = GratiaTheme.colors.maroon.copy(alpha = 0.05f))
+                            .shadow(24.dp, RoundedCornerShape(32.dp), spotColor = GratiaTheme.colors.accent.copy(alpha = 0.15f), ambientColor = GratiaTheme.colors.accent.copy(alpha = 0.05f))
                             .liquidGlass(
                                 shape = RoundedCornerShape(32.dp),
                                 backgroundColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
@@ -106,7 +120,7 @@ fun GratiaAppRoot() {
                                 .width(tabWidth)
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(28.dp))
-                                .background(GratiaTheme.colors.maroon.copy(alpha = 0.08f))
+                                .background(GratiaTheme.colors.accent.copy(alpha = 0.08f))
                         )
 
                         // Tab icons and labels
@@ -137,7 +151,7 @@ fun GratiaAppRoot() {
                                         imageVector = if (selected) screen.selectedIcon else screen.icon,
                                         contentDescription = screen.label,
                                         modifier = Modifier.size(24.dp),
-                                        tint = if (selected) GratiaTheme.colors.cherryRed else GratiaTheme.colors.textSecondary
+                                        tint = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
@@ -145,7 +159,7 @@ fun GratiaAppRoot() {
                                         fontSize = 10.sp,
                                         fontFamily = Inter,
                                         fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
-                                        color = if (selected) GratiaTheme.colors.cherryRed else GratiaTheme.colors.textSecondary,
+                                        color = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
                                         maxLines = 1
                                     )
                                 }
@@ -163,8 +177,16 @@ fun GratiaAppRoot() {
                 exitTransition = { fadeOut(animationSpec = tween(200)) },
             ) {
                 composable(Screen.Home.route) {
+                    val scope = rememberCoroutineScope()
                     HomeScreen(
                         playerViewModel = playerViewModel,
+                        isDark = isDark,
+                        onToggleTheme = {
+                            scope.launch {
+                                val nextTheme = if (isDark) com.gratia.music.data.ThemeOption.LIGHT else com.gratia.music.data.ThemeOption.DARK
+                                settingsDataStore.setThemeOption(nextTheme)
+                            }
+                        },
                         onNavigateToUpload = { navController.navigate("upload") },
                         onNavigateToProfile = { navController.navigate("profile") },
                         onNavigateToSettings = { navController.navigate("settings") }
@@ -173,10 +195,10 @@ fun GratiaAppRoot() {
                 composable(Screen.Search.route) {
                     SearchScreen(playerViewModel = playerViewModel)
                 }
-                composable(Screen.Radio.route) {
-                    RadioScreen(playerViewModel = playerViewModel)
+                composable(Screen.Library.route) {
+                    LibraryScreen(playerViewModel = playerViewModel)
                 }
-                composable(Screen.Favorites.route) {
+                composable("favorites") { // Favorites is still accessible from Home
                     FavoritesScreen(playerViewModel = playerViewModel)
                 }
                 composable(Screen.Playlists.route) {
@@ -226,6 +248,50 @@ fun GratiaAppRoot() {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateToAbout = { navController.navigate("about") }
+                    )
+                }
+                composable(
+                    "album/{albumName}",
+                    arguments = listOf(navArgument("albumName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("albumName") ?: ""
+                    AlbumDetailScreen(
+                        albumName = name,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    "artist/{artistName}",
+                    arguments = listOf(navArgument("artistName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("artistName") ?: ""
+                    ArtistDetailScreen(
+                        artistName = name,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    "folder/{folderName}",
+                    arguments = listOf(navArgument("folderName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("folderName") ?: ""
+                    FolderDetailScreen(
+                        folderName = name,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    "playlist/{playlistId}",
+                    arguments = listOf(navArgument("playlistId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getString("playlistId") ?: ""
+                    PlaylistDetailScreen(
+                        playlistId = id,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable("about") {
@@ -287,7 +353,7 @@ fun GratiaAppRoot() {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(GratiaTheme.colors.cotton),
+                    .background(GratiaTheme.colors.background),
                 contentAlignment = Alignment.Center
             ) {
                 val logoScale by animateFloatAsState(
@@ -306,4 +372,5 @@ fun GratiaAppRoot() {
             }
         }
     }
+}
 }

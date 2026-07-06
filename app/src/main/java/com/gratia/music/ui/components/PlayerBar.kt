@@ -40,19 +40,21 @@ fun PlayerBar(playerViewModel: PlayerViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .liquidGlass(
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                backgroundColor = GratiaTheme.colors.miniPlayerSurface.copy(alpha = 0.95f),
+                shape = RoundedCornerShape(32.dp),
+                backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.95f),
                 borderColorStart = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.2f),
                 borderColorEnd = androidx.compose.ui.graphics.Color.Transparent
             )
+            .clip(RoundedCornerShape(32.dp))
     ) {
         // Progress bar at top — Cherry Red
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier.fillMaxWidth().height(2.dp),
-            color = GratiaTheme.colors.cherryRed,
-            trackColor = GratiaTheme.colors.noirBlack.copy(alpha = 0.3f),
+            color = GratiaTheme.colors.accent,
+            trackColor = GratiaTheme.colors.textPrimary.copy(alpha = 0.3f),
         )
 
         // Main player row
@@ -82,7 +84,7 @@ fun PlayerBar(playerViewModel: PlayerViewModel) {
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
-                    color = GratiaTheme.colors.textOnDark,
+                    color = GratiaTheme.colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -90,7 +92,7 @@ fun PlayerBar(playerViewModel: PlayerViewModel) {
                     song.artist,
                     fontFamily = Inter,
                     fontSize = 11.sp,
-                    color = GratiaTheme.colors.textOnDarkSecondary,
+                    color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -98,7 +100,7 @@ fun PlayerBar(playerViewModel: PlayerViewModel) {
 
             // Controls
             IconButton(onClick = { playerViewModel.prevSong() }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.SkipPrevious, null, tint = GratiaTheme.colors.textOnDarkSecondary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.SkipPrevious, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
             }
 
             IconButton(
@@ -106,18 +108,18 @@ fun PlayerBar(playerViewModel: PlayerViewModel) {
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(GratiaTheme.colors.maroon)
+                    .background(GratiaTheme.colors.accent)
             ) {
                 Icon(
                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = GratiaTheme.colors.cotton,
+                    tint = GratiaTheme.colors.background,
                     modifier = Modifier.size(20.dp)
                 )
             }
 
             IconButton(onClick = { playerViewModel.nextSong() }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.SkipNext, null, tint = GratiaTheme.colors.textOnDarkSecondary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.SkipNext, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
             }
         }
     }

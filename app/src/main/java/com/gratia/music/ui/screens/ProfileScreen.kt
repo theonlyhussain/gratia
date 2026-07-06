@@ -52,6 +52,16 @@ fun ProfileScreen(
     val listeningRepo = remember { ListeningEventRepository(GratiaApp.instance.database.listeningEventDao()) }
     val songCount by songRepo.getSongCount().collectAsState(initial = 0)
     val favCount by songRepo.getFavoritesCount().collectAsState(initial = 0)
+    
+    // Additional Stats
+    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
+    val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
+    val playlists by playlistDao.getAllPlaylists().collectAsState(initial = emptyList())
+    
+    val albumCount = remember(allSongs) { allSongs.mapNotNull { it.album }.distinct().size }
+    val artistCount = remember(allSongs) { allSongs.map { it.artist }.distinct().size }
+    val totalListenTimeMs = remember(allSongs) { allSongs.sumOf { it.totalListenTime ?: 0L } }
+    val listenMinutes = (totalListenTimeMs / (1000 * 60)).toInt()
 
     // Profile state
     val profileFlow by profileDao.getProfile().collectAsState(initial = null)
@@ -116,7 +126,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.cotton)
+            .background(GratiaTheme.colors.background)
             .verticalScroll(rememberScrollState())
     ) {
         // Header
@@ -133,9 +143,9 @@ fun ProfileScreen(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(GratiaTheme.colors.surfaceCard)
+                    .background(GratiaTheme.colors.surface)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", Modifier.size(16.dp), tint = GratiaTheme.colors.textMuted)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", Modifier.size(16.dp), tint = GratiaTheme.colors.textSecondary)
             }
             Text("Profile", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = GratiaTheme.colors.textPrimary)
         }
@@ -164,15 +174,15 @@ fun ProfileScreen(
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    GratiaTheme.colors.noirBlack,
-                                    GratiaTheme.colors.maroon,
-                                    GratiaTheme.colors.cherryRed.copy(alpha = 0.8f)
+                                    GratiaTheme.colors.textPrimary,
+                                    GratiaTheme.colors.accent,
+                                    GratiaTheme.colors.accent.copy(alpha = 0.8f)
                                 )
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.CameraAlt, null, tint = GratiaTheme.colors.cotton.copy(alpha = 0.4f), modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.CameraAlt, null, tint = GratiaTheme.colors.background.copy(alpha = 0.4f), modifier = Modifier.size(28.dp))
                 }
             }
         }
@@ -189,7 +199,7 @@ fun ProfileScreen(
                     .size(80.dp)
                     .clickable { avatarPicker.launch(arrayOf("image/*")) },
                 shape = CircleShape,
-                color = GratiaTheme.colors.surfaceCard,
+                color = GratiaTheme.colors.surface,
                 shadowElevation = 4.dp,
             ) {
                 if (avatarPath != null && File(avatarPath!!).exists()) {
@@ -206,9 +216,26 @@ fun ProfileScreen(
                             fontFamily = SpaceGrotesk,
                             fontWeight = FontWeight.Bold,
                             fontSize = 32.sp,
-                            color = GratiaTheme.colors.maroon
+                            color = GratiaTheme.colors.accent
                         )
                     }
+                }
+            }
+        }
+
+        // Remove picture option
+        if (avatarPath != null) {
+            Column(
+                modifier = Modifier.fillMaxWidth().offset(y = (-24).dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TextButton(
+                    onClick = {
+                        avatarPath = null
+                        hasChanges = true
+                    }
+                ) {
+                    Text("Remove Picture", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.error)
                 }
             }
         }
@@ -221,7 +248,7 @@ fun ProfileScreen(
                 .offset(y = (-16).dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Display Name", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+            Text("Display Name", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
             Spacer(Modifier.height(6.dp))
             OutlinedTextField(
                 value = displayName,
@@ -240,13 +267,13 @@ fun ProfileScreen(
                     fontSize = 18.sp
                 ),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GratiaTheme.colors.cherryRed.copy(alpha = 0.5f),
+                    focusedBorderColor = GratiaTheme.colors.accent.copy(alpha = 0.5f),
                     unfocusedBorderColor = GratiaTheme.colors.surfaceHover,
-                    focusedContainerColor = GratiaTheme.colors.surfaceCard,
-                    unfocusedContainerColor = GratiaTheme.colors.surfaceCard,
+                    focusedContainerColor = GratiaTheme.colors.surface,
+                    unfocusedContainerColor = GratiaTheme.colors.surface,
                     focusedTextColor = GratiaTheme.colors.textPrimary,
                     unfocusedTextColor = GratiaTheme.colors.textPrimary,
-                    cursorColor = GratiaTheme.colors.cherryRed,
+                    cursorColor = GratiaTheme.colors.accent,
                 )
             )
 
@@ -275,10 +302,10 @@ fun ProfileScreen(
                 enabled = hasChanges && displayName.isNotBlank(),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = GratiaTheme.colors.maroon,
-                    contentColor = GratiaTheme.colors.cotton,
+                    containerColor = GratiaTheme.colors.accent,
+                    contentColor = GratiaTheme.colors.background,
                     disabledContainerColor = GratiaTheme.colors.surfaceHover,
-                    disabledContentColor = GratiaTheme.colors.textMuted
+                    disabledContentColor = GratiaTheme.colors.textSecondary
                 ),
                 modifier = Modifier.fillMaxWidth(0.6f).height(44.dp)
             ) {
@@ -297,7 +324,7 @@ fun ProfileScreen(
         Surface(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             shape = RoundedCornerShape(12.dp),
-            color = GratiaTheme.colors.surfaceCard,
+            color = GratiaTheme.colors.surface,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -314,10 +341,14 @@ fun ProfileScreen(
         // Settings sections
         ProfileSection(title = "LIBRARY") {
             ProfileItem(icon = Icons.Default.Storage, label = "Storage", detail = "Local Device", onClick = onNavigateToStorage)
-            ProfileItem(icon = Icons.Default.LibraryMusic, label = "Library", detail = "$songCount songs")
+            ProfileItem(icon = Icons.Default.LibraryMusic, label = "Songs", detail = "$songCount tracks")
+            ProfileItem(icon = Icons.Default.Album, label = "Albums", detail = "$albumCount albums")
+            ProfileItem(icon = Icons.Default.Person, label = "Artists", detail = "$artistCount artists")
+            ProfileItem(icon = Icons.Default.QueueMusic, label = "Playlists", detail = "${playlists.size} playlists")
         }
 
         ProfileSection(title = "PLAYBACK") {
+            ProfileItem(icon = Icons.Default.Headset, label = "Total Listening Time", detail = "$listenMinutes minutes")
             ProfileItem(icon = Icons.Default.HighQuality, label = "Audio Quality", detail = "Original quality preserved")
             ProfileItem(icon = Icons.Default.Lyrics, label = "Lyrics", detail = "Plain & synced support")
         }
@@ -336,8 +367,8 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Gratia", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GratiaTheme.colors.cherryRed)
-            Text("Your personal music library", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+            Text("Gratia", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GratiaTheme.colors.accent)
+            Text("Your personal music library", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
         }
 
         Spacer(Modifier.height(40.dp))
@@ -348,7 +379,7 @@ fun ProfileScreen(
             onDismissRequest = { showClearHistoryDialog = false },
             title = { Text("Clear listening history?", color = GratiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
             text = { Text("This removes local listening stats from this device.", color = GratiaTheme.colors.textSecondary) },
-            containerColor = GratiaTheme.colors.surfaceCard,
+            containerColor = GratiaTheme.colors.surface,
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch(Dispatchers.IO) {
@@ -372,7 +403,7 @@ fun ProfileScreen(
 private fun StatItem(count: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(count, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GratiaTheme.colors.textPrimary)
-        Text(label, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+        Text(label, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
     }
 }
 
@@ -380,13 +411,13 @@ private fun StatItem(count: String, label: String) {
 private fun ProfileSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Text(
         title, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
-        color = GratiaTheme.colors.textMuted, letterSpacing = 1.sp,
+        color = GratiaTheme.colors.textSecondary, letterSpacing = 1.sp,
         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
     )
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         shape = RoundedCornerShape(12.dp),
-        color = GratiaTheme.colors.surfaceCard,
+        color = GratiaTheme.colors.surface,
     ) {
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
             content()
@@ -409,16 +440,16 @@ private fun ProfileItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = GratiaTheme.colors.textMuted, modifier = Modifier.size(20.dp))
+        Icon(icon, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(label, fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textPrimary)
             if (detail != null) {
-                Text(detail, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+                Text(detail, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
             }
         }
         if (onClick != null) {
-            Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textInactive, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
         }
     }
 }

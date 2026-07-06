@@ -361,8 +361,8 @@ fun UploadScreen(
     val canSubmit = !uploading
 
     if (!formLoaded) {
-        Box(modifier = Modifier.fillMaxSize().background(GratiaTheme.colors.baseDark), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = GratiaTheme.colors.accentPrimary)
+        Box(modifier = Modifier.fillMaxSize().background(GratiaTheme.colors.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = GratiaTheme.colors.accent)
         }
         return
     }
@@ -370,7 +370,7 @@ fun UploadScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.cotton)
+            .background(GratiaTheme.colors.background)
             .verticalScroll(rememberScrollState())
     ) {
         // Header
@@ -385,7 +385,7 @@ fun UploadScreen(
                     .size(36.dp)
                     .border(1.dp, GratiaTheme.colors.glassBorder, CircleShape)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(16.dp), tint = GratiaTheme.colors.textMuted)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(16.dp), tint = GratiaTheme.colors.textSecondary)
             }
             Text(
                 if (isEditMode) "Edit Song" else "Upload to ",
@@ -400,7 +400,7 @@ fun UploadScreen(
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 18.sp,
-                    color = GratiaTheme.colors.accentPrimary
+                    color = GratiaTheme.colors.accent
                 )
             }
         }
@@ -426,12 +426,12 @@ fun UploadScreen(
                             .clip(RoundedCornerShape(12.dp))
                             .clickable { filePicker.launch(arrayOf("audio/*", "video/*")) },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (selectedUri != null) GratiaTheme.colors.accentPrimary.copy(alpha = 0.05f)
-                        else GratiaTheme.colors.surfaceCard,
+                        color = if (selectedUri != null) GratiaTheme.colors.accent.copy(alpha = 0.05f)
+                        else GratiaTheme.colors.surface,
                         border = ButtonDefaults.outlinedButtonBorder.copy(
                             brush = androidx.compose.ui.graphics.SolidColor(
                                 if (validationErrors.containsKey("file")) GratiaTheme.colors.error
-                                else if (selectedUri != null) GratiaTheme.colors.accentPrimary.copy(alpha = 0.3f)
+                                else if (selectedUri != null) GratiaTheme.colors.accent.copy(alpha = 0.3f)
                                 else GratiaTheme.colors.glassBorder
                             )
                         )
@@ -444,30 +444,30 @@ fun UploadScreen(
                                 if (selectedUri != null) Icons.Default.AudioFile else Icons.Default.Upload,
                                 contentDescription = null,
                                 modifier = Modifier.size(24.dp),
-                                tint = if (selectedUri != null) GratiaTheme.colors.accentPrimary else GratiaTheme.colors.textMuted
+                                tint = if (selectedUri != null) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
                             )
                             Spacer(Modifier.height(12.dp))
                             if (selectedUri != null) {
                                 Text(fileName, fontFamily = Inter, fontSize = 13.sp, color = GratiaTheme.colors.textPrimary)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(fileSize, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+                                    Text(fileSize, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
                                     if (detectedDurationMs > 0) {
-                                        Text("·", fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
-                                        Text(formatDuration(detectedDurationMs), fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+                                        Text("·", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
+                                        Text(formatDuration(detectedDurationMs), fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
                                     }
                                     audioFormat?.let {
-                                        Text("·", fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
-                                        Text(it.uppercase(), fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.accentPrimary)
+                                        Text("·", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
+                                        Text(it.uppercase(), fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.accent)
                                     }
                                 }
                                 if (audioBitrate != null) {
-                                    Text("${audioBitrate} kbps", fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textMuted)
+                                    Text("${audioBitrate} kbps", fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textSecondary)
                                 }
                                 Spacer(Modifier.height(8.dp))
-                                Text("Tap to change file", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+                                Text("Tap to change file", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
                             } else {
                                 Text("Tap to select an audio file", fontFamily = Inter, fontSize = 13.sp, color = GratiaTheme.colors.textSecondary)
-                                Text("mp3, m4a, wav, ogg, aac, flac", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+                                Text("mp3, m4a, wav, ogg, aac, flac", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
                             }
                         }
                     }
@@ -480,20 +480,20 @@ fun UploadScreen(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        color = GratiaTheme.colors.surfaceCard,
+                        color = GratiaTheme.colors.surface,
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(Icons.Default.AudioFile, null, tint = GratiaTheme.colors.accentPrimary, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.AudioFile, null, tint = GratiaTheme.colors.accent, modifier = Modifier.size(20.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(fileName.ifBlank { "Audio file" }, fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textPrimary)
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    if (fileSize.isNotBlank()) Text(fileSize, fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textMuted)
-                                    audioFormat?.let { Text(it.uppercase(), fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.accentPrimary) }
-                                    audioBitrate?.let { Text("${it} kbps", fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textMuted) }
+                                    if (fileSize.isNotBlank()) Text(fileSize, fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textSecondary)
+                                    audioFormat?.let { Text(it.uppercase(), fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.accent) }
+                                    audioBitrate?.let { Text("${it} kbps", fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textSecondary) }
                                 }
                             }
                         }
@@ -525,10 +525,10 @@ fun UploadScreen(
                         if (hasEmbeddedCover && coverSource == "embedded") {
                             Text("Cover found in audio file", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.success)
                         } else if (coverArtPath != null) {
-                            Text("Cover image selected", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.accentPrimary)
+                            Text("Cover image selected", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.accent)
                         } else {
-                            Text("No cover found", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textMuted)
-                            Text("Add an optional cover image.", fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textInactive)
+                            Text("No cover found", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textSecondary)
+                            Text("Add an optional cover image.", fontFamily = Inter, fontSize = 10.sp, color = GratiaTheme.colors.textSecondary)
                         }
                         Spacer(Modifier.height(8.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -537,11 +537,11 @@ fun UploadScreen(
                                     coverPicker.launch(arrayOf("image/*"))
                                 },
                                 shape = RoundedCornerShape(8.dp),
-                                color = GratiaTheme.colors.surfaceCard,
+                                color = GratiaTheme.colors.surface,
                             ) {
                                 Text(
                                     if (coverArtPath != null) "Change cover" else "Add cover image",
-                                    fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.accentPrimary,
+                                    fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.accent,
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                 )
                             }
@@ -553,7 +553,7 @@ fun UploadScreen(
                                         selectedCoverUri = null
                                     },
                                     shape = RoundedCornerShape(8.dp),
-                                    color = GratiaTheme.colors.surfaceCard,
+                                    color = GratiaTheme.colors.surface,
                                 ) {
                                     Text(
                                         "Remove",
@@ -649,7 +649,7 @@ fun UploadScreen(
                     text = "Paste plain lyrics, LRC, Enhanced LRC, or JSON word lyrics",
                     fontFamily = Inter,
                     fontSize = 11.sp,
-                    color = GratiaTheme.colors.textMuted
+                    color = GratiaTheme.colors.textSecondary
                 )
                 Spacer(Modifier.height(8.dp))
 
@@ -659,20 +659,20 @@ fun UploadScreen(
                     placeholder = {
                         Text(
                             text = "Paste lyrics here...",
-                            color = GratiaTheme.colors.textMuted,
+                            color = GratiaTheme.colors.textSecondary,
                             fontSize = 12.sp
                         )
                     },
                     modifier = Modifier.fillMaxWidth().height(180.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GratiaTheme.colors.accentPrimary.copy(alpha = 0.4f),
+                        focusedBorderColor = GratiaTheme.colors.accent.copy(alpha = 0.4f),
                         unfocusedBorderColor = GratiaTheme.colors.glassBorder,
-                        focusedContainerColor = GratiaTheme.colors.surfaceCard,
-                        unfocusedContainerColor = GratiaTheme.colors.surfaceCard,
+                        focusedContainerColor = GratiaTheme.colors.surface,
+                        unfocusedContainerColor = GratiaTheme.colors.surface,
                         focusedTextColor = GratiaTheme.colors.textPrimary,
                         unfocusedTextColor = GratiaTheme.colors.textPrimary,
-                        cursorColor = GratiaTheme.colors.accentPrimary,
+                        cursorColor = GratiaTheme.colors.accent,
                     ),
                     textStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontFamily = Inter)
                 )
@@ -695,7 +695,7 @@ fun UploadScreen(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    color = GratiaTheme.colors.surfaceCard,
+                    color = GratiaTheme.colors.surface,
                     border = ButtonDefaults.outlinedButtonBorder.copy(
                         brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
                     )
@@ -713,7 +713,7 @@ fun UploadScreen(
                             text = "Plain:\nFirst line\nSecond line\n\nLRC:\n[00:05.00] First line\n\nEnhanced LRC:\n[00:05.00] <00:05.00> First <00:05.40> line",
                             fontFamily = Inter,
                             fontSize = 10.sp,
-                            color = GratiaTheme.colors.textMuted,
+                            color = GratiaTheme.colors.textSecondary,
                             lineHeight = 14.sp
                         )
                     }
@@ -758,14 +758,14 @@ fun UploadScreen(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = GratiaTheme.colors.accentPrimary,
-                        contentColor = GratiaTheme.colors.baseDark,
+                        containerColor = GratiaTheme.colors.accent,
+                        contentColor = GratiaTheme.colors.background,
                         disabledContainerColor = GratiaTheme.colors.surfaceHover,
-                        disabledContentColor = GratiaTheme.colors.textMuted
+                        disabledContentColor = GratiaTheme.colors.textSecondary
                     )
                 ) {
                     if (uploading) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = GratiaTheme.colors.baseDark)
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = GratiaTheme.colors.background)
                         Spacer(Modifier.width(8.dp))
                         Text("Saving…", fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     } else {
@@ -787,18 +787,18 @@ private fun GratiaTextField(value: String, onValueChange: (String) -> Unit, labe
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholder, color = GratiaTheme.colors.textMuted, fontSize = 13.sp) },
+        placeholder = { Text(placeholder, color = GratiaTheme.colors.textSecondary, fontSize = 13.sp) },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = if (errorMessage != null) GratiaTheme.colors.error else GratiaTheme.colors.accentPrimary.copy(alpha = 0.4f),
+            focusedBorderColor = if (errorMessage != null) GratiaTheme.colors.error else GratiaTheme.colors.accent.copy(alpha = 0.4f),
             unfocusedBorderColor = if (errorMessage != null) GratiaTheme.colors.error else GratiaTheme.colors.glassBorder,
             focusedContainerColor = androidx.compose.ui.graphics.Color.White,
             unfocusedContainerColor = androidx.compose.ui.graphics.Color.White,
             focusedTextColor = GratiaTheme.colors.textPrimary,
             unfocusedTextColor = GratiaTheme.colors.textPrimary,
-            cursorColor = GratiaTheme.colors.accentPrimary,
+            cursorColor = GratiaTheme.colors.accent,
         ),
         textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, fontFamily = Inter)
     )
@@ -813,10 +813,10 @@ private fun GratiaChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = if (selected) GratiaTheme.colors.accentPrimary.copy(alpha = 0.2f) else GratiaTheme.colors.surfaceCard,
+        color = if (selected) GratiaTheme.colors.accent.copy(alpha = 0.2f) else GratiaTheme.colors.surface,
         border = ButtonDefaults.outlinedButtonBorder.copy(
             brush = androidx.compose.ui.graphics.SolidColor(
-                if (selected) GratiaTheme.colors.accentPrimary.copy(alpha = 0.4f) else GratiaTheme.colors.glassBorder
+                if (selected) GratiaTheme.colors.accent.copy(alpha = 0.4f) else GratiaTheme.colors.glassBorder
             )
         )
     ) {
@@ -824,7 +824,7 @@ private fun GratiaChip(text: String, selected: Boolean, onClick: () -> Unit) {
             text,
             fontFamily = Inter,
             fontSize = 11.sp,
-            color = if (selected) GratiaTheme.colors.accentPrimary else GratiaTheme.colors.textSecondary,
+            color = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
