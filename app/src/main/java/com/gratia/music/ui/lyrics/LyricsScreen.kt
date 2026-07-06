@@ -180,7 +180,7 @@ fun LyricsScreen(
                     Icon(
                         imageVector = if (song.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = if (song.isFavorite) GratiaTheme.colors.cherryRed else Color.White.copy(alpha = 0.5f),
+                        tint = if (song.isFavorite) GratiaTheme.colors.accent else Color.White.copy(alpha = 0.5f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -263,7 +263,7 @@ private fun CompactControlsPanel(
             onValueChange = { playerViewModel.seekTo((it * durationMs).toLong()) },
             colors = SliderDefaults.colors(
                 thumbColor = Color.White,
-                activeTrackColor = GratiaTheme.colors.cherryRed,
+                activeTrackColor = GratiaTheme.colors.accent,
                 inactiveTrackColor = Color.White.copy(alpha = 0.15f)
             ),
             modifier = Modifier

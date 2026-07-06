@@ -38,7 +38,7 @@ fun MusicCard(
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = GratiaTheme.colors.surfaceCard,
+        color = GratiaTheme.colors.surface,
         border = ButtonDefaults.outlinedButtonBorder.copy(
             brush = androidx.compose.ui.graphics.SolidColor(
                 if (isActive) GratiaTheme.colors.glassBorder else androidx.compose.ui.graphics.Color.Transparent
@@ -71,13 +71,13 @@ fun MusicCard(
                             .padding(6.dp)
                             .size(36.dp)
                             .clip(CircleShape)
-                            .background(GratiaTheme.colors.accentPrimary),
+                            .background(GratiaTheme.colors.accent),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = "Play",
-                            tint = GratiaTheme.colors.cotton,
+                            tint = GratiaTheme.colors.background,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -91,7 +91,7 @@ fun MusicCard(
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
-                color = if (isActive) GratiaTheme.colors.accentPrimary else GratiaTheme.colors.textPrimary,
+                color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

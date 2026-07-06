@@ -38,7 +38,7 @@ fun AboutScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.cotton)
+            .background(GratiaTheme.colors.background)
             .statusBarsPadding()
     ) {
         // Header
@@ -57,7 +57,7 @@ fun AboutScreen(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back",
                     modifier = Modifier.size(16.dp),
-                    tint = GratiaTheme.colors.textMuted
+                    tint = GratiaTheme.colors.textSecondary
                 )
             }
             Text(
@@ -95,14 +95,14 @@ fun AboutScreen(
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Bold,
                         fontSize = 28.sp,
-                        color = GratiaTheme.colors.cherryRed
+                        color = GratiaTheme.colors.accent
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = "Version 0.1.0-alpha",
                         fontFamily = Inter,
                         fontSize = 12.sp,
-                        color = GratiaTheme.colors.textMuted
+                        color = GratiaTheme.colors.textSecondary
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
@@ -164,7 +164,7 @@ fun AboutScreen(
                             imageVector = Icons.Default.Launch,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = GratiaTheme.colors.textMuted
+                            tint = GratiaTheme.colors.textSecondary
                         )
                     }
                 }
@@ -191,7 +191,7 @@ fun AboutScreen(
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
-                        tint = GratiaTheme.colors.cherryRed,
+                        tint = GratiaTheme.colors.accent,
                         modifier = Modifier.size(20.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -206,7 +206,7 @@ fun AboutScreen(
                             text = "Legal notices, code attributions, and disclaimers",
                             fontFamily = Inter,
                             fontSize = 11.sp,
-                            color = GratiaTheme.colors.textMuted
+                            color = GratiaTheme.colors.textSecondary
                         )
                     }
                 }

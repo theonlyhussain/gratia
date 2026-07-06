@@ -31,7 +31,7 @@ fun StorageScreen(onNavigateBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.cotton)
+            .background(GratiaTheme.colors.background)
             .verticalScroll(rememberScrollState())
     ) {
         // Header
@@ -45,13 +45,13 @@ fun StorageScreen(onNavigateBack: () -> Unit) {
         ) {
             IconButton(
                 onClick = onNavigateBack,
-                modifier = Modifier.size(36.dp).clip(CircleShape).background(GratiaTheme.colors.surfaceCard)
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(GratiaTheme.colors.surface)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", Modifier.size(16.dp), tint = GratiaTheme.colors.textMuted)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", Modifier.size(16.dp), tint = GratiaTheme.colors.textSecondary)
             }
             Column {
                 Text("Music Storage", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = GratiaTheme.colors.textPrimary)
-                Text("Choose where Gratia keeps your music.", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textMuted)
+                Text("Choose where Gratia keeps your music.", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textSecondary)
             }
         }
 
@@ -90,7 +90,7 @@ fun StorageScreen(onNavigateBack: () -> Unit) {
             title = "Advanced",
             subtitle = "Not configured",
             isActive = false,
-            accentColor = GratiaTheme.colors.textMuted,
+            accentColor = GratiaTheme.colors.textSecondary,
             onClick = { showCloudDialog = "Advanced storage" }
         )
 
@@ -101,7 +101,7 @@ fun StorageScreen(onNavigateBack: () -> Unit) {
     if (showCloudDialog != null) {
         AlertDialog(
             onDismissRequest = { showCloudDialog = null },
-            containerColor = GratiaTheme.colors.surfaceCard,
+            containerColor = GratiaTheme.colors.surface,
             title = {
                 Text("$showCloudDialog", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary)
             },
@@ -115,7 +115,7 @@ fun StorageScreen(onNavigateBack: () -> Unit) {
             },
             confirmButton = {
                 TextButton(onClick = { showCloudDialog = null }) {
-                    Text("OK", color = GratiaTheme.colors.cherryRed, fontFamily = Inter)
+                    Text("OK", color = GratiaTheme.colors.accent, fontFamily = Inter)
                 }
             }
         )
@@ -138,7 +138,7 @@ private fun StorageCard(
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = GratiaTheme.colors.surfaceCard,
+        color = GratiaTheme.colors.surface,
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -157,7 +157,7 @@ private fun StorageCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = GratiaTheme.colors.textPrimary)
-                Text(subtitle, fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textMuted)
+                Text(subtitle, fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textSecondary)
             }
 
             if (isActive) {
@@ -169,7 +169,7 @@ private fun StorageCard(
                         color = accentColor, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
                 }
             } else {
-                Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textInactive, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
             }
         }
     }

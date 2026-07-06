@@ -5,64 +5,68 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /**
- * Gratia Design System — Warm Premium Color Palette
- *
- * Cotton:      #EDEBDE  — main background for normal screens
- * Cherry Red:  #810100  — important accents (active tab, play button, progress)
- * Maroon:      #630102  — strong surfaces (bottom nav, mini-player, buttons)
- * Noir Black:  #1B1716  — main text and deep dark surfaces
- *
- * Design: warm, premium, vintage, music-first, soft but bold.
+ * Gratia Design System - Light (Cloudy) and Dark (Charcoal/Purple)
  */
 @Immutable
 data class GratiaColors(
+    val isDark: Boolean = false,
+    
     // Main backgrounds
-    val cotton: Color = Color(0xFFEDEBDE),       // Light warm background
-    val noirBlack: Color = Color(0xFF1B1716),     // Deep dark text / surfaces
-    val cherryRed: Color = Color(0xFF810100),     // Primary accent
-    val maroon: Color = Color(0xFF630102),        // Strong accent / surfaces
-
-    // Derived — backwards-compatible property names
-    val baseDark: Color = cotton,                 // Main screen background
-    val baseBlack: Color = noirBlack,             // Deepest dark
-
-    // Surfaces
-    val surfaceCard: Color = Color(0xFFE2DFD2),   // Card surface (warm off-white)
-    val surfaceHover: Color = Color(0xFFD8D5C8),  // Hover/pressed surface
-
+    val background: Color,
+    val surface: Color,
+    val surfaceHover: Color,
+    
     // Accents
-    val accentPrimary: Color = cherryRed,          // Primary accent
-    val accentSecondary: Color = maroon,           // Secondary accent
-    val accentWarm: Color = Color(0xFFA65D03),     // Warm accent for special elements
-
-    // Text — on Cotton background
-    val textPrimary: Color = noirBlack,            // Main text
-    val textSecondary: Color = Color(0xFF4A4440),  // Secondary text
-    val textMuted: Color = Color(0xFF8A8478),      // Muted/hint text
-    val textInactive: Color = Color(0xFFB5AFA6),   // Inactive/disabled text
-
-    // Text — on dark/player surfaces
-    val textOnDark: Color = Color(0xFFF5F3EB),     // Text on dark backgrounds
-    val textOnDarkSecondary: Color = Color(0xFFBDB8AB),
-
-    // Glass — for overlays on dark surfaces (player/lyrics)
-    val glassBg: Color = Color(0xB31B1716),        // 70% Noir
-    val glassBorder: Color = Color(0x26EDEBDE),    // 15% Cotton
-    val glassLight: Color = Color(0x0DEDEBDE),     // 5% Cotton
-
-    // Bottom nav / mini-player surface
-    val navSurface: Color = Color(0xFF231E1C),     // Noir + Maroon mix
-    val miniPlayerSurface: Color = Color(0xFF2D1E1D), // Slightly warmer dark
-
-    // Player fallback gradient colors
-    val playerGradientStart: Color = noirBlack,
-    val playerGradientMid: Color = maroon,
-    val playerGradientEnd: Color = cherryRed,
-
+    val accent: Color,
+    val accentGlow: Color,
+    
+    // Text
+    val textPrimary: Color,
+    val textSecondary: Color,
+    
+    // Glass
+    val glassBg: Color,
+    val glassBorder: Color,
+    
     // Semantic
-    val success: Color = Color(0xFF2E7D32),        // Green for success
-    val error: Color = Color(0xFFC62828),           // Red for errors
-    val warning: Color = Color(0xFFE65100),         // Orange for warnings
+    val error: Color,
+    val success: Color,
+    val warning: Color,
+    val accentWarm: Color
 )
 
-val LocalGratiaColors = staticCompositionLocalOf { GratiaColors() }
+val lightGratiaColors = GratiaColors(
+    isDark = false,
+    background = Color(0xFFE6F7FF), // Cloudy blue
+    surface = Color(0xFFFFFFFF),    // Frosted glass white
+    surfaceHover = Color(0xFFF0F9FF),
+    accent = Color(0xFF4A90E2),     // Soft blue
+    accentGlow = Color(0x334A90E2),
+    textPrimary = Color(0xFF1A2D50),// Dark navy
+    textSecondary = Color(0xFF5A6D90),
+    glassBg = Color(0xB3FFFFFF),    // Semi-transparent white
+    glassBorder = Color(0x261A2D50),
+    error = Color(0xFFB00020),
+    success = Color(0xFF2E7D32),
+    warning = Color(0xFFE65100),
+    accentWarm = Color(0xFFA65D03)
+)
+
+val darkGratiaColors = GratiaColors(
+    isDark = true,
+    background = Color(0xFF121212), // Deep black
+    surface = Color(0xFF1E1E1E),    // Charcoal
+    surfaceHover = Color(0xFF2C2C2C),
+    accent = Color(0xFFBB86FC),     // Purple accent
+    accentGlow = Color(0x66BB86FC), // Purple glow
+    textPrimary = Color(0xFFFFFFFF),// White
+    textSecondary = Color(0xFFBDB8AB),
+    glassBg = Color(0xB31E1E1E),    // Semi-transparent charcoal
+    glassBorder = Color(0x26FFFFFF),
+    error = Color(0xFFCF6679),
+    success = Color(0xFF2E7D32),
+    warning = Color(0xFFE65100),
+    accentWarm = Color(0xFFA65D03)
+)
+
+val LocalGratiaColors = staticCompositionLocalOf { lightGratiaColors }

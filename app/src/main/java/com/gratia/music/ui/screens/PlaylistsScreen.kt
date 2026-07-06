@@ -2,9 +2,11 @@ package com.gratia.music.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -14,112 +16,199 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gratia.music.GratiaApp
+import com.gratia.music.data.model.PlaylistEntity
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import kotlinx.coroutines.launch
+import java.util.UUID
 
-/**
- * Playlists screen — shows empty state with guidance.
- * Real playlist creation is planned for a future update.
- */
 @Composable
 fun PlaylistsScreen() {
-    Column(
+    val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
+    val playlists by playlistDao.getAllPlaylists().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var showCreateDialog by remember { mutableStateOf(false) }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.cotton)
+            .background(GratiaTheme.colors.background)
     ) {
-        Text(
-            "Playlists",
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
-            color = GratiaTheme.colors.textPrimary,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
-        )
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Decorative icon
-            Surface(
-                modifier = Modifier.size(88.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = GratiaTheme.colors.surfaceCard,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(36.dp),
-                        tint = GratiaTheme.colors.textMuted
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(24.dp))
-
+        Column(modifier = Modifier.fillMaxSize()) {
             Text(
-                "No playlists yet",
-                fontFamily = Inter,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = GratiaTheme.colors.textSecondary,
-                textAlign = TextAlign.Center
+                "Playlists",
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold,
+                fontSize = 28.sp,
+                color = GratiaTheme.colors.textPrimary,
+                modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 8.dp)
             )
 
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "Create your first playlist to organize\nyour favorite songs",
-                fontFamily = Inter,
-                fontSize = 13.sp,
-                color = GratiaTheme.colors.textMuted,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-
-            Spacer(Modifier.height(28.dp))
-
-            // Coming soon badge
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = GratiaTheme.colors.cherryRed.copy(alpha = 0.08f),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            if (playlists.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = GratiaTheme.colors.cherryRed
-                    )
+                    Surface(
+                        modifier = Modifier.size(88.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        color = GratiaTheme.colors.surface,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.QueueMusic,
+                                contentDescription = null,
+                                modifier = Modifier.size(36.dp),
+                                tint = GratiaTheme.colors.textSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(24.dp))
                     Text(
-                        "Coming soon",
+                        "No playlists yet",
+                        fontFamily = Inter,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GratiaTheme.colors.textSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Create your first playlist to organize\nyour favorite songs",
                         fontFamily = Inter,
                         fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = GratiaTheme.colors.cherryRed
+                        color = GratiaTheme.colors.textSecondary,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
                     )
                 }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(playlists) { playlist ->
+                        PlaylistRow(playlist)
+                    }
+                }
             }
+        }
 
-            Spacer(Modifier.height(12.dp))
+        FloatingActionButton(
+            onClick = { showCreateDialog = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 100.dp, end = 24.dp),
+            containerColor = GratiaTheme.colors.accent,
+            contentColor = GratiaTheme.colors.background,
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Create Playlist")
+        }
 
-            Text(
-                "Start by uploading songs to your library",
-                fontFamily = Inter,
-                fontSize = 11.sp,
-                color = GratiaTheme.colors.textMuted,
-                textAlign = TextAlign.Center
+        if (showCreateDialog) {
+            CreatePlaylistDialog(
+                onDismiss = { showCreateDialog = false },
+                onCreate = { name ->
+                    scope.launch {
+                        playlistDao.insertPlaylist(
+                            PlaylistEntity(id = UUID.randomUUID().toString(), name = name, createdAt = System.currentTimeMillis())
+                        )
+                        showCreateDialog = false
+                    }
+                }
             )
         }
     }
+}
+
+@Composable
+fun PlaylistRow(playlist: PlaylistEntity) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = GratiaTheme.colors.surface
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(GratiaTheme.colors.surfaceHover, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.QueueMusic,
+                    contentDescription = null,
+                    tint = GratiaTheme.colors.textSecondary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = playlist.name,
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.sp,
+                    color = GratiaTheme.colors.textPrimary
+                )
+                Text(
+                    text = "Playlist",
+                    fontFamily = Inter,
+                    fontSize = 13.sp,
+                    color = GratiaTheme.colors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New Playlist", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Playlist Name") },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GratiaTheme.colors.accent,
+                    unfocusedBorderColor = GratiaTheme.colors.glassBorder,
+                    cursorColor = GratiaTheme.colors.accent
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (text.isNotBlank()) onCreate(text) },
+                colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.accent)
+            ) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
+            ) {
+                Text("Cancel")
+            }
+        },
+        containerColor = GratiaTheme.colors.surface,
+        textContentColor = GratiaTheme.colors.textSecondary
+    )
 }

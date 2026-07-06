@@ -40,7 +40,7 @@ fun ListeningCalendarPreview(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(GratiaTheme.colors.surfaceCard)
+            .background(GratiaTheme.colors.surface)
             .clickable { onPreviewClick() }
             .padding(16.dp)
     ) {
@@ -103,7 +103,7 @@ fun ListeningCalendarPreview(
                     ) {
                         Text(
                             text = dayName,
-                            color = if (intensity > 2) GratiaTheme.colors.textOnDark else GratiaTheme.colors.textPrimary,
+                            color = if (intensity > 2) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textPrimary,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.align(Alignment.Center)
@@ -129,11 +129,11 @@ fun getIntensityLevel(seconds: Long): Int {
 @Composable
 fun getCalendarColor(level: Int): Color {
     return when (level) {
-        0 -> GratiaTheme.colors.cotton.copy(alpha = 0.5f)
+        0 -> GratiaTheme.colors.background.copy(alpha = 0.5f)
         1 -> Color(0xFFDCA7A7) // pale warm red
-        2 -> GratiaTheme.colors.cherryRed.copy(alpha = 0.7f)
-        3 -> GratiaTheme.colors.cherryRed
-        4 -> GratiaTheme.colors.maroon
-        else -> GratiaTheme.colors.cotton
+        2 -> GratiaTheme.colors.accent.copy(alpha = 0.7f)
+        3 -> GratiaTheme.colors.accent
+        4 -> GratiaTheme.colors.accent
+        else -> GratiaTheme.colors.background
     }
 }

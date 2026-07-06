@@ -1,11 +1,11 @@
 package com.gratia.music.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.googlefonts.Font
@@ -32,23 +32,6 @@ val Inter = FontFamily(
     Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.SemiBold),
 )
 
-/**
- * Gratia warm premium color scheme.
- * Uses Cotton background with Noir text and Cherry/Maroon accents.
- */
-private val GratiaColorScheme = lightColorScheme(
-    primary = Color(0xFF810100),        // Cherry Red
-    onPrimary = Color(0xFFEDEBDE),      // Cotton
-    secondary = Color(0xFF630102),       // Maroon
-    background = Color(0xFFEDEBDE),     // Cotton
-    surface = Color(0xFFE2DFD2),        // Card surface
-    onBackground = Color(0xFF1B1716),   // Noir Black
-    onSurface = Color(0xFF1B1716),      // Noir Black
-    error = Color(0xFFC62828),
-)
-
-private val gratiaColors = GratiaColors()
-
 object GratiaTheme {
     val colors: GratiaColors
         @Composable
@@ -57,12 +40,49 @@ object GratiaTheme {
 }
 
 @Composable
-fun GratiaTheme(content: @Composable () -> Unit) {
+fun GratiaTheme(
+    isDark: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
+    val targetColors = if (isDark) darkGratiaColors else lightGratiaColors
+
+    val background by androidx.compose.animation.animateColorAsState(targetColors.background, label = "background")
+    val surface by androidx.compose.animation.animateColorAsState(targetColors.surface, label = "surface")
+    val surfaceHover by androidx.compose.animation.animateColorAsState(targetColors.surfaceHover, label = "surfaceHover")
+    val accent by androidx.compose.animation.animateColorAsState(targetColors.accent, label = "accent")
+    val accentGlow by androidx.compose.animation.animateColorAsState(targetColors.accentGlow, label = "accentGlow")
+    val textPrimary by androidx.compose.animation.animateColorAsState(targetColors.textPrimary, label = "textPrimary")
+    val textSecondary by androidx.compose.animation.animateColorAsState(targetColors.textSecondary, label = "textSecondary")
+    val glassBg by androidx.compose.animation.animateColorAsState(targetColors.glassBg, label = "glassBg")
+    val glassBorder by androidx.compose.animation.animateColorAsState(targetColors.glassBorder, label = "glassBorder")
+    val error by androidx.compose.animation.animateColorAsState(targetColors.error, label = "error")
+    val success by androidx.compose.animation.animateColorAsState(targetColors.success, label = "success")
+    val warning by androidx.compose.animation.animateColorAsState(targetColors.warning, label = "warning")
+    val accentWarm by androidx.compose.animation.animateColorAsState(targetColors.accentWarm, label = "accentWarm")
+
+    val animatedColors = GratiaColors(
+        isDark = isDark,
+        background = background,
+        surface = surface,
+        surfaceHover = surfaceHover,
+        accent = accent,
+        accentGlow = accentGlow,
+        textPrimary = textPrimary,
+        textSecondary = textSecondary,
+        glassBg = glassBg,
+        glassBorder = glassBorder,
+        error = error,
+        success = success,
+        warning = warning,
+        accentWarm = accentWarm
+    )
+
     CompositionLocalProvider(
-        LocalGratiaColors provides gratiaColors
+        LocalGratiaColors provides animatedColors
     ) {
+        // We still provide MaterialTheme for standard components that rely on it
         MaterialTheme(
-            colorScheme = GratiaColorScheme,
+            colorScheme = if (isDark) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme(),
             content = content
         )
     }

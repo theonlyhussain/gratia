@@ -44,8 +44,8 @@ fun CoverArtFallback(
                 Brush.linearGradient(
                     colors = listOf(
                         accentColor.copy(alpha = 0.4f),
-                        GratiaTheme.colors.maroon.copy(alpha = 0.3f),
-                        GratiaTheme.colors.noirBlack.copy(alpha = 0.8f)
+                        GratiaTheme.colors.accent.copy(alpha = 0.3f),
+                        GratiaTheme.colors.textPrimary.copy(alpha = 0.8f)
                     )
                 )
             ),
@@ -56,7 +56,7 @@ fun CoverArtFallback(
             fontFamily = SpaceGrotesk,
             fontWeight = FontWeight.Bold,
             fontSize = fontSize,
-            color = GratiaTheme.colors.cotton.copy(alpha = 0.8f)
+            color = GratiaTheme.colors.background.copy(alpha = 0.8f)
         )
     }
 }

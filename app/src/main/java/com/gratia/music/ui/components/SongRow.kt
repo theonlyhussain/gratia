@@ -30,16 +30,17 @@ fun SongRow(
     isPlaying: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-    badge: String? = null
+    badge: String? = null,
+    modifier: Modifier = Modifier
 ) {
     val firstMood = song.mood?.split(",")?.firstOrNull()?.trim()
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .then(
-                if (isActive) Modifier.background(GratiaTheme.colors.glassLight)
+                if (isActive) Modifier.background(GratiaTheme.colors.glassBorder)
                 else Modifier
             )
             .clickable(onClick = onClick)
@@ -55,7 +56,7 @@ fun SongRow(
                     "${index + 1}",
                     fontFamily = Inter,
                     fontSize = 11.sp,
-                    color = if (isActive) GratiaTheme.colors.accentPrimary else GratiaTheme.colors.textMuted
+                    color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
                 )
             }
         }
@@ -81,7 +82,7 @@ fun SongRow(
                 fontFamily = Inter,
                 fontWeight = FontWeight.Medium,
                 fontSize = 13.sp,
-                color = if (isActive) GratiaTheme.colors.accentPrimary else GratiaTheme.colors.textPrimary,
+                color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -95,12 +96,12 @@ fun SongRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 if (song.album != null) {
-                    Text(" · ", fontSize = 11.sp, color = GratiaTheme.colors.textMuted)
+                    Text(" · ", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
                     Text(
                         song.album!!,
                         fontFamily = Inter,
                         fontSize = 11.sp,
-                        color = GratiaTheme.colors.textMuted,
+                        color = GratiaTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -112,7 +113,7 @@ fun SongRow(
                     badge,
                     fontFamily = Inter,
                     fontSize = 9.sp,
-                    color = GratiaTheme.colors.cherryRed,
+                    color = GratiaTheme.colors.accent,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -131,7 +132,7 @@ fun SongRow(
                     firstMood,
                     fontFamily = Inter,
                     fontSize = 9.sp,
-                    color = GratiaTheme.colors.textMuted,
+                    color = GratiaTheme.colors.textSecondary,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                 )
             }
@@ -143,7 +144,7 @@ fun SongRow(
             formatTime(song.durationMs),
             fontFamily = Inter,
             fontSize = 11.sp,
-            color = GratiaTheme.colors.textMuted
+            color = GratiaTheme.colors.textSecondary
         )
     }
 }
@@ -188,7 +189,7 @@ fun PlayingBars() {
                     .width(3.dp)
                     .height(height.dp)
                     .clip(RoundedCornerShape(1.dp))
-                    .background(GratiaTheme.colors.accentPrimary)
+                    .background(GratiaTheme.colors.accent)
             )
         }
     }

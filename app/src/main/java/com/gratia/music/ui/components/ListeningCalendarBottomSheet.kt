@@ -45,7 +45,7 @@ fun ListeningCalendarBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = GratiaTheme.colors.cotton,
+        containerColor = GratiaTheme.colors.background,
         dragHandle = null
     ) {
         Column(
@@ -132,7 +132,7 @@ fun ListeningCalendarBottomSheet(
                             .background(getCalendarColor(intensity))
                             .border(
                                 width = if (isSelected) 2.dp else if (intensity == 0) 1.dp else 0.dp,
-                                color = if (isSelected) GratiaTheme.colors.maroon else if (intensity == 0) GratiaTheme.colors.surfaceHover else Color.Transparent,
+                                color = if (isSelected) GratiaTheme.colors.accent else if (intensity == 0) GratiaTheme.colors.surfaceHover else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .clickable { selectedDate = date }
@@ -140,7 +140,7 @@ fun ListeningCalendarBottomSheet(
                         // Optional: tiny number for date
                         Text(
                             text = date.dayOfMonth.toString(),
-                            color = if (intensity > 2) GratiaTheme.colors.textOnDark else GratiaTheme.colors.textPrimary.copy(alpha = 0.5f),
+                            color = if (intensity > 2) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textPrimary.copy(alpha = 0.5f),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.align(Alignment.Center)
@@ -187,7 +187,7 @@ fun ListeningCalendarBottomSheet(
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Listening stats stay on this device.",
-                color = GratiaTheme.colors.textMuted,
+                color = GratiaTheme.colors.textSecondary,
                 fontSize = 12.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -201,7 +201,7 @@ fun StatBox(label: String, value: String) {
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(GratiaTheme.colors.surfaceCard)
+            .background(GratiaTheme.colors.surface)
             .padding(12.dp)
             .widthIn(min = 140.dp)
     ) {

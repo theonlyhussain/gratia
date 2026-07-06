@@ -32,6 +32,9 @@ data class SongEntity(
     val updatedAt: Long = System.currentTimeMillis(),
     val isFavorite: Boolean = false,
     val playCount: Int = 0,
+    val skipCount: Int = 0,
+    val completedCount: Int = 0,
+    val totalListenTime: Long = 0L,
     val lastPlayedAt: Long? = null,
 
     // Cover art — added in v2
