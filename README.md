@@ -73,9 +73,16 @@ cd gratia
 * Android Auto
 * Wear OS
 * Gapless playback
-* Crossfade
+* Crossfad-
 
 ---
+## upcoming features
+ * Better dark UI
+ * AI song shuffle
+ * smart algorithm
+ * AI playlist    
+ * All processes will operate locally on the device, without utilizing your processing power or battery life, as is typically the case with other AI systems. I will ensure optimal performance, as I am committed to delivering my best efforts on this project.
+--- 
 
 ## License
 
