@@ -73,6 +73,16 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val flavor = variant.name
+            val version = variant.versionName
+            outputImpl.outputFileName = "Gratia-v${version}-${flavor}.apk"
+        }
+    }
 }
 
 dependencies {
