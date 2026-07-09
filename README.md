@@ -69,6 +69,15 @@ cd gratia
 
 ---
 
+## 🔮 Upcoming Features
+
+* Better dark UI
+* AI song shuffle
+* Smart algorithm
+* AI playlist    
+* All processes will operate locally on the device, without utilizing your processing power or battery life, as is typically the case with other AI systems. I will ensure optimal performance, as I am committed to delivering my best efforts on this project.
+--- 
+
 ## 📄 License
 
 This project is licensed under the GNU General Public License v3.0 - see the `LICENSE` file for details.
