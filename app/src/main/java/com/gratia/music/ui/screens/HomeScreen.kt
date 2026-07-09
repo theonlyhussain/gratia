@@ -27,7 +27,11 @@ import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.ui.components.ArtistFallback
+import com.gratia.music.ui.components.CollageArtwork
+import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.Header
+import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -133,25 +137,21 @@ fun HomeScreen(
 
 @Composable
 fun PlaylistsRow(playlists: List<com.gratia.music.data.model.PlaylistEntity>) {
+    val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(horizontal = 24.dp)
     ) {
         items(playlists) { playlist ->
+            val songs by playlistDao.getSongsForPlaylist(playlist.id).collectAsState(initial = emptyList())
+            val paths = songs.take(4).map { it.coverArtPath }
+            
             Column(modifier = Modifier.width(140.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(GratiaTheme.colors.surface)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp).align(Alignment.Center),
-                        tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f)
-                    )
-                }
+                CollageArtwork(
+                    paths = paths,
+                    size = 140.dp,
+                    cornerRadius = 20.dp
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = playlist.name,
@@ -214,24 +214,16 @@ fun FeaturedCarousel(songs: List<SongEntity>, playerViewModel: PlayerViewModel) 
             Column(
                 modifier = Modifier
                     .width(160.dp)
-                    .clickable { playerViewModel.playSong(song, songs) }
+                    .clickableWithScale { playerViewModel.playSong(song, songs) }
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(160.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(GratiaTheme.colors.surface)
-                ) {
-                    // Fallback cover art
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .align(Alignment.Center),
-                        tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f)
-                    )
-                }
+                CoverArtImage(
+                    coverArtPath = song.coverArtPath,
+                    title = song.title,
+                    artist = song.artist,
+                    size = 160.dp,
+                    cornerRadius = 24.dp,
+                    fontSize = 32.sp
+                )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = song.title,
@@ -265,7 +257,7 @@ fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlay
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(GratiaTheme.colors.surface.copy(alpha = 0.5f))
-                    .clickable { playerViewModel.playSong(song, songs) }
+                    .clickableWithScale { playerViewModel.playSong(song, songs) }
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -277,11 +269,13 @@ fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlay
                         modifier = Modifier.width(24.dp)
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(GratiaTheme.colors.surfaceHover)
+                CoverArtImage(
+                    coverArtPath = song.coverArtPath,
+                    title = song.title,
+                    artist = song.artist,
+                    size = 48.dp,
+                    cornerRadius = 8.dp,
+                    fontSize = 14.sp
                 )
                 Spacer(Modifier.width(16.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -308,27 +302,34 @@ fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlay
 
 @Composable
 fun TopArtistsRow(artists: List<String>) {
+    val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(horizontal = 24.dp)
     ) {
         items(artists) { artistName ->
+            val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
+            val artistSongs = remember(allSongs, artistName) { allSongs.filter { it.artist == artistName } }
+            val coverArtPath = artistSongs.firstOrNull { it.coverArtPath != null }?.coverArtPath ?: artistSongs.firstOrNull()?.coverArtPath
+            
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.width(80.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(GratiaTheme.colors.surface),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = artistName.take(1).uppercase(),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
-                        color = GratiaTheme.colors.textPrimary
+                if (coverArtPath != null) {
+                    CoverArtImage(
+                        coverArtPath = coverArtPath,
+                        title = artistName,
+                        artist = artistName,
+                        size = 80.dp,
+                        cornerRadius = 40.dp,
+                        fontSize = 24.sp
+                    )
+                } else {
+                    ArtistFallback(
+                        artistName = artistName,
+                        size = 80.dp,
+                        fontSize = 24.sp
                     )
                 }
                 Spacer(Modifier.height(8.dp))

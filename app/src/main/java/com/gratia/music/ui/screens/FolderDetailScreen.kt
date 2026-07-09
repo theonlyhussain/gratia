@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -77,20 +78,12 @@ fun FolderDetailScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(160.dp)
-                            .clip(RoundedCornerShape(32.dp))
-                            .background(GratiaTheme.colors.surface),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Folder, 
-                            contentDescription = null, 
-                            tint = GratiaTheme.colors.accent,
-                            modifier = Modifier.size(64.dp)
-                        )
-                    }
+                    val paths = folderSongs.take(4).map { it.coverArtPath }
+                    CollageArtwork(
+                        paths = paths,
+                        size = 160.dp,
+                        cornerRadius = 32.dp
+                    )
                     Spacer(Modifier.height(24.dp))
                     Text(
                         text = folderName,

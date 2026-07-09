@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.PlaylistEntity
+import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -130,6 +131,10 @@ fun PlaylistsScreen() {
 
 @Composable
 fun PlaylistRow(playlist: PlaylistEntity) {
+    val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
+    val songs by playlistDao.getSongsForPlaylist(playlist.id).collectAsState(initial = emptyList())
+    val paths = songs.take(4).map { it.coverArtPath }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -139,19 +144,11 @@ fun PlaylistRow(playlist: PlaylistEntity) {
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .background(GratiaTheme.colors.surfaceHover, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.QueueMusic,
-                    contentDescription = null,
-                    tint = GratiaTheme.colors.textSecondary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            CollageArtwork(
+                paths = paths,
+                size = 56.dp,
+                cornerRadius = 12.dp
+            )
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(
@@ -162,7 +159,7 @@ fun PlaylistRow(playlist: PlaylistEntity) {
                     color = GratiaTheme.colors.textPrimary
                 )
                 Text(
-                    text = "Playlist",
+                    text = "${songs.size} songs",
                     fontFamily = Inter,
                     fontSize = 13.sp,
                     color = GratiaTheme.colors.textSecondary

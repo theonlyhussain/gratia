@@ -3,7 +3,12 @@ package com.gratia.music.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -79,3 +84,94 @@ private fun deriveAccentColor(title: String, artist: String): Color {
     )
     return palette[hash % palette.size]
 }
+
+@Composable
+fun ArtistFallback(
+    artistName: String,
+    size: Dp = 48.dp,
+    fontSize: TextUnit = 16.sp,
+    modifier: Modifier = Modifier
+) {
+    val initials = if (artistName.isNotBlank()) artistName.take(1).uppercase() else "?"
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        GratiaTheme.colors.accent.copy(alpha = 0.4f),
+                        GratiaTheme.colors.surface
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            initials,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Bold,
+            fontSize = fontSize,
+            color = GratiaTheme.colors.textPrimary
+        )
+    }
+}
+
+@Composable
+fun PlaylistFallback(
+    size: Dp = 48.dp,
+    cornerRadius: Dp = 8.dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        GratiaTheme.colors.accentWarm.copy(alpha = 0.4f),
+                        GratiaTheme.colors.surface
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.AutoMirrored.Filled.QueueMusic,
+            contentDescription = null,
+            tint = GratiaTheme.colors.accentWarm,
+            modifier = Modifier.size(size * 0.5f)
+        )
+    }
+}
+
+@Composable
+fun FolderFallback(
+    size: Dp = 48.dp,
+    cornerRadius: Dp = 8.dp,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(
+                        GratiaTheme.colors.success.copy(alpha = 0.4f),
+                        GratiaTheme.colors.surface
+                    )
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.Folder,
+            contentDescription = null,
+            tint = GratiaTheme.colors.success,
+            modifier = Modifier.size(size * 0.5f)
+        )
+    }
+}
+

@@ -95,9 +95,9 @@ fun GratiaAppRoot() {
                             .shadow(24.dp, RoundedCornerShape(32.dp), spotColor = GratiaTheme.colors.accent.copy(alpha = 0.15f), ambientColor = GratiaTheme.colors.accent.copy(alpha = 0.05f))
                             .liquidGlass(
                                 shape = RoundedCornerShape(32.dp),
-                                backgroundColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
-                                borderColorStart = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
-                                borderColorEnd = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)
+                                backgroundColor = if (isDark) androidx.compose.ui.graphics.Color(0xFF0D0D0D).copy(alpha = 0.96f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.88f),
+                                borderColorStart = if (isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
+                                borderColorEnd = if (isDark) androidx.compose.ui.graphics.Color.Transparent else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)
                             )
                             .padding(horizontal = 4.dp, vertical = 4.dp)
                             .height(64.dp)
@@ -120,7 +120,7 @@ fun GratiaAppRoot() {
                                 .width(tabWidth)
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(28.dp))
-                                .background(GratiaTheme.colors.accent.copy(alpha = 0.08f))
+                                .background(GratiaTheme.colors.accent.copy(alpha = 0.15f))
                         )
 
                         // Tab icons and labels
@@ -147,11 +147,13 @@ fun GratiaAppRoot() {
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
+                                    val iconTint by androidx.compose.animation.animateColorAsState(if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary, label = "iconTint")
+                                    val textTint by androidx.compose.animation.animateColorAsState(if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary, label = "textTint")
                                     Icon(
                                         imageVector = if (selected) screen.selectedIcon else screen.icon,
                                         contentDescription = screen.label,
                                         modifier = Modifier.size(24.dp),
-                                        tint = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
+                                        tint = iconTint
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
@@ -159,7 +161,7 @@ fun GratiaAppRoot() {
                                         fontSize = 10.sp,
                                         fontFamily = Inter,
                                         fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
-                                        color = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                                        color = textTint,
                                         maxLines = 1
                                     )
                                 }
@@ -196,7 +198,12 @@ fun GratiaAppRoot() {
                     SearchScreen(playerViewModel = playerViewModel)
                 }
                 composable(Screen.Library.route) {
-                    LibraryScreen(playerViewModel = playerViewModel)
+                    LibraryScreen(
+                        playerViewModel = playerViewModel,
+                        onNavigateToAlbum = { navController.navigate("album/$it") },
+                        onNavigateToArtist = { navController.navigate("artist/$it") },
+                        onNavigateToFolder = { navController.navigate("folder/$it") }
+                    )
                 }
                 composable("favorites") { // Favorites is still accessible from Home
                     FavoritesScreen(playerViewModel = playerViewModel)

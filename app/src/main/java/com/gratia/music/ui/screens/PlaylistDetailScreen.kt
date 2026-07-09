@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -34,10 +35,7 @@ fun PlaylistDetailScreen(
 ) {
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     val playlistFlow by playlistDao.getPlaylist(playlistId).collectAsState(initial = null)
-    // For now we get songs via cross-ref query, assuming it exists or we mock it.
-    // Assuming songRepo has a getSongsForPlaylist, but we don't know yet.
-    // I'll leave playlistSongs as an empty list for now since schema might not have the helper yet.
-    val playlistSongs = emptyList<com.gratia.music.data.model.SongEntity>() // TODO: Implement query
+    val playlistSongs by playlistDao.getSongsForPlaylist(playlistId).collectAsState(initial = emptyList())
     
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
@@ -76,20 +74,12 @@ fun PlaylistDetailScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(180.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(GratiaTheme.colors.surface),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.QueueMusic, 
-                                contentDescription = null, 
-                                tint = GratiaTheme.colors.accent,
-                                modifier = Modifier.size(72.dp)
-                            )
-                        }
+                        val paths = playlistSongs.take(4).map { it.coverArtPath }
+                        CollageArtwork(
+                            paths = paths,
+                            size = 180.dp,
+                            cornerRadius = 16.dp
+                        )
                         Spacer(Modifier.height(24.dp))
                         Text(
                             text = playlist.name,

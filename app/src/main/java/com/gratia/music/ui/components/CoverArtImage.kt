@@ -11,6 +11,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.platform.LocalContext
 import java.io.File
 
 /**
@@ -30,7 +32,10 @@ fun CoverArtImage(
 ) {
     if (!coverArtPath.isNullOrBlank() && File(coverArtPath).exists()) {
         AsyncImage(
-            model = File(coverArtPath),
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(File(coverArtPath))
+                .crossfade(300)
+                .build(),
             contentDescription = "$title cover art",
             contentScale = ContentScale.Crop,
             modifier = modifier
