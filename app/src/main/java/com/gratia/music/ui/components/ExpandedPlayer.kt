@@ -38,8 +38,6 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import com.gratia.music.ui.components.liquidGlass
 
-import kotlinx.coroutines.isActive
-
 /**
  * Full-screen expanded player with dynamic cover-art background.
  * Apple Music-inspired premium layout with smooth transitions.
@@ -58,23 +56,9 @@ fun ExpandedPlayer(
 
     val song = currentSong ?: return
 
-    var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
-    var lastUpdateTime by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
-
-    LaunchedEffect(currentTimeMs, isPlaying) {
-        visualTimeMs = currentTimeMs
-        lastUpdateTime = android.os.SystemClock.elapsedRealtime()
-        if (isPlaying) {
-            while (isActive) {
-                androidx.compose.runtime.withFrameNanos {
-                    val now = android.os.SystemClock.elapsedRealtime()
-                    visualTimeMs = currentTimeMs + (now - lastUpdateTime)
-                }
-            }
-        }
-    }
-
-    val progress = if (durationMs > 0) visualTimeMs.toFloat() / durationMs.toFloat() else 0f
+    // Use currentTimeMs directly from PlayerManager — single source of truth.
+    // No interpolation timer. Progress updates come every 100ms from PlayerManager.
+    val progress = if (durationMs > 0) (currentTimeMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
 
     // Extract colors from cover art (cached, done on IO thread)
     var coverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
@@ -101,17 +85,17 @@ fun ExpandedPlayer(
         } else null
     }
 
-    val currentLyricPreview by remember(parsedLyrics, visualTimeMs) {
+    val currentLyricPreview by remember(parsedLyrics, currentTimeMs) {
         derivedStateOf {
             val doc = parsedLyrics
             if (doc != null) {
                 when (doc) {
                     is LyricsDocument.LineSynced -> {
-                        val activeIndex = LyricsTimingEngine.findActiveLineIndex(doc.lines, visualTimeMs)
+                        val activeIndex = LyricsTimingEngine.findActiveLineIndex(doc.lines, currentTimeMs)
                         doc.lines.getOrNull(activeIndex)?.text
                     }
                     is LyricsDocument.WordSynced -> {
-                        val activeIndex = LyricsTimingEngine.findActiveLineIndex(doc.lines, visualTimeMs)
+                        val activeIndex = LyricsTimingEngine.findActiveLineIndex(doc.lines, currentTimeMs)
                         doc.lines.getOrNull(activeIndex)?.text
                     }
                     else -> null
@@ -257,7 +241,7 @@ fun ExpandedPlayer(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(formatTime(visualTimeMs), fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f), fontFamily = Inter)
+                    Text(formatTime(currentTimeMs), fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f), fontFamily = Inter)
                     Text(formatTime(durationMs), fontSize = 11.sp, color = Color.White.copy(alpha = 0.5f), fontFamily = Inter)
                 }
             }

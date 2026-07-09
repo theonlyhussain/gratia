@@ -71,6 +71,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         super.onCleared()
-        playerManager.release()
+        // IMPORTANT: Do NOT call playerManager.release() here.
+        // PlayerManager is a singleton owned by GratiaApp.
+        // Releasing it here would kill playback when the Activity is recreated.
     }
 }
