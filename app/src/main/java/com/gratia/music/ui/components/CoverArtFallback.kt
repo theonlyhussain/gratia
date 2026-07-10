@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlin.math.abs
+import com.gratia.music.ui.player.getInitials
 
 /**
  * Gradient fallback cover art with song initial and warm Gratia accent.
