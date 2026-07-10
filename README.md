@@ -1,90 +1,119 @@
-# Gratia 🎵
+# Gratia
 
-**Version 1.0.1**
+> A modern, private Android music player focused on beautiful design, smooth playback, and a personal listening experience.
+> 
+### Playback
+* Gapless-inspired playback
+* Queue support
+* Shuffle
+* Repeat
+* Mini Player
+* Expanded Player
+* Media notification
+* Lock screen controls
+* Reliable playback
 
-Gratia is a privacy-first, premium local music player for Android featuring a beautiful glassmorphism UI, reliable background playback, and a completely local-first architecture.
+### Library
+* Songs
+* Albums
+* Artists
+* Folders
+* Playlists
+* Favorites
+* Recently Played
 
----
+### Experience
+* Dynamic backgrounds
+* Glassmorphism
+* Smooth animations
+* Theme switching
+* Light mode
+* Dark mode
+* Adaptive artwork colors
 
-## 📥 Download & Installation
+### Lyrics
+* Synced lyrics
+* Smooth scrolling
+* Tap to seek
+* Manual lyric support
+* Beautiful empty state
 
-Download the latest signed APK (`app-release.apk`) directly from the Releases page:
+## Technology
 
-**[GitHub Releases](https://github.com/theonlyhussain/gratia/releases/latest)**
+| Component            | Technology              |
+| -------------------- | ----------------------- |
+| Language             | Kotlin                  |
+| UI                   | Jetpack Compose         |
+| Architecture         | MVVM                    |
+| Database             | Room                    |
+| Media                | Media3 / ExoPlayer      |
+| Image Loading        | Coil                    |
 
-*Note: Gratia is currently sideload-only. You may need to enable "Install from Unknown Sources" on your Android device.*
+## Installation
 
----
+### Download APK
 
-## ✨ Features (v1.0.1)
+You can download the latest compiled APK from the GitHub Releases page:
 
-- **Premium UI:** Apple Music & Spotify-inspired design with dynamic glassmorphism and smooth micro-animations.
-- **Dynamic Artwork:** 2x2 cover art collages for playlists and generated initials for missing artist art.
-- **Rock-Solid Playback:** Media3/ExoPlayer architecture that survives backgrounding, rotation, and deep sleep.
-- **Library Management:** Browse by Albums, Artists, and Folders.
-- **Playlists & Favorites:** Full support for custom playlists and favorite tracks.
-- **Synced Lyrics:** Support for time-synced lyrics with a beautiful UI.
-- **Adaptive Theme:** Gorgeous Light and Dark modes that adapt to your system.
-- **Offline First:** No internet connection required.
+[GitHub Releases](https://github.com/theonlyhussain/gratia/releases/latest)
 
----
+### Build from source
 
-## 🔒 Privacy-First Philosophy
-
-Your data is yours. Gratia is built on the principle of absolute privacy:
-* **No cloud uploads:** Your music never leaves your device.
-* **No accounts:** Just open the app and play.
-* **No telemetry:** We do not track your listening habits or app usage.
-
----
-
-## 🏗️ Architecture
-
-Gratia uses a modern Android technology stack:
-- **UI:** Jetpack Compose (100%)
-- **Architecture:** MVVM + Coroutines/Flow
-- **Playback:** Media3 / ExoPlayer with robust `MediaSessionService`
-- **Database:** Room (SQLite)
-
----
-
-## 🛠️ Building from Source
+To build Gratia locally, clone the repository and assemble the release build:
 
 ```bash
 git clone https://github.com/theonlyhussain/gratia.git
 cd gratia
-./gradlew clean assembleDebug
+./gradlew assembleRelease
 ```
 
----
+## Project Structure
 
-## 🚀 Roadmap
+```text
+app/src/main/java/com/gratia/music/
+ ├── data/
+ ├── lyrics/
+ ├── player/
+ ├── storage/
+ └── ui/
+      ├── components/
+      ├── lyrics/
+      ├── player/
+      ├── screens/
+      └── theme/
+```
 
-* Better recommendation engine
-* AI-assisted local recommendations
-* Word-by-word lyrics improvements
-* Android Auto & Wear OS support
-* Gapless playback & Crossfade
-* Equalizer and DSP effects
+## Roadmap
 
----
+**Completed**
+* [x] Local music playback
+* [x] Queue
+* [x] Playlist support
+* [x] Dynamic player
+* [x] Light theme
+* [x] Dark theme
+* [x] Lyrics
+* [x] Media notification
 
-## 🔮 Upcoming Features
+**Planned**
+* [ ] Android Auto
+* [ ] Wear OS
+* [ ] Equalizer
+* [ ] Chromecast improvements
+* [ ] Smart recommendations
+* [ ] Folder artwork generation
+* [ ] More lyric providers
 
-* Better dark UI
-* AI song shuffle
-* Smart algorithm
-* AI playlist    
-* All processes will operate locally on the device, without utilizing your processing power or battery life, as is typically the case with other AI systems. I will ensure optimal performance, as I am committed to delivering my best efforts on this project.
---- 
+## Contributing
 
-## 📄 License
+Pull requests are always welcome! If you're planning a major feature or significant architectural change, please open an issue first to discuss your ideas.
+
+## License
 
 This project is licensed under the GNU General Public License v3.0 - see the `LICENSE` file for details.
 
 ---
 
-## 👨‍💻 Author
+Built with Kotlin and Jetpack Compose.
 
-Created by **Hussain Shaikh**  
-GitHub: [theonlyhussain](https://github.com/theonlyhussain)
+Designed to be fast, private, and personal.
