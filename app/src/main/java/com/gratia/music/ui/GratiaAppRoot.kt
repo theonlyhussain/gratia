@@ -38,8 +38,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.gratia.music.player.PlayerViewModel
-import com.gratia.music.ui.components.ExpandedPlayer
-import com.gratia.music.ui.components.PlayerBar
+import com.gratia.music.ui.player.ExpandedPlayer
+import com.gratia.music.ui.player.MiniPlayer
+import com.gratia.music.ui.player.QueueSheet
 import com.gratia.music.ui.screens.*
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -54,6 +55,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector,
 
 val bottomNavItems = listOf(Screen.Home, Screen.Search, Screen.Library, Screen.Playlists)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GratiaAppRoot() {
     val navController = rememberNavController()
@@ -61,6 +63,7 @@ fun GratiaAppRoot() {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val expandedPlayerOpen by playerViewModel.expandedPlayerOpen.collectAsState()
     val lyricsOverlayOpen by playerViewModel.lyricsOverlayOpen.collectAsState()
+    var queueSheetOpen by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
@@ -84,7 +87,7 @@ fun GratiaAppRoot() {
                 Column {
                     // Mini Player — sits above bottom nav
                     if (currentSong != null) {
-                        PlayerBar(playerViewModel = playerViewModel)
+                        MiniPlayer(playerViewModel = playerViewModel)
                     }
 
                     // Glassmorphism Bottom Navigation
@@ -318,8 +321,8 @@ fun GratiaAppRoot() {
         // Expanded Player Overlay
         AnimatedVisibility(
             visible = expandedPlayerOpen && currentSong != null,
-            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
-            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250)) + fadeOut(animationSpec = tween(250))
+            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(350)) + fadeIn(animationSpec = tween(350)),
+            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(280)) + fadeOut(animationSpec = tween(280))
         ) {
             ExpandedPlayer(
                 playerViewModel = playerViewModel,
@@ -327,8 +330,29 @@ fun GratiaAppRoot() {
                     playerViewModel.setExpandedPlayerOpen(false)
                     val songId = currentSong?.id ?: return@ExpandedPlayer
                     navController.navigate("fullLyrics/$songId")
+                },
+                onOpenQueue = {
+                    queueSheetOpen = true
+                },
+                onDismiss = {
+                    playerViewModel.setExpandedPlayerOpen(false)
                 }
             )
+        }
+
+        // Queue Bottom Sheet
+        if (queueSheetOpen) {
+            androidx.compose.material3.ModalBottomSheet(
+                onDismissRequest = { queueSheetOpen = false },
+                containerColor = GratiaTheme.colors.surface,
+                scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            ) {
+                QueueSheet(
+                    playerViewModel = playerViewModel,
+                    onDismiss = { queueSheetOpen = false }
+                )
+            }
         }
 
         // Lyrics overlay (from lyrics button in expanded player)

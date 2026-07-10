@@ -32,3 +32,7 @@ sample-songs/
 reference/
 
 .kotlin/
+
+# Agent configuration
+.agents/
+AGENTS.md

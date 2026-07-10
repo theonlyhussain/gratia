@@ -32,6 +32,12 @@ val Inter = FontFamily(
     Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.SemiBold),
 )
 
+/** Monospaced font for time labels, progress indicators, and metadata. */
+val JetBrainsMono = FontFamily(
+    Font(googleFont = GoogleFont("JetBrains Mono"), fontProvider = provider, weight = FontWeight.Normal),
+    Font(googleFont = GoogleFont("JetBrains Mono"), fontProvider = provider, weight = FontWeight.Medium),
+)
+
 object GratiaTheme {
     val colors: GratiaColors
         @Composable
@@ -59,6 +65,11 @@ fun GratiaTheme(
     val success by androidx.compose.animation.animateColorAsState(targetColors.success, label = "success")
     val warning by androidx.compose.animation.animateColorAsState(targetColors.warning, label = "warning")
     val accentWarm by androidx.compose.animation.animateColorAsState(targetColors.accentWarm, label = "accentWarm")
+    val playerGlow by androidx.compose.animation.animateColorAsState(targetColors.playerGlow, label = "playerGlow")
+    val progressTrack by androidx.compose.animation.animateColorAsState(targetColors.progressTrack, label = "progressTrack")
+    val progressActive by androidx.compose.animation.animateColorAsState(targetColors.progressActive, label = "progressActive")
+    val controlMuted by androidx.compose.animation.animateColorAsState(targetColors.controlMuted, label = "controlMuted")
+    val playerSurface by androidx.compose.animation.animateColorAsState(targetColors.playerSurface, label = "playerSurface")
 
     val animatedColors = GratiaColors(
         isDark = isDark,
@@ -74,7 +85,12 @@ fun GratiaTheme(
         error = error,
         success = success,
         warning = warning,
-        accentWarm = accentWarm
+        accentWarm = accentWarm,
+        playerGlow = playerGlow,
+        progressTrack = progressTrack,
+        progressActive = progressActive,
+        controlMuted = controlMuted,
+        playerSurface = playerSurface
     )
 
     CompositionLocalProvider(

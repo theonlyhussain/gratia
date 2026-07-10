@@ -165,15 +165,15 @@ fun LyricLineView(
 
     // Target States
     val targetScale = when {
-        isActive -> 1.05f
-        isPast -> 0.96f
-        else -> 0.94f
+        isActive -> 1.04f
+        isPast -> 0.95f
+        else -> 0.93f
     }
 
     val targetAlpha = when {
         isActive -> 1.0f
-        isPast -> 0.15f
-        else -> 0.25f
+        isPast -> 0.12f
+        else -> 0.30f
     }
 
     val targetBlur = when {
@@ -184,9 +184,9 @@ fun LyricLineView(
 
     // Cubic Bezier Easing
     val floatEasing = CubicBezierEasing(0.25f, 1f, 0.4f, 1f)
-    val scaleSpec = tween<Float>(durationMillis = 750, easing = floatEasing)
-    val alphaSpec = tween<Float>(durationMillis = 750, easing = floatEasing)
-    val blurSpec = tween<Dp>(durationMillis = 750, easing = floatEasing)
+    val scaleSpec = tween<Float>(durationMillis = 600, easing = floatEasing)
+    val alphaSpec = tween<Float>(durationMillis = 600, easing = floatEasing)
+    val blurSpec = tween<Dp>(durationMillis = 600, easing = floatEasing)
 
     val scale by animateFloatAsState(targetValue = targetScale, animationSpec = scaleSpec, label = "lineScale")
     val alpha by animateFloatAsState(targetValue = targetAlpha, animationSpec = alphaSpec, label = "lineAlpha")
@@ -248,13 +248,15 @@ fun LyricLineView(
             }
         }
     } else {
+        val textSize = if (isActive) 30.sp else if (isPast) 24.sp else 28.sp
+        val textLineHeight = if (isActive) 40.sp else if (isPast) 32.sp else 38.sp
         Text(
             text = line.text,
             fontFamily = Inter,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 28.sp,
+            fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
+            fontSize = textSize,
             color = cottonColor,
-            lineHeight = 38.sp,
+            lineHeight = textLineHeight,
             modifier = lineModifier.padding(vertical = 4.dp)
         )
     }

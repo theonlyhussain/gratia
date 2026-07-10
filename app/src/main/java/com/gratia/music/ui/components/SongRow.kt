@@ -18,6 +18,7 @@ import com.gratia.music.data.model.SongEntity
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import com.gratia.music.ui.player.formatTime
 
 /**
  * Library song row. Translates SongRow.tsx from the web prototype.

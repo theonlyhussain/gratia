@@ -386,6 +386,33 @@ class PlayerManager(private val context: Context) {
         _playbackError.value = null
     }
 
+    /** Remove a song from the queue by its ID. */
+    fun removeFromQueue(songId: String) {
+        val current = _currentSong.value
+        if (current?.id == songId) return // Can't remove currently playing song
+        val newQueue = _queue.value.filterNot { it.id == songId }
+        _queue.value = newQueue
+        Log.d(TAG, "removeFromQueue: removed $songId, queue size=${newQueue.size}")
+    }
+
+    /** Move a song within the queue from one position to another. */
+    fun moveInQueue(from: Int, to: Int) {
+        val q = _queue.value.toMutableList()
+        if (from < 0 || from >= q.size || to < 0 || to >= q.size) return
+        val item = q.removeAt(from)
+        q.add(to, item)
+        _queue.value = q
+        Log.d(TAG, "moveInQueue: $from -> $to")
+    }
+
+    /** Play a specific song from the queue by index. */
+    fun playFromQueue(index: Int) {
+        val q = _queue.value
+        if (index < 0 || index >= q.size) return
+        Log.d(TAG, "playFromQueue: index=$index, song='${q[index].title}'")
+        playSong(q[index], q)
+    }
+
     private fun handleSongEnded() {
         when (_repeatMode.value) {
             RepeatMode.ONE -> {

@@ -63,6 +63,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _lyricsOverlayOpen.value = open
     }
 
+    fun removeFromQueue(songId: String) = playerManager.removeFromQueue(songId)
+    fun moveInQueue(from: Int, to: Int) = playerManager.moveInQueue(from, to)
+    fun playFromQueue(index: Int) = playerManager.playFromQueue(index)
+
     fun toggleFavorite(song: SongEntity) {
         viewModelScope.launch {
             songRepository.toggleFavorite(song.id, !song.isFavorite)

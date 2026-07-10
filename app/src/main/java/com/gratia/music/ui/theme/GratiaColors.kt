@@ -6,6 +6,9 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * Gratia Design System - Light (Cloudy) and Dark (Charcoal/Purple)
+ *
+ * Player-specific tokens provide dedicated colors for the cinematic
+ * playback experience without polluting the main theme palette.
  */
 @Immutable
 data class GratiaColors(
@@ -32,7 +35,14 @@ data class GratiaColors(
     val error: Color,
     val success: Color,
     val warning: Color,
-    val accentWarm: Color
+    val accentWarm: Color,
+
+    // Player-specific tokens
+    val playerGlow: Color,          // Ambient glow behind artwork & play button
+    val progressTrack: Color,       // Inactive progress bar track
+    val progressActive: Color,      // Active progress bar fill
+    val controlMuted: Color,        // Disabled / inactive control tint
+    val playerSurface: Color        // Glass surface tint inside the player
 )
 
 val lightGratiaColors = GratiaColors(
@@ -49,7 +59,12 @@ val lightGratiaColors = GratiaColors(
     error = Color(0xFFB00020),
     success = Color(0xFF2E7D32),
     warning = Color(0xFFE65100),
-    accentWarm = Color(0xFFA65D03)
+    accentWarm = Color(0xFFA65D03),
+    playerGlow = Color(0x264A90E2),
+    progressTrack = Color(0x261A2D50),
+    progressActive = Color(0xFF4A90E2),
+    controlMuted = Color(0x661A2D50),
+    playerSurface = Color(0xCCFFFFFF)
 )
 
 val darkGratiaColors = GratiaColors(
@@ -66,7 +81,12 @@ val darkGratiaColors = GratiaColors(
     error = Color(0xFFCF6679),
     success = Color(0xFF2E7D32),
     warning = Color(0xFFE65100),
-    accentWarm = Color(0xFFA65D03)
+    accentWarm = Color(0xFFA65D03),
+    playerGlow = Color(0x40BB86FC),
+    progressTrack = Color(0x26FFFFFF),
+    progressActive = Color(0xFFFFFFFF),
+    controlMuted = Color(0x4DFFFFFF),
+    playerSurface = Color(0xB3161616)
 )
 
 val LocalGratiaColors = staticCompositionLocalOf { lightGratiaColors }

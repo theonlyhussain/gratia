@@ -27,7 +27,7 @@ import com.gratia.music.lyrics.LyricsDocument
 import com.gratia.music.lyrics.LyricsParser
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.CoverArtImage
-import com.gratia.music.ui.components.formatTime
+import com.gratia.music.ui.player.formatTime
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -345,7 +345,7 @@ private fun EmptyLyricsState(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1B1716))
+            .background(Color(0xFF0A0A0A))
             .statusBarsPadding()
     ) {
         IconButton(
@@ -368,29 +368,62 @@ private fun EmptyLyricsState(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Default.Lyrics,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = Color.White.copy(alpha = 0.3f)
-                )
-                Spacer(Modifier.height(16.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 40.dp)
+            ) {
+                // Large icon with ambient glow
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(120.dp)
+                ) {
+                    // Glow circle behind icon
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        GratiaTheme.colors.accent.copy(alpha = 0.15f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Lyrics,
+                        contentDescription = null,
+                        modifier = Modifier.size(56.dp),
+                        tint = Color.White.copy(alpha = 0.4f)
+                    )
+                }
+
+                Spacer(Modifier.height(24.dp))
+
+                // Headline
                 Text(
                     text = message,
-                    fontFamily = Inter,
-                    fontSize = 16.sp,
-                    color = Color.White.copy(alpha = 0.6f)
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp,
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(4.dp))
+
+                Spacer(Modifier.height(10.dp))
+
+                // Description
                 Text(
                     text = detail,
                     fontFamily = Inter,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = Color.White.copy(alpha = 0.4f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
                 )
             }
         }
     }
 }
+
