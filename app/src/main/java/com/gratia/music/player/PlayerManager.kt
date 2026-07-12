@@ -395,10 +395,27 @@ class PlayerManager(private val context: Context) {
     /** Remove a song from the queue by its ID. */
     fun removeFromQueue(songId: String) {
         val current = _currentSong.value
-        if (current?.id == songId) return // Can't remove currently playing song
+        if (current?.id == songId) return
         val newQueue = _queue.value.filterNot { it.id == songId }
         _queue.value = newQueue
         Log.d(TAG, "removeFromQueue: removed $songId, queue size=${newQueue.size}")
+    }
+
+    fun playNext(song: SongEntity) {
+        val currentQueue = _queue.value.toMutableList()
+        val currentSongIndex = currentQueue.indexOfFirst { it.id == _currentSong.value?.id }
+        if (currentSongIndex != -1) {
+            currentQueue.add(currentSongIndex + 1, song)
+        } else {
+            currentQueue.add(0, song)
+        }
+        _queue.value = currentQueue
+    }
+
+    fun addToQueue(song: SongEntity) {
+        val currentQueue = _queue.value.toMutableList()
+        currentQueue.add(song)
+        _queue.value = currentQueue
     }
 
     /** Move a song within the queue from one position to another. */

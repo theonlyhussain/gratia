@@ -70,6 +70,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun removeFromQueue(songId: String) = playerManager.removeFromQueue(songId)
     fun moveInQueue(from: Int, to: Int) = playerManager.moveInQueue(from, to)
     fun playFromQueue(index: Int) = playerManager.playFromQueue(index)
+    fun clearQueue() = playerManager.clearQueue()
+    fun playNext(song: SongEntity) = playerManager.playNext(song)
+    fun addToQueue(song: SongEntity) = playerManager.addToQueue(song)
 
     fun toggleFavorite(song: SongEntity) {
         viewModelScope.launch {
@@ -88,11 +91,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
     
-    fun clearQueue() {
-        viewModelScope.launch {
-            playerManager.clearQueue()
-        }
-    }
 
     override fun onCleared() {
         super.onCleared()
