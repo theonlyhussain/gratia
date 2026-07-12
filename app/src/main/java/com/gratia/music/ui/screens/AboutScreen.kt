@@ -124,7 +124,7 @@ fun AboutScreen(
                     color = GratiaTheme.colors.textPrimary
                 )
                 Text(
-                    text = "Version 2.0.0",
+                    text = "Version 2.0.1",
                     fontFamily = Inter,
                     fontSize = 14.sp,
                     color = GratiaTheme.colors.accent,
@@ -186,7 +186,7 @@ fun AboutScreen(
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
                 AboutActionRow(
                     title = "Changelog",
-                    subtitle = "What's new in v2.0.0",
+                    subtitle = "What's new in v2.0.1",
                     onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/releases")))
                     }
