@@ -11,6 +11,9 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists ORDER BY updatedAt DESC")
     fun getAllPlaylists(): Flow<List<PlaylistEntity>>
 
+    @Query("SELECT COUNT(*) FROM playlists")
+    fun getPlaylistCount(): Flow<Int>
+
     @Query("SELECT * FROM playlists WHERE id = :playlistId")
     fun getPlaylist(playlistId: String): Flow<PlaylistEntity?>
 

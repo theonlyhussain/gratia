@@ -1,6 +1,7 @@
 package com.gratia.music.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,12 +14,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.PlaylistEntity
 import com.gratia.music.ui.components.CollageArtwork
+import com.gratia.music.ui.components.EmptyStateView
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -26,7 +27,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
-fun PlaylistsScreen() {
+fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     val playlists by playlistDao.getAllPlaylists().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -48,45 +49,13 @@ fun PlaylistsScreen() {
             )
 
             if (playlists.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Surface(
-                        modifier = Modifier.size(88.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        color = GratiaTheme.colors.surface,
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.QueueMusic,
-                                contentDescription = null,
-                                modifier = Modifier.size(36.dp),
-                                tint = GratiaTheme.colors.textSecondary
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(24.dp))
-                    Text(
-                        "No playlists yet",
-                        fontFamily = Inter,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = GratiaTheme.colors.textSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Create your first playlist to organize\nyour favorite songs",
-                        fontFamily = Inter,
-                        fontSize = 13.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 20.sp
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    EmptyStateView(
+                        icon = Icons.AutoMirrored.Filled.QueueMusic,
+                        headline = "No playlists yet",
+                        description = "Create your first playlist to organize your favorite songs",
+                        actionLabel = "Create Playlist",
+                        onActionClick = { showCreateDialog = true }
                     )
                 }
             } else {
@@ -95,7 +64,10 @@ fun PlaylistsScreen() {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(playlists) { playlist ->
-                        PlaylistRow(playlist)
+                        PlaylistRow(
+                            playlist = playlist,
+                            onClick = { onNavigateToPlaylist(playlist.id) }
+                        )
                     }
                 }
             }
@@ -130,13 +102,15 @@ fun PlaylistsScreen() {
 }
 
 @Composable
-fun PlaylistRow(playlist: PlaylistEntity) {
+fun PlaylistRow(playlist: PlaylistEntity, onClick: () -> Unit) {
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     val songs by playlistDao.getSongsForPlaylist(playlist.id).collectAsState(initial = emptyList())
     val paths = songs.take(4).map { it.coverArtPath }
 
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = GratiaTheme.colors.surface
     ) {

@@ -95,12 +95,28 @@ fun QueueSheet(
                 letterSpacing = 2.sp,
                 color = GratiaTheme.colors.textSecondary
             )
-            Text(
-                "${queue.size} songs",
-                fontFamily = Inter,
-                fontSize = 12.sp,
-                color = GratiaTheme.colors.textSecondary.copy(alpha = 0.6f)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${queue.size} songs",
+                    fontFamily = Inter,
+                    fontSize = 12.sp,
+                    color = GratiaTheme.colors.textSecondary.copy(alpha = 0.6f)
+                )
+                if (queue.isNotEmpty()) {
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "CLEAR",
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        color = GratiaTheme.colors.accent,
+                        modifier = Modifier.clickable { 
+                            playerViewModel.clearQueue()
+                            onDismiss()
+                        }.padding(4.dp)
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(12.dp))

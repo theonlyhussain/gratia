@@ -32,6 +32,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
+import androidx.compose.animation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -86,7 +87,11 @@ fun GratiaAppRoot() {
 
                 Column {
                     // Mini Player — sits above bottom nav
-                    if (currentSong != null) {
+                    AnimatedVisibility(
+                        visible = currentSong != null && !expandedPlayerOpen,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
                         MiniPlayer(playerViewModel = playerViewModel)
                     }
 
@@ -212,7 +217,7 @@ fun GratiaAppRoot() {
                     FavoritesScreen(playerViewModel = playerViewModel)
                 }
                 composable(Screen.Playlists.route) {
-                    PlaylistsScreen()
+                    PlaylistsScreen(onNavigateToPlaylist = { navController.navigate("playlist/$it") })
                 }
                 composable("upload") {
                     UploadScreen(onNavigateBack = { navController.popBackStack() })
@@ -306,6 +311,7 @@ fun GratiaAppRoot() {
                 }
                 composable("about") {
                     AboutScreen(
+                        playerViewModel = playerViewModel,
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateToLicenses = { navController.navigate("licenses") }
                     )

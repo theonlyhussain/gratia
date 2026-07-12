@@ -50,6 +50,10 @@ fun LyricsScreen(
     val currentTimeMs by playerViewModel.currentTimeMs.collectAsState()
     val durationMs by playerViewModel.durationMs.collectAsState()
 
+    var showMenu by remember { mutableStateOf(false) }
+    var showEditor by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
     // Smooth interpolator for time tracking to avoid layout jumps between ticks
     var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
     var lastUpdateTime by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
@@ -98,7 +102,7 @@ fun LyricsScreen(
     }
 
     val parsedDocument = remember(lyricsRaw) {
-        LyricsParser.parse(lyricsRaw)
+        if (lyricsRaw.isNotBlank()) LyricsParser.parse(lyricsRaw) else null
     }
 
     Box(
@@ -184,6 +188,38 @@ fun LyricsScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
+
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "More",
+                            tint = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(GratiaTheme.colors.surface)
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Edit Lyrics", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                            onClick = {
+                                showMenu = false
+                                showEditor = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete Lyrics", color = GratiaTheme.colors.error, fontFamily = Inter) },
+                            onClick = {
+                                showMenu = false
+                                showDeleteConfirm = true
+                            }
+                        )
+                    }
+                }
             }
 
             // Lyrics Main View Container
@@ -205,28 +241,56 @@ fun LyricsScreen(
                         drawRect(brush = maskBrush, blendMode = BlendMode.DstIn)
                     }
             ) {
-                when (parsedDocument) {
-                    is LyricsDocument.Plain -> {
-                        PlainLyricsView(
-                            text = parsedDocument.text,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                if (parsedDocument == null) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Lyrics,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp),
+                                tint = Color.White.copy(alpha = 0.4f)
+                            )
+                            Spacer(Modifier.height(24.dp))
+                            Text(
+                                text = "No Lyrics Available",
+                                fontFamily = SpaceGrotesk,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = "There are no lyrics for this song yet.",
+                                fontFamily = Inter,
+                                fontSize = 14.sp,
+                                color = Color.White.copy(alpha = 0.4f)
+                            )
+                        }
                     }
-                    is LyricsDocument.LineSynced -> {
-                        KineticLyricsColumn(
-                            lines = parsedDocument.lines,
-                            currentTimeMs = visualTimeMs,
-                            onLineClick = { seekMs -> playerViewModel.seekTo(seekMs) },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                    is LyricsDocument.WordSynced -> {
-                        KineticLyricsColumn(
-                            lines = parsedDocument.lines,
-                            currentTimeMs = visualTimeMs,
-                            onLineClick = { seekMs -> playerViewModel.seekTo(seekMs) },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                } else {
+                    when (parsedDocument) {
+                        is LyricsDocument.Plain -> {
+                            PlainLyricsView(
+                                text = parsedDocument.text,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        is LyricsDocument.LineSynced -> {
+                            KineticLyricsColumn(
+                                lines = parsedDocument.lines,
+                                currentTimeMs = visualTimeMs,
+                                onLineClick = { seekMs -> playerViewModel.seekTo(seekMs) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        is LyricsDocument.WordSynced -> {
+                            KineticLyricsColumn(
+                                lines = parsedDocument.lines,
+                                currentTimeMs = visualTimeMs,
+                                onLineClick = { seekMs -> playerViewModel.seekTo(seekMs) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             }
@@ -239,6 +303,53 @@ fun LyricsScreen(
                 durationMs = durationMs
             )
         }
+    }
+    
+    if (showEditor) {
+        LyricsEditorDialog(
+            song = song,
+            initialLyrics = lyricsRaw,
+            onDismiss = { showEditor = false },
+            onSave = { newLyrics ->
+                val isSynced = newLyrics.contains("[00:") || newLyrics.contains("[01:") || newLyrics.contains("[02:")
+                val updatedSong = song.copy(
+                    lyrics = newLyrics,
+                    lyricsPlain = if (!isSynced) newLyrics else null,
+                    lyricsSynced = if (isSynced) newLyrics else null
+                )
+                playerViewModel.updateSong(updatedSong)
+                showEditor = false
+            }
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Lyrics", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            text = { Text("Are you sure you want to remove lyrics from this song?", fontFamily = Inter, color = GratiaTheme.colors.textSecondary) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val updatedSong = song.copy(lyrics = null, lyricsPlain = null, lyricsSynced = null)
+                        playerViewModel.updateSong(updatedSong)
+                        showDeleteConfirm = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.error)
+                ) {
+                    Text("Delete", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteConfirm = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
+                ) {
+                    Text("Cancel", fontFamily = Inter)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
     }
 }
 

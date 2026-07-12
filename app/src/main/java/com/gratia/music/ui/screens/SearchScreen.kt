@@ -1,13 +1,14 @@
 package com.gratia.music.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Lyrics
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,20 +20,18 @@ import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.ui.components.EmptyStateView
 import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.items
 
 @Composable
 fun SearchScreen(playerViewModel: PlayerViewModel) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     var query by remember { mutableStateOf("") }
     val results by songRepo.search(query.ifBlank { "§§NOMATCH§§" }).collectAsState(initial = emptyList())
-    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val scope = rememberCoroutineScope()
@@ -50,10 +49,21 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
         }
     }
 
-    val filters = listOf("All", "Songs", "Albums", "Artists", "Lyrics", "Playlists")
+    val filters = listOf("All", "Songs", "Artists", "Albums", "Lyrics")
     var selectedFilter by remember { mutableStateOf(filters[0]) }
 
-    val displayResults = if (query.isBlank()) emptyList() else results
+    val baseResults = if (query.isBlank()) emptyList() else results
+    val displayResults = remember(baseResults, lyricsMatchIds, selectedFilter, query) {
+        if (query.isBlank()) return@remember emptyList<SongEntity>()
+        when (selectedFilter) {
+            "All" -> baseResults + baseResults.filter { it.id in lyricsMatchIds }.filter { it !in baseResults }
+            "Songs" -> baseResults.filter { it.title.contains(query, ignoreCase = true) }
+            "Artists" -> baseResults.filter { it.artist.contains(query, ignoreCase = true) }
+            "Albums" -> baseResults.filter { it.album?.contains(query, ignoreCase = true) == true }
+            "Lyrics" -> baseResults.filter { it.id in lyricsMatchIds }
+            else -> baseResults
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -123,23 +133,21 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
 
         if (query.isBlank()) {
             // Empty search state
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(Icons.Default.Search, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(48.dp))
-                Spacer(Modifier.height(16.dp))
-                Text("Search your private library", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textSecondary)
-                Text("Try a song, artist, album, mood, or lyric.", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                EmptyStateView(
+                    icon = Icons.Default.Search,
+                    headline = "Search your library",
+                    description = "Find any song, artist, album, or matching lyric."
+                )
             }
         } else if (displayResults.isEmpty()) {
             // No results
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text("No results for \"$query\"", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textSecondary)
-                Text("Try a different spelling or search term", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                EmptyStateView(
+                    icon = Icons.Default.Search,
+                    headline = "No results for \"$query\"",
+                    description = "Try a different spelling or check your active filter."
+                )
             }
         } else {
             // Results
@@ -153,13 +161,13 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
             LazyColumn(
                 contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp)
             ) {
-                itemsIndexed(displayResults, key = { _, s -> s.id }) { index, song ->
+                itemsIndexed(displayResults.distinctBy { it.id }, key = { _, s -> s.id }) { index, song ->
                     SongRow(
                         song = song,
                         index = index,
                         isActive = currentSong?.id == song.id,
                         isPlaying = currentSong?.id == song.id && isPlaying,
-                        onClick = { playerViewModel.playSong(song, displayResults) },
+                        onClick = { playerViewModel.playSong(song, displayResults.distinctBy { it.id }) },
                         badge = if (song.id in lyricsMatchIds) "Lyrics match" else null,
                         modifier = Modifier.padding(horizontal = 24.dp)
                     )

@@ -22,6 +22,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val songRepository = SongRepository(
         GratiaApp.instance.database.songDao()
     )
+    private val playlistDao = GratiaApp.instance.database.playlistDao()
 
     val currentSong = playerManager.currentSong
     val isPlaying = playerManager.isPlaying
@@ -31,6 +32,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val shuffleEnabled = playerManager.shuffleEnabled
     val repeatMode = playerManager.repeatMode
     val playbackError = playerManager.playbackError
+
+    val songCount = songRepository.getSongCount()
+    val playlistCount = playlistDao.getPlaylistCount()
 
     private val _expandedPlayerOpen = MutableStateFlow(false)
     val expandedPlayerOpen: StateFlow<Boolean> = _expandedPlayerOpen.asStateFlow()
@@ -70,6 +74,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleFavorite(song: SongEntity) {
         viewModelScope.launch {
             songRepository.toggleFavorite(song.id, !song.isFavorite)
+        }
+    }
+
+    fun updateSong(song: SongEntity) {
+        viewModelScope.launch {
+            songRepository.updateSong(song)
+            if (currentSong.value?.id == song.id) {
+                // To trigger UI updates if current song is updated
+                // The easiest way is to reload or rely on Flow, but PlayerManager might need it
+                playerManager.playSong(song, queue.value)
+            }
+        }
+    }
+    
+    fun clearQueue() {
+        viewModelScope.launch {
+            playerManager.clearQueue()
         }
     }
 

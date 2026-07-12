@@ -279,7 +279,7 @@ class PlayerManager(private val context: Context) {
                 .setMediaId(song.id)
                 .setMediaMetadata(metadataBuilder.build())
                 .build()
-                
+
             controller.setMediaItem(mediaItem)
             controller.prepare()
             controller.play()
@@ -322,6 +322,12 @@ class PlayerManager(private val context: Context) {
         Log.d(TAG, "seekTo: ${clampedPosition}ms")
         controller.seekTo(clampedPosition)
         _currentTimeMs.value = clampedPosition
+    }
+
+    fun clearQueue() {
+        mediaController?.clearMediaItems()
+        _currentSong.value = null
+        _queue.value = emptyList()
     }
 
     fun nextSong() {

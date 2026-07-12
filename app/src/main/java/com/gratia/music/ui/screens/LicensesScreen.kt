@@ -71,7 +71,7 @@ fun LicensesScreen(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = androidx.compose.ui.graphics.Color.White,
+                color = GratiaTheme.colors.surface,
                 border = ButtonDefaults.outlinedButtonBorder.copy(
                     brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
                 ),
@@ -96,41 +96,11 @@ fun LicensesScreen(
                 }
             }
 
-            // Attributions Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = androidx.compose.ui.graphics.Color.White,
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
-                ),
-                shadowElevation = 4.dp
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Attributions & References",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = GratiaTheme.colors.textPrimary
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "This project includes or adapts open-source components and implementation ideas from GPLv3-licensed Android music player projects, including Retro Music Player. We are grateful to the original developers for their contributions to the open-source Android music ecosystem.\n\n" +
-                               "Lyrics animation behavior is adapted from akshayjadhav4/lyrics-animation, modified and written in native Kotlin and Jetpack Compose.",
-                        fontFamily = Inter,
-                        fontSize = 12.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        lineHeight = 18.sp
-                    )
-                }
-            }
-
             // Third-party libraries info
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = androidx.compose.ui.graphics.Color.White,
+                color = GratiaTheme.colors.surface,
                 border = ButtonDefaults.outlinedButtonBorder.copy(
                     brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
                 ),

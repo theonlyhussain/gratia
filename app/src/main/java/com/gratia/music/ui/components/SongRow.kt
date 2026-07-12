@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +33,7 @@ fun SongRow(
     isPlaying: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    onMoreClick: (() -> Unit)? = null,
     badge: String? = null,
     modifier: Modifier = Modifier
 ) {
@@ -147,6 +150,21 @@ fun SongRow(
             fontSize = 11.sp,
             color = GratiaTheme.colors.textSecondary
         )
+        
+        if (onMoreClick != null) {
+            Spacer(Modifier.width(8.dp))
+            IconButton(
+                onClick = onMoreClick,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.MoreVert,
+                    contentDescription = "More options",
+                    tint = GratiaTheme.colors.textSecondary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
     }
 }
 

@@ -16,6 +16,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import com.gratia.music.ui.components.SongMenuSheet
+import com.gratia.music.ui.components.SongInfoDialog
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -83,6 +85,10 @@ fun ExpandedPlayer(
 
     // --- State for progress bar drag interaction ---
     var isDragging by remember { mutableStateOf(false) }
+    
+    // --- Menu state ---
+    var showSongMenu by remember { mutableStateOf(false) }
+    var showSongInfo by remember { mutableStateOf(false) }
 
     // --- Swipe-to-dismiss state ---
     var dismissOffsetY by remember { mutableFloatStateOf(0f) }
@@ -203,7 +209,7 @@ fun ExpandedPlayer(
                 )
 
                 IconButton(
-                    onClick = { /* More options */ },
+                    onClick = { showSongMenu = true },
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
@@ -291,6 +297,30 @@ fun ExpandedPlayer(
 
             Spacer(Modifier.weight(0.05f))
             Spacer(Modifier.navigationBarsPadding())
+        }
+        
+        if (showSongMenu) {
+            SongMenuSheet(
+                song = song,
+                onDismiss = { showSongMenu = false },
+                onPlayNext = { },
+                onAddToQueue = { },
+                onAddToPlaylist = { },
+                onToggleLike = { playerViewModel.toggleFavorite(song) },
+                onGoToAlbum = { },
+                onGoToArtist = { },
+                onEditLyrics = { },
+                onShare = { },
+                onSongInfo = { showSongInfo = true },
+                onDelete = { }
+            )
+        }
+        
+        if (showSongInfo) {
+            SongInfoDialog(
+                song = song,
+                onDismiss = { showSongInfo = false }
+            )
         }
     }
 }
