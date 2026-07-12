@@ -1,31 +1,7 @@
 # Gratia
 
 > A modern, private Android music player focused on beautiful design, smooth playback, and a personal listening experience.
-
-<!-- Banner Image -->
-
-## Screenshots
-
-The screenshots below showcase the latest Gratia user interface.
-
-| Home | Player |
-|------|--------|
-| ![](docs/screenshots/home.png) | ![](docs/screenshots/player.png) |
-
-| Lyrics | Library |
-|--------|----------|
-| ![](docs/screenshots/lyrics.png) | ![](docs/screenshots/library.png) |
-
-| Search | Playlist |
-|--------|----------|
-| ![](docs/screenshots/search.png) | ![](docs/screenshots/playlist.png) |
-
-| Profile |
-|---------|
-| ![](docs/screenshots/profile.png) |
-
-## Features
-
+> 
 ### Playback
 * Gapless-inspired playback
 * Queue support
