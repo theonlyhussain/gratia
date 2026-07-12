@@ -34,6 +34,9 @@ fun PlayerHeader(
     artist: String,
     album: String?,
     playingFrom: String = "GRATIA",
+    onClickTitle: () -> Unit = {},
+    onClickArtist: () -> Unit = {},
+    onClickAlbum: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -64,7 +67,8 @@ fun PlayerHeader(
             lineHeight = 30.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            fadeDurationMs = 400
+            fadeDurationMs = 400,
+            modifier = Modifier.clickable { onClickTitle() }
         )
 
         Spacer(Modifier.height(6.dp))
@@ -77,7 +81,8 @@ fun PlayerHeader(
             fontFamily = Inter,
             color = Color.White.copy(alpha = 0.55f),
             maxLines = 1,
-            fadeDurationMs = 350
+            fadeDurationMs = 350,
+            modifier = Modifier.clickable { onClickArtist() }
         )
 
         // Album / year — only if present
@@ -90,7 +95,8 @@ fun PlayerHeader(
                 fontFamily = Inter,
                 color = Color.White.copy(alpha = 0.3f),
                 maxLines = 1,
-                fadeDurationMs = 350
+                fadeDurationMs = 350,
+                modifier = Modifier.clickable { onClickAlbum() }
             )
         }
     }

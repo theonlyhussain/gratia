@@ -77,11 +77,28 @@ fun GratiaAppRoot() {
         com.gratia.music.data.ThemeOption.SYSTEM -> isSystemDark
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     GratiaTheme(isDark = isDark) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Scaffold(
-                containerColor = GratiaTheme.colors.background,
-            bottomBar = {
+        CompositionLocalProvider(
+            LocalSnackbarHostState provides snackbarHostState,
+            LocalNavController provides navController,
+            LocalPlayerViewModel provides playerViewModel
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Scaffold(
+                    containerColor = GratiaTheme.colors.background,
+                    snackbarHost = { 
+                        SnackbarHost(hostState = snackbarHostState) { data ->
+                            Snackbar(
+                                snackbarData = data,
+                                containerColor = GratiaTheme.colors.surface,
+                                contentColor = GratiaTheme.colors.textPrimary,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
+                    },
+                    bottomBar = {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
@@ -262,7 +279,8 @@ fun GratiaAppRoot() {
                 composable("settings") {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateToAbout = { navController.navigate("about") }
+                        onNavigateToAbout = { navController.navigate("about") },
+                        onNavigateToLicenses = { navController.navigate("licenses") }
                     )
                 }
                 composable(
@@ -340,6 +358,12 @@ fun GratiaAppRoot() {
                 onOpenQueue = {
                     queueSheetOpen = true
                 },
+                onNavigateToAlbum = { albumName ->
+                    navController.navigate("album/$albumName")
+                },
+                onNavigateToArtist = { artistName ->
+                    navController.navigate("artist/$artistName")
+                },
                 onDismiss = {
                     playerViewModel.setExpandedPlayerOpen(false)
                 }
@@ -406,6 +430,7 @@ fun GratiaAppRoot() {
                         .scale(logoScale)
                         .clip(RoundedCornerShape(32.dp))
                 )
+            }
             }
         }
     }

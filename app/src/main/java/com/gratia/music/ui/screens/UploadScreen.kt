@@ -411,7 +411,7 @@ fun UploadScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             shape = RoundedCornerShape(16.dp),
-            color = androidx.compose.ui.graphics.Color.White,
+            color = GratiaTheme.colors.surface,
             border = ButtonDefaults.outlinedButtonBorder.copy(
                 brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
             ),
@@ -794,8 +794,8 @@ private fun GratiaTextField(value: String, onValueChange: (String) -> Unit, labe
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = if (errorMessage != null) GratiaTheme.colors.error else GratiaTheme.colors.accent.copy(alpha = 0.4f),
             unfocusedBorderColor = if (errorMessage != null) GratiaTheme.colors.error else GratiaTheme.colors.glassBorder,
-            focusedContainerColor = androidx.compose.ui.graphics.Color.White,
-            unfocusedContainerColor = androidx.compose.ui.graphics.Color.White,
+            focusedContainerColor = GratiaTheme.colors.surface,
+            unfocusedContainerColor = GratiaTheme.colors.surface,
             focusedTextColor = GratiaTheme.colors.textPrimary,
             unfocusedTextColor = GratiaTheme.colors.textPrimary,
             cursorColor = GratiaTheme.colors.accent,

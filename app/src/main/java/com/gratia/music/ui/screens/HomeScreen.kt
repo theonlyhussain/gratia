@@ -247,55 +247,21 @@ fun FeaturedCarousel(songs: List<SongEntity>, playerViewModel: PlayerViewModel) 
 
 @Composable
 fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlayCount: Boolean = false) {
+    val currentSong by playerViewModel.currentSong.collectAsState()
+    val isPlaying by playerViewModel.isPlaying.collectAsState()
+
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(horizontal = 24.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         songs.forEachIndexed { index, song ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GratiaTheme.colors.surface.copy(alpha = 0.5f))
-                    .clickableWithScale { playerViewModel.playSong(song, songs) }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (showPlayCount) {
-                    Text(
-                        text = "${index + 1}",
-                        fontWeight = FontWeight.Bold,
-                        color = GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.width(24.dp)
-                    )
-                }
-                CoverArtImage(
-                    coverArtPath = song.coverArtPath,
-                    title = song.title,
-                    artist = song.artist,
-                    size = 48.dp,
-                    cornerRadius = 8.dp,
-                    fontSize = 14.sp
-                )
-                Spacer(Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song.title,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp,
-                        color = GratiaTheme.colors.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song.artist,
-                        fontSize = 13.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
+            com.gratia.music.ui.components.SongRow(
+                song = song,
+                index = index,
+                isActive = currentSong?.id == song.id,
+                isPlaying = currentSong?.id == song.id && isPlaying,
+                onClick = { playerViewModel.playSong(song, songs) },
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
         }
     }
 }

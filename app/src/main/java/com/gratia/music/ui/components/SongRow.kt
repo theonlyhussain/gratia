@@ -1,8 +1,10 @@
 package com.gratia.music.ui.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +19,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.data.model.SongEntity
+import com.gratia.music.ui.LocalNavController
+import com.gratia.music.ui.LocalPlayerViewModel
+import com.gratia.music.ui.components.SongMenuSheet
+import com.gratia.music.ui.components.SongInfoDialog
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -25,6 +31,7 @@ import com.gratia.music.ui.player.formatTime
 /**
  * Library song row. Translates SongRow.tsx from the web prototype.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(
     song: SongEntity,
@@ -37,7 +44,12 @@ fun SongRow(
     badge: String? = null,
     modifier: Modifier = Modifier
 ) {
+    val navController = LocalNavController.current
+    val playerViewModel = LocalPlayerViewModel.current
     val firstMood = song.mood?.split(",")?.firstOrNull()?.trim()
+    var showMenu by remember { mutableStateOf(false) }
+    var showInfo by remember { mutableStateOf(false) }
+    var showAddToPlaylist by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -47,7 +59,10 @@ fun SongRow(
                 if (isActive) Modifier.background(GratiaTheme.colors.glassBorder)
                 else Modifier
             )
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { showMenu = true }
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -68,14 +83,18 @@ fun SongRow(
         Spacer(Modifier.width(12.dp))
 
         // Cover art image
-        CoverArtImage(
-            coverArtPath = song.coverArtPath,
-            title = song.title,
-            artist = song.artist,
-            size = 40.dp,
-            cornerRadius = 6.dp,
-            fontSize = 10.sp
-        )
+        Box(modifier = Modifier
+            .clickable { playerViewModel.setExpandedPlayerOpen(true) }
+        ) {
+            CoverArtImage(
+                coverArtPath = song.coverArtPath,
+                title = song.title,
+                artist = song.artist,
+                size = 40.dp,
+                cornerRadius = 6.dp,
+                fontSize = 10.sp
+            )
+        }
 
         Spacer(Modifier.width(12.dp))
 
@@ -97,7 +116,8 @@ fun SongRow(
                     fontSize = 11.sp,
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable { navController.navigate("artist/${song.artist}") }
                 )
                 if (song.album != null) {
                     Text(" · ", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
@@ -107,7 +127,8 @@ fun SongRow(
                         fontSize = 11.sp,
                         color = GratiaTheme.colors.textSecondary,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { navController.navigate("album/${song.album}") }
                     )
                 }
             }
@@ -154,7 +175,7 @@ fun SongRow(
         if (onMoreClick != null) {
             Spacer(Modifier.width(8.dp))
             IconButton(
-                onClick = onMoreClick,
+                onClick = { showMenu = true },
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
@@ -165,6 +186,44 @@ fun SongRow(
                 )
             }
         }
+    }
+
+    if (showMenu) {
+        SongMenuSheet(
+            song = song,
+            onDismiss = { showMenu = false },
+            onPlayNext = { playerViewModel.playNext(song) },
+            onAddToQueue = { playerViewModel.addToQueue(song) },
+            onAddToPlaylist = { 
+                showMenu = false
+                showAddToPlaylist = true 
+            },
+            onToggleLike = { playerViewModel.toggleFavorite(song) },
+            onGoToAlbum = { 
+                if (!song.album.isNullOrBlank()) navController.navigate("album/${song.album}")
+            },
+            onGoToArtist = { navController.navigate("artist/${song.artist}") },
+            onEditLyrics = {
+                navController.navigate("fullLyrics/${song.id}")
+            },
+            onShare = { /* TODO */ },
+            onSongInfo = { showInfo = true },
+            onDelete = { /* TODO Phase 6 */ }
+        )
+    }
+
+    if (showInfo) {
+        SongInfoDialog(
+            song = song,
+            onDismiss = { showInfo = false }
+        )
+    }
+
+    if (showAddToPlaylist) {
+        com.gratia.music.ui.components.AddToPlaylistSheet(
+            song = song,
+            onDismiss = { showAddToPlaylist = false }
+        )
     }
 }
 

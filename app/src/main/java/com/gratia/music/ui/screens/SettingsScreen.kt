@@ -34,7 +34,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToAbout: () -> Unit
+    onNavigateToAbout: () -> Unit,
+    onNavigateToLicenses: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -257,49 +258,91 @@ fun SettingsScreen(
                 }
             }
 
-            // About Card
+            // Legal & More Card
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                color = androidx.compose.ui.graphics.Color.White,
+                color = GratiaTheme.colors.surface,
                 border = ButtonDefaults.outlinedButtonBorder.copy(
                     brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
                 ),
                 shadowElevation = 4.dp
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { onNavigateToAbout() }
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "About",
-                            fontFamily = Inter,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = GratiaTheme.colors.textPrimary
-                        )
-                        Text(
-                            text = "App info, developer, and legal licenses",
-                            fontFamily = Inter,
-                            fontSize = 11.sp,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = null,
-                        tint = GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.size(20.dp)
+                Column {
+                    SettingsRow(
+                        title = "GitHub",
+                        subtitle = "Open source repository",
+                        onClick = {
+                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia")))
+                        }
+                    )
+                    HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                    SettingsRow(
+                        title = "Privacy Policy",
+                        subtitle = "Local-first data policy",
+                        onClick = { 
+                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia/blob/main/PRIVACY.md")))
+                        }
+                    )
+                    HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                    SettingsRow(
+                        title = "Changelog",
+                        subtitle = "What's new in v2.0.0",
+                        onClick = { 
+                            context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia/releases")))
+                        }
+                    )
+                    HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                    SettingsRow(
+                        title = "Licenses",
+                        subtitle = "Open-source libraries",
+                        onClick = onNavigateToLicenses
+                    )
+                    HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                    SettingsRow(
+                        title = "About",
+                        subtitle = "App info, developer, and device stats",
+                        onClick = onNavigateToAbout
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontFamily = Inter,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                color = GratiaTheme.colors.textPrimary
+            )
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    text = subtitle,
+                    fontFamily = Inter,
+                    fontSize = 11.sp,
+                    color = GratiaTheme.colors.textSecondary
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = GratiaTheme.colors.textSecondary,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

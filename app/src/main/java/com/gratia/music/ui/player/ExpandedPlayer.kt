@@ -38,6 +38,8 @@ import com.gratia.music.ui.components.GlassSurface
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import com.gratia.music.ui.LocalSnackbarHostState
+import kotlinx.coroutines.launch
 
 /**
  * Full-screen cinematic expanded player.
@@ -62,6 +64,8 @@ fun ExpandedPlayer(
     playerViewModel: PlayerViewModel,
     onOpenLyrics: () -> Unit = {},
     onOpenQueue: () -> Unit = {},
+    onNavigateToAlbum: (String) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     onDismiss: () -> Unit = { playerViewModel.setExpandedPlayerOpen(false) }
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
@@ -70,6 +74,9 @@ fun ExpandedPlayer(
     val durationMs by playerViewModel.durationMs.collectAsState()
     val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
     val repeatMode by playerViewModel.repeatMode.collectAsState()
+
+    val snackbarHostState = LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
 
     val song = currentSong ?: return
 
@@ -89,6 +96,7 @@ fun ExpandedPlayer(
     // --- Menu state ---
     var showSongMenu by remember { mutableStateOf(false) }
     var showSongInfo by remember { mutableStateOf(false) }
+    var showAddToPlaylist by remember { mutableStateOf(false) }
 
     // --- Swipe-to-dismiss state ---
     var dismissOffsetY by remember { mutableFloatStateOf(0f) }
@@ -240,7 +248,18 @@ fun ExpandedPlayer(
                 title = song.title,
                 artist = song.artist,
                 album = song.album,
-                playingFrom = (song.album ?: "GRATIA").uppercase()
+                playingFrom = (song.album ?: "GRATIA").uppercase(),
+                onClickTitle = { showSongInfo = true },
+                onClickArtist = {
+                    onDismiss()
+                    onNavigateToArtist(song.artist)
+                },
+                onClickAlbum = {
+                    if (!song.album.isNullOrBlank()) {
+                        onDismiss()
+                        onNavigateToAlbum(song.album)
+                    }
+                }
             )
 
             Spacer(Modifier.height(16.dp))
@@ -277,7 +296,11 @@ fun ExpandedPlayer(
                 isFavorite = song.isFavorite,
                 onToggleShuffle = { playerViewModel.toggleShuffle() },
                 onCycleRepeat = { playerViewModel.cycleRepeatMode() },
-                onToggleFavorite = { playerViewModel.toggleFavorite(song) },
+                onToggleFavorite = { 
+                    playerViewModel.toggleFavorite(song)
+                    val msg = if (song.isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
+                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                },
                 onOpenQueue = onOpenQueue,
                 onOpenLyrics = onOpenLyrics,
                 accentColor = GratiaTheme.colors.accent
@@ -303,16 +326,31 @@ fun ExpandedPlayer(
             SongMenuSheet(
                 song = song,
                 onDismiss = { showSongMenu = false },
-                onPlayNext = { },
-                onAddToQueue = { },
-                onAddToPlaylist = { },
-                onToggleLike = { playerViewModel.toggleFavorite(song) },
-                onGoToAlbum = { },
-                onGoToArtist = { },
-                onEditLyrics = { },
-                onShare = { },
+                onPlayNext = { playerViewModel.playNext(song) },
+                onAddToQueue = { playerViewModel.addToQueue(song) },
+                onAddToPlaylist = { 
+                    showSongMenu = false
+                    showAddToPlaylist = true 
+                },
+                onToggleLike = { 
+                    playerViewModel.toggleFavorite(song)
+                    val msg = if (song.isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
+                    scope.launch { snackbarHostState.showSnackbar(msg) }
+                },
+                onGoToAlbum = {
+                    if (!song.album.isNullOrBlank()) {
+                        onDismiss()
+                        onNavigateToAlbum(song.album)
+                    }
+                },
+                onGoToArtist = {
+                    onDismiss()
+                    onNavigateToArtist(song.artist)
+                },
+                onEditLyrics = { onOpenLyrics() },
+                onShare = { /* TODO Context sharing */ },
                 onSongInfo = { showSongInfo = true },
-                onDelete = { }
+                onDelete = { /* TODO Phase 6: ConfirmationDialog */ }
             )
         }
         
@@ -320,6 +358,13 @@ fun ExpandedPlayer(
             SongInfoDialog(
                 song = song,
                 onDismiss = { showSongInfo = false }
+            )
+        }
+
+        if (showAddToPlaylist) {
+            com.gratia.music.ui.components.AddToPlaylistSheet(
+                song = song,
+                onDismiss = { showAddToPlaylist = false }
             )
         }
     }

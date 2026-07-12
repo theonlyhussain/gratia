@@ -138,6 +138,9 @@ dependencies {
     // Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
 
+    // Drag-to-reorder for lists
+    implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
+
     // Debug tools
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

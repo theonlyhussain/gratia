@@ -16,27 +16,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Launch
-import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gratia.music.GratiaApp
 import com.gratia.music.R
+import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -48,8 +47,12 @@ fun AboutScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
+    val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
+
     val songCount by playerViewModel.songCount.collectAsState(initial = 0)
     val playlistCount by playerViewModel.playlistCount.collectAsState(initial = 0)
+    val albumCount by songRepo.getAllSongs().map { songs -> songs.mapNotNull { it.album }.distinct().size }.collectAsState(initial = 0)
+    val artistCount by songRepo.getAllSongs().map { songs -> songs.map { it.artist }.distinct().size }.collectAsState(initial = 0)
     
     var storageUsed by remember { mutableStateOf("Calculating...") }
     
@@ -63,7 +66,7 @@ fun AboutScreen(
             .background(GratiaTheme.colors.background)
             .statusBarsPadding()
     ) {
-        // Header
+        // Header (Matches Settings exactly)
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -96,7 +99,7 @@ fun AboutScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
                 .verticalScroll(scrollState),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Hero App Info
             Column(
@@ -129,68 +132,70 @@ fun AboutScreen(
                 )
             }
 
-            // Software & Device Info Section
-            SectionCard("System Information") {
-                InfoRow("Build Number", "200")
+            AboutCard(title = "System Information") {
+                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                val appVersion = packageInfo.versionName ?: "Unknown"
+                val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    packageInfo.longVersionCode.toString()
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageInfo.versionCode.toString()
+                }
+                
+                AboutInfoRow("Build Number", buildNumber)
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                InfoRow("Release Channel", "Stable")
+                AboutInfoRow("Release Channel", "Beta")
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                InfoRow("App Version", "2.0.0")
+                AboutInfoRow("Android Version", Build.VERSION.RELEASE)
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                InfoRow("Android Version", Build.VERSION.RELEASE)
-                HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                InfoRow("Device Model", "${Build.MANUFACTURER} ${Build.MODEL}")
+                AboutInfoRow("Device Model", "${Build.MANUFACTURER} ${Build.MODEL}")
             }
 
-            // Library Stats Section
-            SectionCard("Library Statistics") {
-                InfoRow("Songs", songCount.toString())
+            // Library Statistics Card
+            AboutCard(title = "Library Statistics") {
+                AboutInfoRow("Storage Used", storageUsed)
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                InfoRow("Playlists", playlistCount.toString())
+                AboutInfoRow("Songs", songCount.toString())
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                InfoRow("Storage Used", storageUsed)
+                AboutInfoRow("Albums", albumCount.toString())
+                HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                AboutInfoRow("Artists", artistCount.toString())
+                HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                AboutInfoRow("Playlists", playlistCount.toString())
             }
 
-            // Links Section
-            SectionCard("Developer") {
-                ActionRow(
-                    icon = Icons.Outlined.Person,
-                    title = "Developer",
-                    subtitle = "Hussain Shaikh",
-                    onClick = null
-                )
+            // Developer & Links Card
+            AboutCard(title = "Developer & Links") {
+                AboutInfoRow("Developer", "Hussain Shaikh")
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                ActionRow(
-                    icon = Icons.Outlined.Code,
+                AboutActionRow(
                     title = "GitHub",
-                    subtitle = "Open Source Repository",
+                    subtitle = "Open source repository",
                     onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia")))
                     }
                 )
-            }
-
-            // Legal & More
-            SectionCard("Legal & More") {
-                ActionRow(
-                    icon = Icons.Outlined.Description,
-                    title = "Open-Source Licenses",
-                    subtitle = "Libraries used in Gratia",
-                    onClick = onNavigateToLicenses
-                )
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                ActionRow(
-                    icon = Icons.Outlined.PrivacyTip,
+                AboutActionRow(
                     title = "Privacy Policy",
                     subtitle = "Local-first data policy",
-                    onClick = { /* Privacy Policy implementation */ }
+                    onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/blob/main/PRIVACY.md")))
+                    }
                 )
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
-                ActionRow(
-                    icon = Icons.Outlined.Update,
+                AboutActionRow(
                     title = "Changelog",
                     subtitle = "What's new in v2.0.0",
-                    onClick = { /* Changelog implementation */ }
+                    onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/releases")))
+                    }
+                )
+                HorizontalDivider(color = GratiaTheme.colors.glassBorder)
+                AboutActionRow(
+                    title = "Licenses",
+                    subtitle = "Open-source libraries",
+                    onClick = onNavigateToLicenses
                 )
             }
 
@@ -200,39 +205,33 @@ fun AboutScreen(
 }
 
 @Composable
-fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column {
-        Text(
-            text = title.uppercase(),
-            fontFamily = Inter,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 11.sp,
-            color = GratiaTheme.colors.textSecondary,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
-        )
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            color = GratiaTheme.colors.surface,
-            border = ButtonDefaults.outlinedButtonBorder.copy(
-                brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
-            ),
-            shadowElevation = 0.dp
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                content()
-            }
+private fun AboutCard(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = GratiaTheme.colors.surface,
+        shadowElevation = 4.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                fontFamily = Inter,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                color = GratiaTheme.colors.textPrimary
+            )
+            Spacer(Modifier.height(8.dp))
+            content()
         }
     }
 }
 
 @Composable
-fun InfoRow(label: String, value: String) {
+private fun AboutInfoRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -253,26 +252,15 @@ fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-fun ActionRow(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: (() -> Unit)?
-) {
+private fun AboutActionRow(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = GratiaTheme.colors.accent,
-            modifier = Modifier.size(24.dp)
-        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
@@ -284,19 +272,17 @@ fun ActionRow(
                 Text(
                     text = subtitle,
                     fontFamily = Inter,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     color = GratiaTheme.colors.textSecondary
                 )
             }
         }
-        if (onClick != null) {
-            Icon(
-                imageVector = Icons.Default.Launch,
-                contentDescription = null,
-                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f),
-                modifier = Modifier.size(16.dp)
-            )
-        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = GratiaTheme.colors.textSecondary,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

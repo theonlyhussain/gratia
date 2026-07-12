@@ -16,7 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.gratia.music.GratiaApp
+import com.gratia.music.data.SettingsDataStore
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
@@ -29,6 +32,10 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SearchScreen(playerViewModel: PlayerViewModel) {
+    val context = LocalContext.current
+    val settingsDataStore = remember { SettingsDataStore(context) }
+    val searchHistory by settingsDataStore.searchHistoryFlow.collectAsState(initial = emptySet())
+    
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     var query by remember { mutableStateOf("") }
     val results by songRepo.search(query.ifBlank { "§§NOMATCH§§" }).collectAsState(initial = emptyList())
@@ -132,13 +139,76 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
         Spacer(Modifier.height(16.dp))
 
         if (query.isBlank()) {
-            // Empty search state
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                EmptyStateView(
-                    icon = Icons.Default.Search,
-                    headline = "Search your library",
-                    description = "Find any song, artist, album, or matching lyric."
-                )
+            if (searchHistory.isEmpty()) {
+                // Empty search state
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    EmptyStateView(
+                        icon = Icons.Default.Search,
+                        headline = "Search your library",
+                        description = "Find any song, artist, album, or matching lyric."
+                    )
+                }
+            } else {
+                // Search History
+                Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Recent Searches",
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+                        Text(
+                            text = "CLEAR",
+                            fontFamily = Inter,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = GratiaTheme.colors.accent,
+                            modifier = Modifier
+                                .clickable { scope.launch { settingsDataStore.clearSearchHistory() } }
+                                .padding(4.dp)
+                        )
+                    }
+
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        searchHistory.forEach { historyQuery ->
+                            InputChip(
+                                selected = false,
+                                onClick = { query = historyQuery },
+                                label = { Text(historyQuery, fontFamily = Inter, fontSize = 13.sp) },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        modifier = Modifier
+                                            .size(16.dp)
+                                            .clickable { scope.launch { settingsDataStore.removeSearchHistory(historyQuery) } }
+                                    )
+                                },
+                                colors = InputChipDefaults.inputChipColors(
+                                    containerColor = GratiaTheme.colors.surface,
+                                    labelColor = GratiaTheme.colors.textPrimary,
+                                    trailingIconColor = GratiaTheme.colors.textSecondary
+                                ),
+                                border = InputChipDefaults.inputChipBorder(
+                                    borderColor = GratiaTheme.colors.glassBorder,
+                                    enabled = true,
+                                    selected = false
+                                )
+                            )
+                        }
+                    }
+                }
             }
         } else if (displayResults.isEmpty()) {
             // No results
@@ -167,7 +237,10 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
                         index = index,
                         isActive = currentSong?.id == song.id,
                         isPlaying = currentSong?.id == song.id && isPlaying,
-                        onClick = { playerViewModel.playSong(song, displayResults.distinctBy { it.id }) },
+                        onClick = { 
+                            scope.launch { settingsDataStore.addSearchHistory(query) }
+                            playerViewModel.playSong(song, displayResults.distinctBy { it.id }) 
+                        },
                         badge = if (song.id in lyricsMatchIds) "Lyrics match" else null,
                         modifier = Modifier.padding(horizontal = 24.dp)
                     )

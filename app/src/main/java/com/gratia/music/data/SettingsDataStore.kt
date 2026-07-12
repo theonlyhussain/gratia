@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -37,6 +38,35 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setThemeOption(themeOption: ThemeOption) {
         context.dataStore.edit { preferences ->
             preferences[THEME_KEY] = themeOption.value
+        }
+    }
+
+    private val SEARCH_HISTORY_KEY = stringSetPreferencesKey("search_history")
+
+    val searchHistoryFlow: Flow<Set<String>> = context.dataStore.data
+        .map { preferences ->
+            preferences[SEARCH_HISTORY_KEY] ?: emptySet()
+        }
+
+    suspend fun addSearchHistory(query: String) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[SEARCH_HISTORY_KEY] ?: emptySet()
+            // Keep up to 10 recent searches
+            val updated = (setOf(query) + current).take(10).toSet()
+            preferences[SEARCH_HISTORY_KEY] = updated
+        }
+    }
+
+    suspend fun removeSearchHistory(query: String) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[SEARCH_HISTORY_KEY] ?: emptySet()
+            preferences[SEARCH_HISTORY_KEY] = current - query
+        }
+    }
+
+    suspend fun clearSearchHistory() {
+        context.dataStore.edit { preferences ->
+            preferences[SEARCH_HISTORY_KEY] = emptySet()
         }
     }
 }

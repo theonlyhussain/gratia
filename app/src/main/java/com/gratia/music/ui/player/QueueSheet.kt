@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -31,6 +32,10 @@ import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import org.burnoutcrew.reorderable.rememberReorderableLazyListState
+import org.burnoutcrew.reorderable.reorderable
+import org.burnoutcrew.reorderable.ReorderableItem
+import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 
 /**
  * Queue bottom sheet showing the current playback queue.
@@ -125,8 +130,25 @@ fun QueueSheet(
             // Empty state
             QueueEmptyState()
         } else {
+            val listState = rememberReorderableLazyListState(
+                onMove = { from, to ->
+                    // Reorder the queue via viewmodel
+                    // Note: from.index and to.index are based on LazyColumn items
+                    // We need to adjust by the number of headers
+                    val headerCount = if (current != null) 2 else 0
+                    val fromAdjusted = from.index - headerCount + upcomingStartIndex
+                    val toAdjusted = to.index - headerCount + upcomingStartIndex
+                    if (fromAdjusted >= upcomingStartIndex && toAdjusted >= upcomingStartIndex && fromAdjusted < queue.size && toAdjusted < queue.size) {
+                        playerViewModel.moveInQueue(fromAdjusted, toAdjusted)
+                    }
+                }
+            )
+
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                state = listState.listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .reorderable(listState),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 // Current song — pinned with highlight
@@ -161,14 +183,52 @@ fun QueueSheet(
                     upcoming,
                     key = { index, song -> "queue_${song.id}_$index" }
                 ) { index, song ->
-                    QueueRow(
-                        song = song,
-                        index = upcomingStartIndex + index,
-                        isCurrentSong = false,
-                        onPlay = { playerViewModel.playFromQueue(upcomingStartIndex + index) },
-                        onRemove = { playerViewModel.removeFromQueue(song.id) },
-                        modifier = Modifier.animateItem()
-                    )
+                    ReorderableItem(listState, key = "queue_${song.id}_$index") { isDragging ->
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { dismissValue ->
+                                if (dismissValue != SwipeToDismissBoxValue.Settled) {
+                                    playerViewModel.removeFromQueue(song.id)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                        )
+
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            modifier = Modifier
+                                .animateItem()
+                                .background(if (isDragging) GratiaTheme.colors.surfaceHover else Color.Transparent),
+                            enableDismissFromStartToEnd = true,
+                            enableDismissFromEndToStart = true,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(GratiaTheme.colors.error)
+                                        .padding(horizontal = 24.dp),
+                                    contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        tint = GratiaTheme.colors.background
+                                    )
+                                }
+                            },
+                            content = {
+                                QueueRow(
+                                    song = song,
+                                    index = upcomingStartIndex + index,
+                                    isCurrentSong = false,
+                                    onPlay = { playerViewModel.playFromQueue(upcomingStartIndex + index) },
+                                    onRemove = { playerViewModel.removeFromQueue(song.id) },
+                                    modifier = Modifier.detectReorderAfterLongPress(listState)
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
