@@ -442,7 +442,7 @@ fun UploadScreen(
                         ) {
                             Icon(
                                 if (selectedUri != null) Icons.Default.AudioFile else Icons.Default.Upload,
-                                contentDescription = null,
+                                contentDescription = "Error icon",
                                 modifier = Modifier.size(24.dp),
                                 tint = if (selectedUri != null) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
                             )
@@ -740,7 +740,7 @@ fun UploadScreen(
                         color = GratiaTheme.colors.success.copy(alpha = 0.08f),
                     ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = GratiaTheme.colors.success, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Check, contentDescription = "Success check", tint = GratiaTheme.colors.success, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 if (isEditMode) "Song updated!" else "Song saved to your library!",

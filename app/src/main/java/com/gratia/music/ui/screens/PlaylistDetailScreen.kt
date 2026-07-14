@@ -30,9 +30,11 @@ import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.EmptyStateView
 import com.gratia.music.ui.components.SongRow
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.GratiaIcon
+import com.gratia.music.ui.components.GratiaIconButton
+import com.gratia.music.ui.components.GratiaButton
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,29 +64,32 @@ fun PlaylistDetailScreen(
             .background(GratiaTheme.colors.background)
     ) {
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 120.dp)
+            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
         ) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 64.dp, bottom = 24.dp, start = 24.dp, end = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(
+                        top = 64.dp, // extra for status bar + top bar
+                        bottom = GratiaTheme.spacing.large,
+                        start = GratiaTheme.spacing.large,
+                        end = GratiaTheme.spacing.large
+                    ),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     val paths = playlistSongs.take(4).map { it.coverArtPath }
-                    Box(modifier = Modifier.shadow(24.dp, RoundedCornerShape(16.dp), spotColor = GratiaTheme.colors.accent)) {
+                    Box(modifier = Modifier.shadow(24.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent)) {
                         CollageArtwork(
                             paths = paths,
                             size = 200.dp,
-                            cornerRadius = 16.dp
+                            cornerRadius = 24.dp
                         )
                     }
                     
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(GratiaTheme.spacing.large))
                     
-                    Text(
+                    GratiaText(
                         text = playlist.name,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp,
+                        style = GratiaTheme.typography.largeTitle,
                         color = GratiaTheme.colors.textPrimary,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
@@ -92,53 +97,42 @@ fun PlaylistDetailScreen(
                     
                     val totalDurationMs = playlistSongs.sumOf { it.durationMs }
                     val minutes = totalDurationMs / (1000 * 60)
-                    Text(
+                    GratiaText(
                         text = "${playlistSongs.size} songs • $minutes min",
-                        fontFamily = Inter,
-                        fontSize = 14.sp,
+                        style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = GratiaTheme.spacing.small),
                         textAlign = TextAlign.Center
                     )
                     
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(GratiaTheme.spacing.large))
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.medium)
                     ) {
-                        Button(
+                        GratiaButton(
+                            text = "Play",
+                            icon = Icons.Default.PlayArrow,
                             onClick = { if (playlistSongs.isNotEmpty()) playerViewModel.playSong(playlistSongs.first(), playlistSongs) },
-                            modifier = Modifier.weight(1f).height(50.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = GratiaTheme.colors.surface,
-                                contentColor = GratiaTheme.colors.textPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Play")
-                            Spacer(Modifier.width(8.dp))
-                            Text("Play", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
-                        }
+                            modifier = Modifier.weight(1f),
+                            backgroundColor = GratiaTheme.colors.surface,
+                            contentColor = GratiaTheme.colors.textPrimary
+                        )
                         
-                        Button(
+                        GratiaButton(
+                            text = "Shuffle",
+                            icon = Icons.Default.Shuffle,
                             onClick = { 
                                 if (playlistSongs.isNotEmpty()) {
                                     playerViewModel.toggleShuffle()
                                     playerViewModel.playSong(playlistSongs.random(), playlistSongs)
                                 }
                             },
-                            modifier = Modifier.weight(1f).height(50.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = GratiaTheme.colors.surface,
-                                contentColor = GratiaTheme.colors.textPrimary
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Shuffle, contentDescription = "Shuffle")
-                            Spacer(Modifier.width(8.dp))
-                            Text("Shuffle", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
-                        }
+                            modifier = Modifier.weight(1f),
+                            backgroundColor = GratiaTheme.colors.surface,
+                            contentColor = GratiaTheme.colors.textPrimary
+                        )
                     }
                 }
             }
@@ -159,7 +153,7 @@ fun PlaylistDetailScreen(
                         isActive = currentSong?.id == song.id,
                         isPlaying = currentSong?.id == song.id && isPlaying,
                         onClick = { playerViewModel.playSong(song, playlistSongs) },
-                        modifier = Modifier.padding(horizontal = 24.dp)
+                        modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
                     )
                 }
             }
@@ -170,30 +164,32 @@ fun PlaylistDetailScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.medium),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(
+            GratiaIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
                 onClick = onBack,
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(GratiaTheme.colors.surface.copy(alpha = 0.8f))
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = GratiaTheme.colors.textPrimary)
-            }
+                    .background(GratiaTheme.colors.surface.copy(alpha = 0.8f)),
+                tint = GratiaTheme.colors.textPrimary
+            )
             
             Box {
-                IconButton(
+                GratiaIconButton(
+                    icon = Icons.Default.MoreVert,
+                    contentDescription = "More Options",
                     onClick = { showMenu = true },
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(GratiaTheme.colors.surface.copy(alpha = 0.8f))
-                ) {
-                    Icon(Icons.Default.MoreVert, "More Options", tint = GratiaTheme.colors.textPrimary)
-                }
+                        .background(GratiaTheme.colors.surface.copy(alpha = 0.8f)),
+                    tint = GratiaTheme.colors.textPrimary
+                )
                 
                 DropdownMenu(
                     expanded = showMenu,
@@ -201,14 +197,14 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.background(GratiaTheme.colors.surface)
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Rename", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                        text = { GratiaText("Rename", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
                         onClick = {
                             showMenu = false
                             showRenameDialog = true
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete Playlist", color = GratiaTheme.colors.error, fontFamily = Inter) },
+                        text = { GratiaText("Delete Playlist", style = GratiaTheme.typography.body, color = GratiaTheme.colors.error) },
                         onClick = {
                             showMenu = false
                             showDeleteConfirm = true
@@ -223,7 +219,7 @@ fun PlaylistDetailScreen(
         var newName by remember { mutableStateOf(playlist.name) }
         AlertDialog(
             onDismissRequest = { showRenameDialog = false },
-            title = { Text("Rename Playlist", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            title = { GratiaText("Rename Playlist", style = GratiaTheme.typography.title, color = GratiaTheme.colors.textPrimary) },
             text = {
                 OutlinedTextField(
                     value = newName,
@@ -267,8 +263,8 @@ fun PlaylistDetailScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete Playlist?", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
-            text = { Text("Are you sure you want to delete '${playlist.name}'? This cannot be undone.", fontFamily = Inter, color = GratiaTheme.colors.textSecondary) },
+            title = { GratiaText("Delete Playlist?", style = GratiaTheme.typography.title, color = GratiaTheme.colors.textPrimary) },
+            text = { GratiaText("Are you sure you want to delete '${playlist.name}'? This cannot be undone.", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textSecondary) },
             confirmButton = {
                 TextButton(
                     onClick = {

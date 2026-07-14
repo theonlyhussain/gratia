@@ -75,7 +75,7 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Favorite,
-                                contentDescription = null,
+                                contentDescription = "Favorite icon",
                                 modifier = Modifier.size(80.dp),
                                 tint = GratiaTheme.colors.background
                             )

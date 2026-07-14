@@ -246,7 +246,7 @@ fun LyricsScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.Lyrics,
-                                contentDescription = null,
+                                contentDescription = "Error icon",
                                 modifier = Modifier.size(56.dp),
                                 tint = Color.White.copy(alpha = 0.4f)
                             )
@@ -504,7 +504,7 @@ private fun EmptyLyricsState(
                     )
                     Icon(
                         imageVector = Icons.Default.Lyrics,
-                        contentDescription = null,
+                        contentDescription = "Search lyrics",
                         modifier = Modifier.size(56.dp),
                         tint = Color.White.copy(alpha = 0.4f)
                     )

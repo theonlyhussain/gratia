@@ -9,27 +9,21 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,16 +32,16 @@ import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.AnimatedText
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.GlassSurface
+import com.gratia.music.ui.components.GratiaIcon
+import com.gratia.music.ui.components.GratiaIconButton
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 
 /**
  * Redesigned mini player that feels connected to the full expanded player.
  *
  * Design details:
  * - Glass surface container matching the Gratia aesthetic
- * - Album art thumbnail (44dp) with rounded corners
+ * - Album art thumbnail (44dp) with GDL medium corners
  * - Song title + artist with crossfade on song change
  * - Thin progress line across the bottom edge
  * - Play/Pause + Next buttons
@@ -64,7 +58,9 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     val song = currentSong ?: return
     val progress = if (durationMs > 0) currentTimeMs.toFloat() / durationMs.toFloat() else 0f
 
-    val hapticFeedback = LocalHapticFeedback.current
+    val view = LocalView.current
+    val haptics = GratiaTheme.haptics
+    val motion = GratiaTheme.motion
 
     // Extract cover colors for subtle tinting
     var coverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
@@ -84,7 +80,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
             .graphicsLayer {
                 translationX = offsetX
                 alpha = (1f - (Math.abs(offsetX) / 1000f)).coerceIn(0f, 1f)
@@ -103,10 +99,10 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     }
                 )
             },
-        shape = RoundedCornerShape(20.dp),
+        shape = GratiaTheme.shapes.extraLarge,
         backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.92f),
         glowColor = coverColors.dominant,
-        elevation = 8.dp,
+        elevation = 8.dp, // GDL standard? GratiaTheme.elevation.low? Let's use 8dp as base
         borderColorStart = if (GratiaTheme.colors.isDark) {
             Color.White.copy(alpha = 0.08f)
         } else {
@@ -128,75 +124,70 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     coverArtPath = song.coverArtPath,
                     title = song.title,
                     artist = song.artist,
-                    size = 44.dp,
-                    cornerRadius = 10.dp,
+                    size = GratiaTheme.spacing.heroSmall, // ~48dp
+                    cornerRadius = 10.dp, // Or GratiaTheme.shapes.small equivalent
                     fontSize = 12.sp
                 )
 
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(GratiaTheme.spacing.mediumSmall))
 
                 // Title + Artist with crossfade
                 Column(modifier = Modifier.weight(1f)) {
                     AnimatedText(
                         text = song.title,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 13.sp,
+                        style = GratiaTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
                         color = GratiaTheme.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fadeDurationMs = 300
+                        fadeDurationMs = motion.normal
                     )
                     AnimatedText(
                         text = song.artist,
-                        fontFamily = Inter,
-                        fontSize = 11.sp,
+                        style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fadeDurationMs = 300
+                        fadeDurationMs = motion.normal
                     )
                 }
 
                 // Play/Pause
-                IconButton(
-                    onClick = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        playerViewModel.togglePlay()
-                    },
-                    modifier = Modifier.size(40.dp)
+                Box(
+                    modifier = Modifier.size(40.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     AnimatedContent(
                         targetState = isPlaying,
                         transitionSpec = {
-                            fadeIn(tween(200)) togetherWith fadeOut(tween(150))
+                            fadeIn(tween(motion.normal)) togetherWith fadeOut(tween(motion.fast))
                         },
                         label = "miniPlayPause"
                     ) { playing ->
-                        Icon(
-                            imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        GratiaIconButton(
+                            icon = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (playing) "Pause" else "Play",
+                            onClick = {
+                                haptics.light(view)
+                                playerViewModel.togglePlay()
+                            },
                             tint = GratiaTheme.colors.textPrimary,
-                            modifier = Modifier.size(24.dp)
+                            size = GratiaTheme.icons.normal
                         )
                     }
                 }
 
                 // Next
-                IconButton(
+                GratiaIconButton(
+                    icon = Icons.Default.SkipNext,
+                    contentDescription = "Next",
                     onClick = {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.light(view)
                         playerViewModel.nextSong()
                     },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        Icons.Default.SkipNext,
-                        contentDescription = "Next",
-                        tint = GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                    tint = GratiaTheme.colors.textSecondary,
+                    size = GratiaTheme.icons.small,
+                    modifier = Modifier.padding(start = GratiaTheme.spacing.small)
+                )
             }
 
             val progressTrackColor = GratiaTheme.colors.progressTrack

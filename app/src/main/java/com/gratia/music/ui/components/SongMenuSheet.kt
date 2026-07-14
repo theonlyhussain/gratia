@@ -121,7 +121,7 @@ private fun MenuActionRow(
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = text,
             tint = tint,
             modifier = Modifier.size(24.dp)
         )

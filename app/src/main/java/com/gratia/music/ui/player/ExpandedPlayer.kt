@@ -10,10 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import com.gratia.music.ui.components.SongMenuSheet
@@ -23,21 +20,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.gratia.music.data.CoverColorCache
 import com.gratia.music.lyrics.LyricsDocument
 import com.gratia.music.lyrics.LyricsParser
 import com.gratia.music.lyrics.LyricsTimingEngine
 import com.gratia.music.player.PlayerViewModel
-import com.gratia.music.player.RepeatMode
 import com.gratia.music.ui.components.AnimatedText
 import com.gratia.music.ui.components.GlassSurface
+import com.gratia.music.ui.components.GratiaIcon
+import com.gratia.music.ui.components.GratiaIconButton
+import com.gratia.music.ui.components.GratiaText
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 import com.gratia.music.ui.LocalSnackbarHostState
 import kotlinx.coroutines.launch
 
@@ -98,13 +93,15 @@ fun ExpandedPlayer(
     var showSongInfo by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
 
+    val motion = GratiaTheme.motion
+
     // --- Swipe-to-dismiss state ---
     var dismissOffsetY by remember { mutableFloatStateOf(0f) }
     val dismissAlpha by animateFloatAsState(
         targetValue = if (dismissOffsetY > 0f) {
             (1f - (dismissOffsetY / 800f)).coerceIn(0.3f, 1f)
         } else 1f,
-        animationSpec = tween(100),
+        animationSpec = tween(motion.instant),
         label = "dismissAlpha"
     )
 
@@ -190,43 +187,33 @@ fun ExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.small),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(
+                GratiaIconButton(
+                    icon = Icons.Default.KeyboardArrowDown,
                     onClick = onDismiss,
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(
-                        Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Collapse",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                    contentDescription = "Collapse",
+                    tint = Color.White,
+                    size = GratiaTheme.icons.large
+                )
 
                 // "PLAYING FROM" in top bar
                 AnimatedText(
                     text = song.album ?: "Gratia",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = Inter,
+                    style = GratiaTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
                     color = Color.White.copy(alpha = 0.7f),
                     maxLines = 1
                 )
 
-                IconButton(
+                GratiaIconButton(
+                    icon = Icons.Default.MoreVert,
                     onClick = { showSongMenu = true },
-                    modifier = Modifier.size(44.dp)
-                ) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "More",
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                    contentDescription = "More",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    size = GratiaTheme.icons.normal
+                )
             }
 
             Spacer(Modifier.weight(0.15f))
@@ -262,7 +249,7 @@ fun ExpandedPlayer(
                 }
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge)) // 16dp
 
             // --- Progress Bar ---
             GratiaProgressBar(
@@ -276,7 +263,7 @@ fun ExpandedPlayer(
                 onDragEnd = { isDragging = false }
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(GratiaTheme.spacing.small)) // 8dp
 
             // --- Primary Controls ---
             PlayerControls(
@@ -287,7 +274,7 @@ fun ExpandedPlayer(
                 glowColor = coverColors.vibrant
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge)) // 16dp
 
             // --- Secondary Actions ---
             SecondaryActionRow(
@@ -306,7 +293,7 @@ fun ExpandedPlayer(
                 accentColor = GratiaTheme.colors.accent
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(GratiaTheme.spacing.mediumSmall)) // 12dp
 
             // --- Lyrics Preview Card ---
             LyricsPreviewCard(
@@ -383,83 +370,76 @@ private fun LyricsPreviewCard(
     GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp)
+            .padding(horizontal = GratiaTheme.spacing.large)
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        shape = GratiaTheme.shapes.large,
         backgroundColor = Color.White.copy(alpha = 0.06f),
         borderColorStart = Color.White.copy(alpha = 0.15f),
         borderColorEnd = Color.Transparent
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(GratiaTheme.spacing.mediumLarge)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "LYRICS",
-                    fontSize = 9.sp,
-                    color = Color.White.copy(alpha = 0.5f),
-                    letterSpacing = 2.sp,
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.Medium
+                GratiaText(
+                    text = "LYRICS",
+                    style = GratiaTheme.typography.caption.copy(
+                        letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp),
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                    ),
+                    color = Color.White.copy(alpha = 0.5f)
                 )
-                Icon(
-                    Icons.Default.OpenInFull,
-                    contentDescription = null,
+                GratiaIcon(
+                    imageVector = Icons.Default.OpenInFull,
+                    contentDescription = "Expand volume slider",
                     tint = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.size(12.dp)
+                    size = GratiaTheme.icons.small
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(GratiaTheme.spacing.small))
 
             if (!hasLyrics) {
-                Text(
-                    "No lyrics added yet",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.35f),
-                    fontFamily = Inter
+                GratiaText(
+                    text = "No lyrics added yet",
+                    style = GratiaTheme.typography.body,
+                    color = Color.White.copy(alpha = 0.35f)
                 )
-                Text(
-                    "Tap to add lyrics",
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.2f),
-                    fontFamily = Inter
+                GratiaText(
+                    text = "Tap to add lyrics",
+                    style = GratiaTheme.typography.caption,
+                    color = Color.White.copy(alpha = 0.2f)
                 )
             } else if (currentLyricPreview != null) {
                 AnimatedText(
                     text = currentLyricPreview,
-                    fontSize = 15.sp,
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.SemiBold,
+                    style = GratiaTheme.typography.section.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
                     color = Color.White.copy(alpha = 0.9f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    fadeDurationMs = 400
+                    fadeDurationMs = GratiaTheme.motion.slow
                 )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Tap to view full lyrics",
-                    fontSize = 10.sp,
-                    color = Color.White.copy(alpha = 0.25f),
-                    fontFamily = Inter
+                Spacer(Modifier.height(GratiaTheme.spacing.extraSmall))
+                GratiaText(
+                    text = "Tap to view full lyrics",
+                    style = GratiaTheme.typography.caption,
+                    color = Color.White.copy(alpha = 0.25f)
                 )
             } else {
                 // Show plain lyrics preview
                 val previewText = plainLyrics ?: ""
                 val preview = previewText.lines().take(3)
                 preview.forEachIndexed { index, line ->
-                    Text(
-                        line,
-                        fontSize = 13.sp,
-                        fontFamily = Inter,
+                    GratiaText(
+                        text = line,
+                        style = GratiaTheme.typography.body.copy(fontWeight = if (index == 0) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal),
                         color = when (index) {
                             0 -> Color.White.copy(alpha = 0.85f)
                             1 -> Color.White.copy(alpha = 0.35f)
                             else -> Color.White.copy(alpha = 0.15f)
-                        },
-                        fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal
+                        }
                     )
                 }
             }

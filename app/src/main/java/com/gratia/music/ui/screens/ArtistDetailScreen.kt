@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
@@ -23,9 +24,11 @@ import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.SongRow
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.GratiaIcon
+import com.gratia.music.ui.components.GratiaIconButton
+import com.gratia.music.ui.components.GratiaButton
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 
 @Composable
 fun ArtistDetailScreen(
@@ -52,26 +55,27 @@ fun ArtistDetailScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
+            GratiaIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
                 onClick = onBack,
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(GratiaTheme.colors.surface)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = GratiaTheme.colors.textSecondary)
-            }
+                    .background(GratiaTheme.colors.surface),
+                tint = GratiaTheme.colors.textSecondary
+            )
         }
 
         LazyColumn(
-            contentPadding = PaddingValues(bottom = 120.dp)
+            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
         ) {
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = GratiaTheme.spacing.large),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CoverArtImage(
@@ -82,38 +86,31 @@ fun ArtistDetailScreen(
                         cornerRadius = 90.dp, // Circle for Artist
                         fontSize = 40.sp
                     )
-                    Spacer(Modifier.height(24.dp))
-                    Text(
+                    Spacer(Modifier.height(GratiaTheme.spacing.large))
+                    GratiaText(
                         text = artistName,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
+                        style = GratiaTheme.typography.title,
                         color = GratiaTheme.colors.textPrimary,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
-                    Text(
+                    GratiaText(
                         text = "${artistSongs.size} songs",
-                        fontFamily = Inter,
-                        fontSize = 14.sp,
+                        style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary,
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(GratiaTheme.spacing.medium))
                     
                     // Play Button
-                    Button(
+                    GratiaButton(
+                        text = "Play",
+                        icon = Icons.Default.PlayArrow,
                         onClick = { if (artistSongs.isNotEmpty()) playerViewModel.playSong(artistSongs.first(), artistSongs) },
-                        modifier = Modifier.fillMaxWidth(0.6f).height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GratiaTheme.colors.accent, contentColor = GratiaTheme.colors.background)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Play", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
-                    }
-                    Spacer(Modifier.height(32.dp))
+                        modifier = Modifier.fillMaxWidth(0.6f)
+                    )
+                    Spacer(Modifier.height(GratiaTheme.spacing.large))
                 }
             }
 
@@ -124,7 +121,7 @@ fun ArtistDetailScreen(
                     isActive = currentSong?.id == song.id,
                     isPlaying = currentSong?.id == song.id && isPlaying,
                     onClick = { playerViewModel.playSong(song, artistSongs) },
-                    modifier = Modifier.padding(horizontal = 24.dp)
+                    modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
                 )
             }
         }

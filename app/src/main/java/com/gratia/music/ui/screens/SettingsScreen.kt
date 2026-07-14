@@ -26,9 +26,14 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.data.scan.MediaStoreScanner
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.GratiaIcon
+import com.gratia.music.ui.components.GratiaIconButton
+import com.gratia.music.ui.components.GratiaCard
+import com.gratia.music.ui.components.GratiaCardStatic
+import com.gratia.music.ui.components.GratiaButton
+import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
 
 @Composable
@@ -79,28 +84,22 @@ fun SettingsScreen(
     ) {
         // Header
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
+            modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large, vertical = GratiaTheme.spacing.large),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
         ) {
-            IconButton(
+            GratiaIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
                 onClick = onNavigateBack,
                 modifier = Modifier
                     .size(36.dp)
-                    .border(1.dp, GratiaTheme.colors.glassBorder, CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    modifier = Modifier.size(16.dp),
-                    tint = GratiaTheme.colors.textSecondary
-                )
-            }
-            Text(
+                    .border(1.dp, GratiaTheme.colors.glassBorder, CircleShape),
+                tint = GratiaTheme.colors.textSecondary
+            )
+            GratiaText(
                 text = "Settings",
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 20.sp,
+                style = GratiaTheme.typography.title,
                 color = GratiaTheme.colors.textPrimary
             )
         }
@@ -108,35 +107,34 @@ fun SettingsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = GratiaTheme.spacing.large)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.medium)
         ) {
             // Appearance Card
             val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
             val themeOption by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = GratiaTheme.colors.surface,
-                shadowElevation = 4.dp
+            GratiaCardStatic(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
+                Column(modifier = Modifier.padding(GratiaTheme.spacing.large)) {
+                    GratiaText(
                         text = "Appearance",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
                         color = GratiaTheme.colors.textPrimary
                     )
-                    Spacer(Modifier.height(16.dp))
-                    Text("Theme", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.textSecondary)
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(GratiaTheme.spacing.medium))
+                    GratiaText(
+                        text = "Theme",
+                        style = GratiaTheme.typography.caption,
+                        color = GratiaTheme.colors.textSecondary
+                    )
+                    Spacer(Modifier.height(GratiaTheme.spacing.small))
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
                     ) {
                         ThemeOptionButton(
                             text = "System",
@@ -161,28 +159,22 @@ fun SettingsScreen(
             }
 
             // Library Sync Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = GratiaTheme.colors.surface,
-                shadowElevation = 4.dp
+            GratiaCardStatic(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
+                Column(modifier = Modifier.padding(GratiaTheme.spacing.large)) {
+                    GratiaText(
                         text = "Library Sync",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                        style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
                         color = GratiaTheme.colors.textPrimary
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
+                    Spacer(Modifier.height(GratiaTheme.spacing.small))
+                    GratiaText(
                         text = "Scan your device storage to automatically import offline audio files.",
-                        fontFamily = Inter,
-                        fontSize = 12.sp,
+                        style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(GratiaTheme.spacing.medium))
 
                     if (scanning) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -191,16 +183,16 @@ fun SettingsScreen(
                                 strokeWidth = 2.dp,
                                 color = GratiaTheme.colors.accent
                             )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
+                            Spacer(Modifier.width(GratiaTheme.spacing.small))
+                            GratiaText(
                                 text = "Scanning local storage...",
-                                fontFamily = Inter,
-                                fontSize = 12.sp,
+                                style = GratiaTheme.typography.caption,
                                 color = GratiaTheme.colors.accent
                             )
                         }
                     } else {
-                        Button(
+                        GratiaButton(
+                            text = "Sync Now",
                             onClick = {
                                 val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     androidx.core.content.ContextCompat.checkSelfPermission(
@@ -230,28 +222,15 @@ fun SettingsScreen(
                                 } else {
                                     permissionLauncher.launch(permission)
                                 }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = GratiaTheme.colors.accent,
-                                contentColor = GratiaTheme.colors.background
-                            )
-                        ) {
-                            Text(
-                                text = "Sync Now",
-                                fontFamily = Inter,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                        }
+                            }
+                        )
                     }
 
                     if (scanResult.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
+                        Spacer(Modifier.height(GratiaTheme.spacing.small))
+                        GratiaText(
                             text = scanResult,
-                            fontFamily = Inter,
-                            fontSize = 12.sp,
+                            style = GratiaTheme.typography.caption,
                             color = if (scanResult.contains("complete")) GratiaTheme.colors.textSecondary else GratiaTheme.colors.accent
                         )
                     }
@@ -259,14 +238,8 @@ fun SettingsScreen(
             }
 
             // Legal & More Card
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = GratiaTheme.colors.surface,
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.glassBorder)
-                ),
-                shadowElevation = 4.dp
+            GratiaCardStatic(
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
                     SettingsRow(
@@ -315,31 +288,28 @@ private fun SettingsRow(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
+            .clickableWithScale(onClick = onClick)
+            .padding(GratiaTheme.spacing.large),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            GratiaText(
                 text = title,
-                fontFamily = Inter,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
                 color = GratiaTheme.colors.textPrimary
             )
             if (subtitle.isNotEmpty()) {
-                Text(
+                GratiaText(
                     text = subtitle,
-                    fontFamily = Inter,
-                    fontSize = 11.sp,
+                    style = GratiaTheme.typography.caption.copy(fontSize = 11.sp),
                     color = GratiaTheme.colors.textSecondary
                 )
             }
         }
-        Icon(
+        GratiaIcon(
             imageVector = Icons.Default.ChevronRight,
-            contentDescription = null,
+            contentDescription = "Expand item",
             tint = GratiaTheme.colors.textSecondary,
             modifier = Modifier.size(20.dp)
         )
@@ -353,23 +323,23 @@ fun ThemeOptionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    Box(
         modifier = modifier
             .height(40.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) GratiaTheme.colors.accent.copy(alpha = 0.15f) else GratiaTheme.colors.background,
-        border = if (selected) androidx.compose.foundation.BorderStroke(1.dp, GratiaTheme.colors.accent) 
-                 else androidx.compose.foundation.BorderStroke(1.dp, GratiaTheme.colors.surfaceHover)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = text,
-                fontFamily = Inter,
-                fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
+            .clip(GratiaTheme.shapes.medium)
+            .background(if (selected) GratiaTheme.colors.accent.copy(alpha = 0.15f) else GratiaTheme.colors.background)
+            .border(
+                1.dp,
+                if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.surfaceHover,
+                GratiaTheme.shapes.medium
             )
-        }
+            .clickableWithScale(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        GratiaText(
+            text = text,
+            style = GratiaTheme.typography.body.copy(fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium),
+            color = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
+        )
     }
 }

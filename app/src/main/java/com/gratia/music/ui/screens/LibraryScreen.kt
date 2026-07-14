@@ -27,9 +27,11 @@ import com.gratia.music.ui.components.ArtistFallback
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.EmptyStateView
 import com.gratia.music.ui.components.FolderFallback
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.GratiaIconButton
+import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 
 @Composable
 fun LibraryScreen(
@@ -65,27 +67,24 @@ fun LibraryScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 20.dp),
+                .padding(horizontal = GratiaTheme.spacing.large, vertical = GratiaTheme.spacing.mediumLarge),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
+            GratiaText(
                 text = "Your Library",
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.Bold,
-                fontSize = 28.sp,
+                style = GratiaTheme.typography.largeTitle,
                 color = GratiaTheme.colors.textPrimary
             )
             
             if (selectedTab == "Songs") {
                 Box {
-                    IconButton(onClick = { showSortMenu = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Sort,
-                            contentDescription = "Sort",
-                            tint = GratiaTheme.colors.textPrimary
-                        )
-                    }
+                    GratiaIconButton(
+                        icon = Icons.Default.Sort,
+                        contentDescription = "Sort",
+                        onClick = { showSortMenu = true },
+                        tint = GratiaTheme.colors.textPrimary
+                    )
                     
                     DropdownMenu(
                         expanded = showSortMenu,
@@ -95,10 +94,10 @@ fun LibraryScreen(
                         listOf("Date added", "Title", "Artist", "Play count").forEach { option ->
                             DropdownMenuItem(
                                 text = { 
-                                    Text(
-                                        text = option, 
-                                        color = if (sortOption == option) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
-                                        fontFamily = Inter
+                                    GratiaText(
+                                        text = option,
+                                        style = GratiaTheme.typography.body,
+                                        color = if (sortOption == option) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary
                                     ) 
                                 },
                                 onClick = {
@@ -116,24 +115,22 @@ fun LibraryScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = GratiaTheme.spacing.large, vertical = GratiaTheme.spacing.small),
+            horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
         ) {
             tabs.forEach { tab ->
                 val isSelected = selectedTab == tab
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(GratiaTheme.shapes.extraLarge)
                         .background(if (isSelected) GratiaTheme.colors.accent else GratiaTheme.colors.surface)
                         .clickable { selectedTab = tab }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                    GratiaText(
                         text = tab,
-                        fontFamily = Inter,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                        fontSize = 14.sp,
+                        style = GratiaTheme.typography.body.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium),
                         color = if (isSelected) GratiaTheme.colors.background else GratiaTheme.colors.textSecondary
                     )
                 }
@@ -141,7 +138,7 @@ fun LibraryScreen(
         }
 
         // Content
-        Box(modifier = Modifier.fillMaxSize().padding(top = 8.dp)) {
+        Box(modifier = Modifier.fillMaxSize().padding(top = GratiaTheme.spacing.small)) {
             when (selectedTab) {
                 "Songs" -> {
                     if (sortedSongs.isEmpty()) {
@@ -152,7 +149,7 @@ fun LibraryScreen(
                         )
                     } else {
                         LazyColumn(
-                            contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp)
+                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small)
                         ) {
                             item { SongList(sortedSongs, playerViewModel) }
                         }
@@ -167,16 +164,28 @@ fun LibraryScreen(
                             description = "Albums will appear here automatically."
                         )
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp, start = 24.dp, end = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
+                            verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
+                        ) {
                             items(albums) { album ->
                                 val coverArtPath = allSongs.firstOrNull { it.album == album && it.coverArtPath != null }?.coverArtPath
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(GratiaTheme.colors.surface).clickable { onNavigateToAlbum(album) }.padding(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(GratiaTheme.shapes.medium)
+                                        .background(GratiaTheme.colors.surface)
+                                        .clickableWithScale { onNavigateToAlbum(album) }
+                                        .padding(GratiaTheme.spacing.mediumSmall),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     CoverArtImage(coverArtPath = coverArtPath, title = album, size = 56.dp, cornerRadius = 8.dp)
-                                    Spacer(Modifier.width(16.dp))
-                                    Text(text = album, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = GratiaTheme.colors.textPrimary)
+                                    Spacer(Modifier.width(GratiaTheme.spacing.mediumLarge))
+                                    GratiaText(
+                                        text = album,
+                                        style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
+                                        color = GratiaTheme.colors.textPrimary
+                                    )
                                 }
                             }
                         }
@@ -191,11 +200,19 @@ fun LibraryScreen(
                             description = "Artists will appear here automatically."
                         )
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp, start = 24.dp, end = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
+                            verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
+                        ) {
                             items(artists) { artist ->
                                 val coverArtPath = allSongs.firstOrNull { it.artist == artist && it.coverArtPath != null }?.coverArtPath
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(GratiaTheme.colors.surface).clickable { onNavigateToArtist(artist) }.padding(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(GratiaTheme.shapes.medium)
+                                        .background(GratiaTheme.colors.surface)
+                                        .clickableWithScale { onNavigateToArtist(artist) }
+                                        .padding(GratiaTheme.spacing.mediumSmall),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (coverArtPath != null) {
@@ -203,8 +220,12 @@ fun LibraryScreen(
                                     } else {
                                         ArtistFallback(artistName = artist, size = 56.dp)
                                     }
-                                    Spacer(Modifier.width(16.dp))
-                                    Text(text = artist, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = GratiaTheme.colors.textPrimary)
+                                    Spacer(Modifier.width(GratiaTheme.spacing.mediumLarge))
+                                    GratiaText(
+                                        text = artist,
+                                        style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
+                                        color = GratiaTheme.colors.textPrimary
+                                    )
                                 }
                             }
                         }
@@ -219,11 +240,19 @@ fun LibraryScreen(
                             description = "Your music folders will appear here."
                         )
                     } else {
-                        LazyColumn(contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp, start = 24.dp, end = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
+                            verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
+                        ) {
                             items(folders) { folder ->
                                 val coverArtPath = allSongs.firstOrNull { it.storagePath?.substringBeforeLast("/")?.substringAfterLast("/") == folder && it.coverArtPath != null }?.coverArtPath
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(GratiaTheme.colors.surface).clickable { onNavigateToFolder(folder) }.padding(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(GratiaTheme.shapes.medium)
+                                        .background(GratiaTheme.colors.surface)
+                                        .clickableWithScale { onNavigateToFolder(folder) }
+                                        .padding(GratiaTheme.spacing.mediumSmall),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     if (coverArtPath != null) {
@@ -231,8 +260,12 @@ fun LibraryScreen(
                                     } else {
                                         FolderFallback(size = 56.dp)
                                     }
-                                    Spacer(Modifier.width(16.dp))
-                                    Text(text = folder, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = GratiaTheme.colors.textPrimary)
+                                    Spacer(Modifier.width(GratiaTheme.spacing.mediumLarge))
+                                    GratiaText(
+                                        text = folder,
+                                        style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
+                                        color = GratiaTheme.colors.textPrimary
+                                    )
                                 }
                             }
                         }

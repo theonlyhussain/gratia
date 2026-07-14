@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,9 +21,12 @@ import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.PlaylistEntity
 import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.EmptyStateView
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.GratiaIcon
+import com.gratia.music.ui.components.GratiaCard
+import com.gratia.music.ui.components.GratiaCardStatic
+import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -39,13 +43,16 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
             .background(GratiaTheme.colors.background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                "Playlists",
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.Bold,
-                fontSize = 28.sp,
+            GratiaText(
+                text = "Playlists",
+                style = GratiaTheme.typography.largeTitle,
                 color = GratiaTheme.colors.textPrimary,
-                modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 8.dp)
+                modifier = Modifier.padding(
+                    start = GratiaTheme.spacing.large,
+                    top = GratiaTheme.spacing.mediumLarge,
+                    end = GratiaTheme.spacing.large,
+                    bottom = GratiaTheme.spacing.small
+                )
             )
 
             if (playlists.isEmpty()) {
@@ -60,8 +67,13 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 120.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(
+                        start = GratiaTheme.spacing.large,
+                        end = GratiaTheme.spacing.large,
+                        top = GratiaTheme.spacing.medium,
+                        bottom = GratiaTheme.spacing.heroLarge
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                 ) {
                     items(playlists) { playlist ->
                         PlaylistRow(
@@ -73,16 +85,21 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
             }
         }
 
-        FloatingActionButton(
-            onClick = { showCreateDialog = true },
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp, end = 24.dp),
-            containerColor = GratiaTheme.colors.accent,
-            contentColor = GratiaTheme.colors.background,
-            shape = RoundedCornerShape(16.dp)
+                .padding(bottom = 100.dp, end = GratiaTheme.spacing.large)
+                .size(56.dp)
+                .clip(GratiaTheme.shapes.extraLarge)
+                .background(GratiaTheme.colors.accent)
+                .clickableWithScale(onClick = { showCreateDialog = true }),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Add, contentDescription = "Create Playlist")
+            GratiaIcon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Create Playlist",
+                tint = GratiaTheme.colors.background
+            )
         }
 
         if (showCreateDialog) {
@@ -107,15 +124,13 @@ fun PlaylistRow(playlist: PlaylistEntity, onClick: () -> Unit) {
     val songs by playlistDao.getSongsForPlaylist(playlist.id).collectAsState(initial = emptyList())
     val paths = songs.take(4).map { it.coverArtPath }
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        color = GratiaTheme.colors.surface
+    GratiaCardStatic(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier
+                .clickableWithScale(onClick = onClick)
+                .padding(GratiaTheme.spacing.mediumSmall),
             verticalAlignment = Alignment.CenterVertically
         ) {
             CollageArtwork(
@@ -123,19 +138,16 @@ fun PlaylistRow(playlist: PlaylistEntity, onClick: () -> Unit) {
                 size = 56.dp,
                 cornerRadius = 12.dp
             )
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(GratiaTheme.spacing.mediumLarge))
             Column {
-                Text(
+                GratiaText(
                     text = playlist.name,
-                    fontFamily = Inter,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
                     color = GratiaTheme.colors.textPrimary
                 )
-                Text(
+                GratiaText(
                     text = "${songs.size} songs",
-                    fontFamily = Inter,
-                    fontSize = 13.sp,
+                    style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary
                 )
             }
@@ -149,7 +161,13 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
     var text by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New Playlist", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+        title = {
+            GratiaText(
+                text = "New Playlist",
+                style = GratiaTheme.typography.title,
+                color = GratiaTheme.colors.textPrimary
+            )
+        },
         text = {
             OutlinedTextField(
                 value = text,

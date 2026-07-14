@@ -12,19 +12,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.JetBrainsMono
 
 /**
@@ -60,36 +57,41 @@ fun GratiaProgressBar(
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(progress) }
 
+    val motion = GratiaTheme.motion
+    val haptics = GratiaTheme.haptics
+    val view = androidx.compose.ui.platform.LocalView.current
+
     // Display progress: use drag value when dragging, otherwise animated real progress
     val displayProgress = if (isDragging) dragProgress else progress
 
     // Thumb opacity — only visible when dragging
     val thumbAlpha by animateFloatAsState(
         targetValue = if (isDragging) 1f else 0f,
-        animationSpec = tween(200),
+        animationSpec = tween(motion.normal, easing = motion.standardEasing),
         label = "thumbAlpha"
     )
 
     // Thumb scale — pops in when dragging
     val thumbScale by animateFloatAsState(
         targetValue = if (isDragging) 1f else 0.4f,
-        animationSpec = tween(200),
+        animationSpec = tween(motion.normal, easing = motion.standardEasing),
         label = "thumbScale"
     )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp)
+            .padding(horizontal = GratiaTheme.spacing.large) // 32dp
     ) {
         // Track + thumb area
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp) // Large touch area
+                .height(GratiaTheme.spacing.heroSmall) // 48dp Large touch area
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
                         val newProgress = (offset.x / size.width).coerceIn(0f, 1f)
+                        haptics.light(view)
                         onSeek(newProgress)
                     }
                 }
@@ -97,6 +99,7 @@ fun GratiaProgressBar(
                     detectHorizontalDragGestures(
                         onDragStart = { offset ->
                             isDragging = true
+                            haptics.medium(view)
                             dragProgress = (offset.x / size.width).coerceIn(0f, 1f)
                             onDragStart()
                         },
@@ -175,18 +178,14 @@ fun GratiaProgressBar(
                 currentTimeMs
             }
 
-            Text(
+            GratiaText(
                 text = formatTimePlayer(displayTime),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal,
-                fontFamily = JetBrainsMono,
+                style = GratiaTheme.typography.caption.copy(fontFamily = JetBrainsMono),
                 color = Color.White.copy(alpha = 0.4f)
             )
-            Text(
+            GratiaText(
                 text = formatTimePlayer(durationMs),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Normal,
-                fontFamily = JetBrainsMono,
+                style = GratiaTheme.typography.caption.copy(fontFamily = JetBrainsMono),
                 color = Color.White.copy(alpha = 0.4f)
             )
         }

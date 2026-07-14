@@ -57,11 +57,9 @@ fun CoverArtFallback(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            initials,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Bold,
-            fontSize = fontSize,
+        GratiaText(
+            text = initials,
+            style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Bold, fontSize = fontSize),
             color = GratiaTheme.colors.background.copy(alpha = 0.8f)
         )
     }
@@ -108,11 +106,9 @@ fun ArtistFallback(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            initials,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Bold,
-            fontSize = fontSize,
+        GratiaText(
+            text = initials,
+            style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Bold, fontSize = fontSize),
             color = GratiaTheme.colors.textPrimary
         )
     }
@@ -138,9 +134,9 @@ fun PlaylistFallback(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            Icons.AutoMirrored.Filled.QueueMusic,
-            contentDescription = null,
+        GratiaIcon(
+            imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+            contentDescription = "Playlist Placeholder",
             tint = GratiaTheme.colors.accentWarm,
             modifier = Modifier.size(size * 0.5f)
         )
@@ -167,9 +163,9 @@ fun FolderFallback(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            Icons.Default.Folder,
-            contentDescription = null,
+        GratiaIcon(
+            imageVector = Icons.Default.Folder,
+            contentDescription = "Folder Placeholder",
             tint = GratiaTheme.colors.success,
             modifier = Modifier.size(size * 0.5f)
         )

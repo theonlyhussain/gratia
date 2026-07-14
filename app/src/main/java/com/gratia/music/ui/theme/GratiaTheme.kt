@@ -43,6 +43,46 @@ object GratiaTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalGratiaColors.current
+
+    val typography: GratiaTypography
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaTypography.current
+
+    val spacing: GratiaSpacing
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaSpacing.current
+
+    val shapes: GratiaShapes
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaShapes.current
+
+    val motion: GratiaMotion
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaMotion.current
+
+    val elevation: GratiaElevation
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaElevation.current
+
+    val glass: GratiaGlass
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaGlass.current
+
+    val icons: GratiaIcons
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaIcons.current
+
+    val haptics: GratiaHaptics
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalGratiaHaptics.current
 }
 
 @Composable
@@ -94,9 +134,17 @@ fun GratiaTheme(
     )
 
     CompositionLocalProvider(
-        LocalGratiaColors provides animatedColors
+        LocalGratiaColors provides animatedColors,
+        LocalGratiaTypography provides GratiaTypography(),
+        LocalGratiaSpacing provides GratiaSpacing(),
+        LocalGratiaShapes provides GratiaShapes(),
+        LocalGratiaMotion provides GratiaMotion(),
+        LocalGratiaElevation provides GratiaElevation(),
+        LocalGratiaGlass provides GratiaGlass(),
+        LocalGratiaIcons provides GratiaIcons(),
+        LocalGratiaHaptics provides GratiaHaptics()
     ) {
-        // We still provide MaterialTheme for standard components that rely on it
+        // We still provide MaterialTheme for standard components that rely on it (like Dialogs)
         MaterialTheme(
             colorScheme = if (isDark) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme(),
             content = content

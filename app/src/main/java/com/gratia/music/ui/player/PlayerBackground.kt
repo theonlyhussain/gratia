@@ -12,6 +12,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.gratia.music.ui.theme.GratiaTheme
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -23,7 +24,7 @@ import kotlin.math.sin
  *
  * Design principles:
  * - Never distracting — very slow, very subtle
- * - Crossfades between color sets on song change (800ms)
+ * - Crossfades between color sets on song change using GDL motion tokens
  * - Respects system reduced-motion setting
  * - Uses Canvas for 60fps performance (no recomposition per frame)
  */
@@ -50,20 +51,22 @@ fun PlayerBackground(
         }
     }
 
+    val motion = GratiaTheme.motion
+
     // Smooth color crossfade when song changes
     val color1 by animateColorAsState(
         targetValue = dominantColor,
-        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        animationSpec = tween(motion.hero, easing = motion.standardEasing),
         label = "bgColor1"
     )
     val color2 by animateColorAsState(
         targetValue = darkMutedColor,
-        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        animationSpec = tween(motion.hero, easing = motion.standardEasing),
         label = "bgColor2"
     )
     val color3 by animateColorAsState(
         targetValue = vibrantColor,
-        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        animationSpec = tween(motion.hero, easing = motion.standardEasing),
         label = "bgColor3"
     )
 

@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,10 +30,9 @@ import com.gratia.music.ui.components.ArtistFallback
 import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.Header
+import com.gratia.music.ui.components.GratiaText
 import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 
 @Composable
 fun HomeScreen(
@@ -80,7 +78,7 @@ fun HomeScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 120.dp) // space for mini player + nav
+            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge) // space for mini player + nav
         ) {
             if (!isDark) {
                 // LIGHT MODE: Continue Listening, Newly Added, Most Played, Playlists, Collections
@@ -139,24 +137,27 @@ fun HomeScreen(
 fun PlaylistsRow(playlists: List<com.gratia.music.data.model.PlaylistEntity>) {
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.medium),
+        contentPadding = PaddingValues(horizontal = GratiaTheme.spacing.large)
     ) {
         items(playlists) { playlist ->
             val songs by playlistDao.getSongsForPlaylist(playlist.id).collectAsState(initial = emptyList())
             val paths = songs.take(4).map { it.coverArtPath }
             
-            Column(modifier = Modifier.width(140.dp)) {
+            Column(
+                modifier = Modifier
+                    .width(140.dp)
+                    .clickableWithScale {}
+            ) {
                 CollageArtwork(
                     paths = paths,
                     size = 140.dp,
                     cornerRadius = 20.dp
                 )
-                Spacer(Modifier.height(8.dp))
-                Text(
+                Spacer(Modifier.height(GratiaTheme.spacing.small))
+                GratiaText(
                     text = playlist.name,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
                     color = GratiaTheme.colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -169,23 +170,22 @@ fun PlaylistsRow(playlists: List<com.gratia.music.data.model.PlaylistEntity>) {
 @Composable
 fun CollectionsRow(collections: List<com.gratia.music.data.model.CollectionEntity>) {
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.medium),
+        contentPadding = PaddingValues(horizontal = GratiaTheme.spacing.large)
     ) {
         items(collections) { collection ->
             Box(
                 modifier = Modifier
                     .width(160.dp)
                     .height(80.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(GratiaTheme.colors.surface),
+                    .clip(GratiaTheme.shapes.large)
+                    .background(GratiaTheme.colors.surface)
+                    .clickableWithScale {},
                 contentAlignment = Alignment.Center
             ) {
-                Text(
+                GratiaText(
                     text = collection.name,
-                    fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    style = GratiaTheme.typography.section,
                     color = GratiaTheme.colors.textPrimary
                 )
             }
@@ -195,20 +195,22 @@ fun CollectionsRow(collections: List<com.gratia.music.data.model.CollectionEntit
 
 @Composable
 fun SectionTitle(title: String) {
-    Text(
+    GratiaText(
         text = title,
-        fontSize = 20.sp,
-        fontWeight = FontWeight.Bold,
+        style = GratiaTheme.typography.section,
         color = GratiaTheme.colors.textPrimary,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+        modifier = Modifier.padding(
+            horizontal = GratiaTheme.spacing.large,
+            vertical = GratiaTheme.spacing.medium
+        )
     )
 }
 
 @Composable
 fun FeaturedCarousel(songs: List<SongEntity>, playerViewModel: PlayerViewModel) {
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.medium),
+        contentPadding = PaddingValues(horizontal = GratiaTheme.spacing.large)
     ) {
         items(songs) { song ->
             Column(
@@ -221,21 +223,20 @@ fun FeaturedCarousel(songs: List<SongEntity>, playerViewModel: PlayerViewModel) 
                     title = song.title,
                     artist = song.artist,
                     size = 160.dp,
-                    cornerRadius = 24.dp,
-                    fontSize = 32.sp
+                    cornerRadius = 24.dp, // GDL shapes.extraLarge
+                    fontSize = GratiaTheme.typography.display.fontSize
                 )
-                Spacer(Modifier.height(12.dp))
-                Text(
+                Spacer(Modifier.height(GratiaTheme.spacing.mediumSmall))
+                GratiaText(
                     text = song.title,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
+                    style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.SemiBold),
                     color = GratiaTheme.colors.textPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
+                GratiaText(
                     text = song.artist,
-                    fontSize = 13.sp,
+                    style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -251,7 +252,7 @@ fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlay
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
     Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
     ) {
         songs.forEachIndexed { index, song ->
             com.gratia.music.ui.components.SongRow(
@@ -260,7 +261,7 @@ fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlay
                 isActive = currentSong?.id == song.id,
                 isPlaying = currentSong?.id == song.id && isPlaying,
                 onClick = { playerViewModel.playSong(song, songs) },
-                modifier = Modifier.padding(horizontal = 24.dp)
+                modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
             )
         }
     }
@@ -270,8 +271,8 @@ fun SongList(songs: List<SongEntity>, playerViewModel: PlayerViewModel, showPlay
 fun TopArtistsRow(artists: List<String>) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(horizontal = 24.dp)
+        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.medium),
+        contentPadding = PaddingValues(horizontal = GratiaTheme.spacing.large)
     ) {
         items(artists) { artistName ->
             val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
@@ -280,7 +281,9 @@ fun TopArtistsRow(artists: List<String>) {
             
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.width(80.dp)
+                modifier = Modifier
+                    .width(80.dp)
+                    .clickableWithScale {}
             ) {
                 if (coverArtPath != null) {
                     CoverArtImage(
@@ -288,20 +291,20 @@ fun TopArtistsRow(artists: List<String>) {
                         title = artistName,
                         artist = artistName,
                         size = 80.dp,
-                        cornerRadius = 40.dp,
-                        fontSize = 24.sp
+                        cornerRadius = 40.dp, // fully rounded
+                        fontSize = GratiaTheme.typography.title.fontSize
                     )
                 } else {
                     ArtistFallback(
                         artistName = artistName,
                         size = 80.dp,
-                        fontSize = 24.sp
+                        fontSize = GratiaTheme.typography.title.fontSize
                     )
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
+                Spacer(Modifier.height(GratiaTheme.spacing.small))
+                GratiaText(
                     text = artistName,
-                    fontSize = 12.sp,
+                    style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

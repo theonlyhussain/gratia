@@ -196,12 +196,29 @@ fun GratiaAppRoot() {
                 }
             }
         ) { innerPadding ->
+            val motion = GratiaTheme.motion
             NavHost(
                 navController = navController,
                 startDestination = Screen.Home.route,
                 modifier = Modifier.padding(innerPadding),
-                enterTransition = { fadeIn(animationSpec = tween(200)) },
-                exitTransition = { fadeOut(animationSpec = tween(200)) },
+                enterTransition = {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(motion.slow, easing = motion.standardEasing)
+                    ) + fadeIn(animationSpec = tween(motion.slow))
+                },
+                exitTransition = {
+                    fadeOut(animationSpec = tween(motion.slow))
+                },
+                popEnterTransition = {
+                    fadeIn(animationSpec = tween(motion.slow))
+                },
+                popExitTransition = {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(motion.slow, easing = motion.standardEasing)
+                    ) + fadeOut(animationSpec = tween(motion.slow))
+                }
             ) {
                 composable(Screen.Home.route) {
                     val scope = rememberCoroutineScope()
@@ -345,8 +362,14 @@ fun GratiaAppRoot() {
         // Expanded Player Overlay
         AnimatedVisibility(
             visible = expandedPlayerOpen && currentSong != null,
-            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(350)) + fadeIn(animationSpec = tween(350)),
-            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(280)) + fadeOut(animationSpec = tween(280))
+            enter = slideInVertically(
+                initialOffsetY = { it }, 
+                animationSpec = GratiaTheme.motion.springStandard()
+            ) + fadeIn(animationSpec = tween(GratiaTheme.motion.normal)),
+            exit = slideOutVertically(
+                targetOffsetY = { it }, 
+                animationSpec = tween(GratiaTheme.motion.normal, easing = GratiaTheme.motion.standardEasing)
+            ) + fadeOut(animationSpec = tween(GratiaTheme.motion.normal))
         ) {
             ExpandedPlayer(
                 playerViewModel = playerViewModel,
@@ -376,7 +399,7 @@ fun GratiaAppRoot() {
                 onDismissRequest = { queueSheetOpen = false },
                 containerColor = GratiaTheme.colors.surface,
                 scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                shape = GratiaTheme.shapes.sheet
             ) {
                 QueueSheet(
                     playerViewModel = playerViewModel,
@@ -388,8 +411,14 @@ fun GratiaAppRoot() {
         // Lyrics overlay (from lyrics button in expanded player)
         AnimatedVisibility(
             visible = lyricsOverlayOpen && currentSong != null,
-            enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
-            exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(250)) + fadeOut(animationSpec = tween(250))
+            enter = slideInVertically(
+                initialOffsetY = { it }, 
+                animationSpec = GratiaTheme.motion.springStandard()
+            ) + fadeIn(animationSpec = tween(GratiaTheme.motion.normal)),
+            exit = slideOutVertically(
+                targetOffsetY = { it }, 
+                animationSpec = tween(GratiaTheme.motion.normal, easing = GratiaTheme.motion.standardEasing)
+            ) + fadeOut(animationSpec = tween(GratiaTheme.motion.normal))
         ) {
             FullLyricsScreen(
                 playerViewModel = playerViewModel,
@@ -407,8 +436,8 @@ fun GratiaAppRoot() {
 
         AnimatedVisibility(
             visible = showSplash,
-            enter = fadeIn(tween(0)), // Starts visible
-            exit = fadeOut(tween(400)),
+            enter = fadeIn(tween(GratiaTheme.motion.instant)), // Starts visible
+            exit = fadeOut(tween(GratiaTheme.motion.hero)),
             modifier = Modifier.fillMaxSize()
         ) {
             Box(
@@ -419,7 +448,7 @@ fun GratiaAppRoot() {
             ) {
                 val logoScale by animateFloatAsState(
                     targetValue = if (showSplash) 1.0f else 0.92f,
-                    animationSpec = tween(800, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+                    animationSpec = tween(GratiaTheme.motion.hero, easing = GratiaTheme.motion.standardEasing),
                     label = "splashScale"
                 )
                 androidx.compose.foundation.Image(
@@ -428,7 +457,7 @@ fun GratiaAppRoot() {
                     modifier = Modifier
                         .size(120.dp)
                         .scale(logoScale)
-                        .clip(RoundedCornerShape(32.dp))
+                        .clip(GratiaTheme.shapes.hero)
                 )
             }
             }

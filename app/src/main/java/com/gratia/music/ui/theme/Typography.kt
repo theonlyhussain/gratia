@@ -1,91 +1,63 @@
 package com.gratia.music.ui.theme
 
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Typography
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.CircleShape
 
-// Shapes system - rounded, soft, premium feel
-object Shapes {
-    // Extra small - for chips, small buttons
-    val ExtraSmall = RoundedCornerShape(4.dp)
-    // Small - for buttons, cards with subtle rounding
-    val Small = RoundedCornerShape(8.dp)
-    // Medium - for cards, containers
-    val Medium = RoundedCornerShape(12.dp)
-    // Large - for prominent cards, modals
-    val Large = RoundedCornerShape(16.dp)
-    // Extra large - for full-screen dialogs, modals
-    val ExtraLarge = RoundedCornerShape(24.dp)
-    // Pill shape for buttons, chips
-    val Pill = RoundedCornerShape(24.dp)
-    // Circle for avatars, icons
-    val Circle = CircleShape
-}
-
-// Typography system matching the premium, emotional feel
-object Typography {
-    // Using system fonts for now, can be customized later
-    val FontFamily = androidx.compose.ui.text.font.FontFamily.Default
-
-    val value = Typography(
-        // Large title - bold, prominent for section headers
-        titleLarge = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 24.sp
-        ),
-        // Medium title - for section titles
-        titleMedium = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 20.sp
-        ),
-        // Small title - for card titles
-        titleSmall = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 16.sp
-        ),
-        // Body large - for primary text content
-        bodyLarge = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 16.sp
-        ),
-        // Body medium - for secondary text content
-        bodyMedium = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Normal,
-            fontSize = 14.sp
-        ),
-        // Body small - for helper text, captions
-        bodySmall = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Normal,
-            fontSize = 12.sp
-        ),
-        // Label large - for buttons, chips
-        labelLarge = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 14.sp
-        ),
-        // Label medium - for small buttons, tags
-        labelMedium = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 12.sp
-        ),
-        // Label small - for captions, icons
-        labelSmall = TextStyle(
-            fontFamily = FontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 11.sp
-        )
+/**
+ * Gratia Design Language (GDL) - Typography System
+ */
+@Immutable
+data class GratiaTypography(
+    /** Hero text, Empty States */
+    val display: TextStyle = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Bold,
+        fontSize = 36.sp,
+        letterSpacing = (-0.5).sp
+    ),
+    /** Page Headers */
+    val largeTitle: TextStyle = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp,
+        letterSpacing = (-0.25).sp
+    ),
+    /** Card Titles, Section Headers */
+    val title: TextStyle = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 22.sp
+    ),
+    /** Sub-headers, Dialog Titles */
+    val section: TextStyle = TextStyle(
+        fontFamily = SpaceGrotesk,
+        fontWeight = FontWeight.Medium,
+        fontSize = 18.sp
+    ),
+    /** Standard text, descriptions */
+    val body: TextStyle = TextStyle(
+        fontFamily = Inter,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 24.sp
+    ),
+    /** Secondary text, metadata labels */
+    val caption: TextStyle = TextStyle(
+        fontFamily = Inter,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp,
+        lineHeight = 18.sp
+    ),
+    /** Time tracking, technical info */
+    val monoMetadata: TextStyle = TextStyle(
+        fontFamily = JetBrainsMono,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        letterSpacing = 0.5.sp
     )
-}
+)
+
+val LocalGratiaTypography = staticCompositionLocalOf { GratiaTypography() }

@@ -386,7 +386,7 @@ private fun QueueEmptyState() {
         ) {
             Icon(
                 Icons.Default.MusicNote,
-                contentDescription = null,
+                contentDescription = "Drag handle",
                 tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.2f),
                 modifier = Modifier.size(64.dp)
             )

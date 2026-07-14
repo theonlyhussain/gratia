@@ -30,9 +30,9 @@ import com.gratia.music.ui.theme.GratiaTheme
  * Row 2: Lyrics
  *
  * All buttons use [PlayerButton] for consistent:
- * - Size (40dp)
+ * - Size (GDL heroSmall 48dp)
  * - Spacing
- * - Animation (press-scale + spring)
+ * - Animation (press-scale + normal speed)
  * - Haptic feedback
  *
  * Active states (shuffle on, repeat on, favorited) use accent color.
@@ -53,7 +53,7 @@ fun SecondaryActionRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp),
+            .padding(horizontal = GratiaTheme.spacing.large), // 32dp
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Row 1: Shuffle · Repeat · Favorite · Queue
@@ -67,8 +67,8 @@ fun SecondaryActionRow(
                 icon = Icons.Default.Shuffle,
                 onClick = onToggleShuffle,
                 contentDescription = "Shuffle",
-                size = 44.dp,
-                iconSize = 22.dp,
+                size = GratiaTheme.spacing.heroSmall,
+                iconSize = GratiaTheme.icons.normal,
                 tint = if (shuffleEnabled) accentColor else Color.White.copy(alpha = 0.5f)
             )
 
@@ -80,8 +80,8 @@ fun SecondaryActionRow(
                 },
                 onClick = onCycleRepeat,
                 contentDescription = "Repeat",
-                size = 44.dp,
-                iconSize = 22.dp,
+                size = GratiaTheme.spacing.heroSmall,
+                iconSize = GratiaTheme.icons.normal,
                 tint = if (repeatMode != RepeatMode.OFF) accentColor else Color.White.copy(alpha = 0.5f)
             )
 
@@ -90,8 +90,8 @@ fun SecondaryActionRow(
                 icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 onClick = onToggleFavorite,
                 contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                size = 44.dp,
-                iconSize = 22.dp,
+                size = GratiaTheme.spacing.heroSmall,
+                iconSize = GratiaTheme.icons.normal,
                 tint = if (isFavorite) accentColor else Color.White.copy(alpha = 0.5f)
             )
 
@@ -100,13 +100,13 @@ fun SecondaryActionRow(
                 icon = Icons.AutoMirrored.Filled.QueueMusic,
                 onClick = onOpenQueue,
                 contentDescription = "Queue",
-                size = 44.dp,
-                iconSize = 22.dp,
+                size = GratiaTheme.spacing.heroSmall,
+                iconSize = GratiaTheme.icons.normal,
                 tint = Color.White.copy(alpha = 0.5f)
             )
         }
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(GratiaTheme.spacing.extraSmall))
 
         // Row 2: Lyrics (centered)
         Row(
@@ -118,8 +118,8 @@ fun SecondaryActionRow(
                 icon = Icons.Default.Lyrics,
                 onClick = onOpenLyrics,
                 contentDescription = "Lyrics",
-                size = 44.dp,
-                iconSize = 22.dp,
+                size = GratiaTheme.spacing.heroSmall,
+                iconSize = GratiaTheme.icons.normal,
                 tint = Color.White.copy(alpha = 0.5f)
             )
         }
