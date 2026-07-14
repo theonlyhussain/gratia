@@ -31,6 +31,7 @@ import com.gratia.music.data.CoverArtManager
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.ui.components.CoverArtImage
+import com.gratia.music.data.repository.LyricsRepository
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -48,6 +49,7 @@ fun UploadScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
+    val lyricsRepo = remember { LyricsRepository(GratiaApp.instance.database.lyricsDao()) }
 
     val isEditMode = editSongId != null
     var existingSong by remember { mutableStateOf<SongEntity?>(null) }
@@ -145,7 +147,13 @@ fun UploadScreen(
                 mood = song.mood ?: ""
                 tags = song.tags ?: ""
                 aliases = song.aliases ?: ""
-                lyricsInput = if (song.lyricsMode == "synced") song.lyricsSynced ?: "" else song.lyricsPlain ?: song.lyrics ?: ""
+                
+                // Fetch lyrics
+                val lyricsEntity = lyricsRepo.getLyricsOnce(song.id)
+                if (lyricsEntity != null) {
+                    lyricsInput = lyricsEntity.text
+                }
+                
                 coverArtPath = song.coverArtPath
                 coverSource = song.coverSource
                 selectedUri = song.localUri?.let { Uri.parse(it) }
@@ -299,10 +307,6 @@ fun UploadScreen(
                         language = language.trim().ifBlank { null },
                         tags = tags.trim().ifBlank { null },
                         aliases = aliases.trim().ifBlank { null },
-                        lyrics = finalLyricsPlain,
-                        lyricsPlain = finalLyricsPlain,
-                        lyricsSynced = finalLyricsSynced,
-                        lyricsMode = finalLyricsMode,
                         coverArtPath = coverArtPath,
                         coverSource = coverSource,
                         format = audioFormat,
@@ -312,6 +316,11 @@ fun UploadScreen(
                         updatedAt = System.currentTimeMillis(),
                     )
                     songRepo.updateSong(updated)
+                    if (lyricsInput.isNotBlank()) {
+                        lyricsRepo.saveManualLyrics(updated.id, lyricsInput.trim(), isSyncedMode)
+                    } else {
+                        lyricsRepo.deleteLyrics(updated.id)
+                    }
                     success = true
                 } else {
                     val song = SongEntity(
@@ -322,10 +331,6 @@ fun UploadScreen(
                         language = language.trim().ifBlank { null },
                         tags = tags.trim().ifBlank { null },
                         aliases = aliases.trim().ifBlank { null },
-                        lyrics = finalLyricsPlain,
-                        lyricsPlain = finalLyricsPlain,
-                        lyricsSynced = finalLyricsSynced,
-                        lyricsMode = finalLyricsMode,
                         durationMs = detectedDurationMs,
                         localUri = selectedUri.toString(),
                         mimeType = mimeType,
@@ -339,6 +344,11 @@ fun UploadScreen(
                         fileSizeBytes = if (fileSizeBytes > 0) fileSizeBytes else null,
                     )
                     songRepo.insertSong(song)
+                    if (lyricsInput.isNotBlank()) {
+                        lyricsRepo.saveManualLyrics(song.id, lyricsInput.trim(), isSyncedMode)
+                    } else {
+                        lyricsRepo.deleteLyrics(song.id)
+                    }
                     success = true
                     // Reset form
                     selectedUri = null; fileName = ""; fileSize = ""

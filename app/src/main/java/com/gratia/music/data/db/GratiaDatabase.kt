@@ -14,6 +14,8 @@ import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.model.UserProfileEntity
 import com.gratia.music.data.model.ListeningEventEntity
 import com.gratia.music.data.dao.ListeningEventDao
+import com.gratia.music.data.dao.LyricsDao
+import com.gratia.music.data.model.LyricsEntity
 
 /**
  * Room migration from v1 to v2.
@@ -133,6 +135,38 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/**
+ * Room migration from v5 to v6.
+ * Creates the lyrics table and migrates data from songs table if present.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS lyrics (
+                songId TEXT NOT NULL PRIMARY KEY,
+                text TEXT NOT NULL,
+                isSynced INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                offsetMs INTEGER NOT NULL,
+                isManuallyEdited INTEGER NOT NULL,
+                downloadDate INTEGER NOT NULL
+            )
+        """)
+        
+        // Migrate existing plain lyrics. We assume old lyrics are un-synced and provided locally.
+        db.execSQL("""
+            INSERT INTO lyrics (songId, text, isSynced, provider, offsetMs, isManuallyEdited, downloadDate)
+            SELECT id, lyricsPlain, 0, 'legacy_migration', 0, 0, 0
+            FROM songs
+            WHERE lyricsPlain IS NOT NULL AND lyricsPlain != ''
+        """)
+        
+        // Note: SQLite doesn't support DROP COLUMN easily before newer versions, 
+        // so we just leave the old columns in the songs table but Room will ignore them 
+        // because we removed them from the Entity.
+    }
+}
+
 @Database(
     entities = [
         SongEntity::class,
@@ -142,8 +176,9 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         com.gratia.music.data.model.CollectionSongCrossRef::class,
         UserProfileEntity::class,
         ListeningEventEntity::class,
+        LyricsEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class GratiaDatabase : RoomDatabase() {
@@ -153,6 +188,7 @@ abstract class GratiaDatabase : RoomDatabase() {
     abstract fun listeningEventDao(): ListeningEventDao
     abstract fun playlistDao(): com.gratia.music.data.dao.PlaylistDao
     abstract fun collectionDao(): com.gratia.music.data.dao.CollectionDao
+    abstract fun lyricsDao(): LyricsDao
 
     companion object {
         @Volatile
@@ -165,7 +201,7 @@ abstract class GratiaDatabase : RoomDatabase() {
                     GratiaDatabase::class.java,
                     "gratia_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

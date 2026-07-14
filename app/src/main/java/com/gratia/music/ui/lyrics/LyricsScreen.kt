@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,6 +33,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Premium Apple Music-style lyrics screen.
@@ -46,6 +48,7 @@ fun LyricsScreen(
     modifier: Modifier = Modifier
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val currentLyrics by playerViewModel.currentLyrics.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentTimeMs by playerViewModel.currentTimeMs.collectAsState()
     val durationMs by playerViewModel.durationMs.collectAsState()
@@ -53,6 +56,17 @@ fun LyricsScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showEditor by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showExportConfirm by remember { mutableStateOf(false) }
+    var showOffsetUI by remember { mutableStateOf(false) }
+    var currentOffsetMs by remember { mutableLongStateOf(currentLyrics?.offsetMs ?: 0L) }
+
+    // Update current offset state if currentLyrics changes
+    LaunchedEffect(currentLyrics) {
+        currentOffsetMs = currentLyrics?.offsetMs ?: 0L
+    }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Smooth interpolator for time tracking to avoid layout jumps between ticks
     var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
@@ -95,14 +109,14 @@ fun LyricsScreen(
     )
 
     // Parser integration
-    val lyricsRaw = when {
-        song.lyricsSynced?.isNotBlank() == true -> song.lyricsSynced
-        song.lyricsPlain?.isNotBlank() == true -> song.lyricsPlain
-        else -> ""
-    }
+    val lyricsRaw = currentLyrics?.text ?: ""
 
     val parsedDocument = remember(lyricsRaw) {
-        if (lyricsRaw.isNotBlank()) LyricsParser.parse(lyricsRaw) else null
+        if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
+            LyricsParser.parse(lyricsRaw)
+        } else if (lyricsRaw.isNotBlank()) {
+            LyricsDocument.Plain(lyricsRaw)
+        } else null
     }
 
     Box(
@@ -205,10 +219,38 @@ fun LyricsScreen(
                         modifier = Modifier.background(GratiaTheme.colors.surface)
                     ) {
                         DropdownMenuItem(
+                            text = { Text("Refresh Lyrics", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                            onClick = {
+                                showMenu = false
+                                playerViewModel.refreshLyrics(force = true)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Replace Lyrics", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                            onClick = {
+                                showMenu = false
+                                showEditor = true // Let user input or paste replacement lyrics
+                            }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Edit Lyrics", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
                             onClick = {
                                 showMenu = false
                                 showEditor = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Adjust Offset", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                            onClick = {
+                                showMenu = false
+                                showOffsetUI = !showOffsetUI
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Export .lrc", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                            onClick = {
+                                showMenu = false
+                                showExportConfirm = true
                             }
                         )
                         DropdownMenuItem(
@@ -222,7 +264,6 @@ fun LyricsScreen(
                 }
             }
 
-            // Lyrics Main View Container
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -295,6 +336,44 @@ fun LyricsScreen(
                 }
             }
 
+            // Offset UI if requested
+            if (showOffsetUI && parsedDocument is LyricsDocument.LineSynced) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Offset: ${currentOffsetMs}ms",
+                        color = Color.White,
+                        fontFamily = Inter,
+                        fontSize = 14.sp
+                    )
+                    Row {
+                        IconButton(onClick = {
+                            currentOffsetMs -= 100L
+                            playerViewModel.updateLyricsOffset(currentOffsetMs)
+                        }) {
+                            Icon(Icons.Default.Remove, contentDescription = "-100ms", tint = Color.White)
+                        }
+                        IconButton(onClick = {
+                            currentOffsetMs += 100L
+                            playerViewModel.updateLyricsOffset(currentOffsetMs)
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = "+100ms", tint = Color.White)
+                        }
+                        IconButton(onClick = { showOffsetUI = false }) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+            }
+
             // Bottom Player Control Panel
             CompactControlsPanel(
                 playerViewModel = playerViewModel,
@@ -312,12 +391,7 @@ fun LyricsScreen(
             onDismiss = { showEditor = false },
             onSave = { newLyrics ->
                 val isSynced = newLyrics.contains("[00:") || newLyrics.contains("[01:") || newLyrics.contains("[02:")
-                val updatedSong = song.copy(
-                    lyrics = newLyrics,
-                    lyricsPlain = if (!isSynced) newLyrics else null,
-                    lyricsSynced = if (isSynced) newLyrics else null
-                )
-                playerViewModel.updateSong(updatedSong)
+                playerViewModel.saveManualLyrics(newLyrics, isSynced)
                 showEditor = false
             }
         )
@@ -331,8 +405,7 @@ fun LyricsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val updatedSong = song.copy(lyrics = null, lyricsPlain = null, lyricsSynced = null)
-                        playerViewModel.updateSong(updatedSong)
+                        playerViewModel.deleteLyrics()
                         showDeleteConfirm = false
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.error)
@@ -343,6 +416,44 @@ fun LyricsScreen(
             dismissButton = {
                 TextButton(
                     onClick = { showDeleteConfirm = false },
+                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
+                ) {
+                    Text("Cancel", fontFamily = Inter)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
+    }
+
+    if (showExportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExportConfirm = false },
+            title = { Text("Export .lrc", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            text = { Text("Export the current lyrics to your Downloads folder?", fontFamily = Inter, color = GratiaTheme.colors.textSecondary) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // Launch coroutine to save
+                        kotlinx.coroutines.GlobalScope.launch {
+                            val fileName = "${song.artist} - ${song.title}.lrc".replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                            try {
+                                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                                val file = java.io.File(downloadsDir, fileName)
+                                file.writeText(lyricsRaw)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        showExportConfirm = false
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.accent)
+                ) {
+                    Text("Export", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showExportConfirm = false },
                     colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
                 ) {
                     Text("Cancel", fontFamily = Inter)

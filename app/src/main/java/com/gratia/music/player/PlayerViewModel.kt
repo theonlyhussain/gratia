@@ -6,9 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
+import com.gratia.music.data.model.LyricsEntity
+import com.gratia.music.data.repository.LyricsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
@@ -23,6 +26,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         GratiaApp.instance.database.songDao()
     )
     private val playlistDao = GratiaApp.instance.database.playlistDao()
+    private val lyricsRepository = LyricsRepository(
+        GratiaApp.instance.database.lyricsDao()
+    )
 
     val currentSong = playerManager.currentSong
     val isPlaying = playerManager.isPlaying
@@ -41,6 +47,52 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _lyricsOverlayOpen = MutableStateFlow(false)
     val lyricsOverlayOpen: StateFlow<Boolean> = _lyricsOverlayOpen.asStateFlow()
+
+    private val _currentLyrics = MutableStateFlow<LyricsEntity?>(null)
+    val currentLyrics: StateFlow<LyricsEntity?> = _currentLyrics.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            currentSong.collectLatest { song ->
+                if (song != null) {
+                    _currentLyrics.value = lyricsRepository.getLyrics(song, forceRefresh = false)
+                } else {
+                    _currentLyrics.value = null
+                }
+            }
+        }
+    }
+
+    fun refreshLyrics(force: Boolean = true) {
+        val song = currentSong.value ?: return
+        viewModelScope.launch {
+            _currentLyrics.value = lyricsRepository.getLyrics(song, forceRefresh = force)
+        }
+    }
+
+    fun saveManualLyrics(text: String, isSynced: Boolean) {
+        val song = currentSong.value ?: return
+        viewModelScope.launch {
+            lyricsRepository.saveManualLyrics(song.id, text, isSynced)
+            refreshLyrics(force = false)
+        }
+    }
+
+    fun updateLyricsOffset(offsetMs: Long) {
+        val song = currentSong.value ?: return
+        viewModelScope.launch {
+            lyricsRepository.updateOffset(song.id, offsetMs)
+            refreshLyrics(force = false)
+        }
+    }
+
+    fun deleteLyrics() {
+        val song = currentSong.value ?: return
+        viewModelScope.launch {
+            lyricsRepository.deleteLyrics(song.id)
+            _currentLyrics.value = null
+        }
+    }
 
     fun playSong(song: SongEntity, songQueue: List<SongEntity>) {
         playerManager.playSong(song, songQueue)
@@ -90,8 +142,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
-    
+    fun deleteSong(song: SongEntity, onUndoExpired: () -> Unit) {
+        viewModelScope.launch {
+            // Remove from queue if present
+            playerManager.removeFromQueue(song.id)
+            if (currentSong.value?.id == song.id) {
+                playerManager.nextSong()
+            }
+            // Delete from DB (temporarily)
+            songRepository.deleteSong(song)
+            
+            // Allow caller to show snackbar, and on expiry delete from storage
+            kotlinx.coroutines.delay(4000) // Snackbar duration
+            onUndoExpired()
+        }
+    }
 
+    fun restoreSong(song: SongEntity) {
+        viewModelScope.launch {
+            songRepository.insertSong(song)
+        }
+    }
     override fun onCleared() {
         super.onCleared()
         // IMPORTANT: Do NOT call playerManager.release() here.

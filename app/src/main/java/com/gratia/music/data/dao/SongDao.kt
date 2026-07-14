@@ -46,15 +46,13 @@ interface SongDao {
         language LIKE '%' || :query || '%' OR 
         tags LIKE '%' || :query || '%' OR 
         aliases LIKE '%' || :query || '%' OR 
-        lyrics LIKE '%' || :query || '%' OR
-        lyricsPlain LIKE '%' || :query || '%'
+        id IN (SELECT songId FROM lyrics WHERE text LIKE '%' || :query || '%')
         ORDER BY 
             CASE WHEN title LIKE '%' || :query || '%' THEN 0
                  WHEN artist LIKE '%' || :query || '%' THEN 1
                  WHEN album LIKE '%' || :query || '%' THEN 2
-                 WHEN lyrics LIKE '%' || :query || '%' THEN 3
-                 WHEN lyricsPlain LIKE '%' || :query || '%' THEN 4
-                 ELSE 5
+                 WHEN id IN (SELECT songId FROM lyrics WHERE text LIKE '%' || :query || '%') THEN 3
+                 ELSE 4
             END,
             playCount DESC
     """)
@@ -62,8 +60,7 @@ interface SongDao {
 
     @Query("""
         SELECT * FROM songs WHERE 
-        lyrics LIKE '%' || :query || '%' OR
-        lyricsPlain LIKE '%' || :query || '%'
+        id IN (SELECT songId FROM lyrics WHERE text LIKE '%' || :query || '%')
     """)
     suspend fun searchByLyrics(query: String): List<SongEntity>
 

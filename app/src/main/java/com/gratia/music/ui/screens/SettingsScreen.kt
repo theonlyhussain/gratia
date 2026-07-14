@@ -260,7 +260,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = GratiaTheme.colors.glassBorder)
                     SettingsRow(
                         title = "Changelog",
-                        subtitle = "What's new in v2.0.0",
+                        subtitle = "What's new in v2.1.1",
                         onClick = { 
                             context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia/releases")))
                         }

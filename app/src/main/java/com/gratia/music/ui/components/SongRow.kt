@@ -27,6 +27,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import com.gratia.music.ui.player.formatTime
+import kotlinx.coroutines.launch
 
 /**
  * Library song row. Translates SongRow.tsx from the web prototype.
@@ -44,12 +45,17 @@ fun SongRow(
     badge: String? = null,
     modifier: Modifier = Modifier
 ) {
-    val navController = LocalNavController.current
     val playerViewModel = LocalPlayerViewModel.current
     val firstMood = song.mood?.split(",")?.firstOrNull()?.trim()
     var showMenu by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    val navController = com.gratia.music.ui.LocalNavController.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val snackbarHostState = com.gratia.music.ui.LocalSnackbarHostState.current
+    val scope = rememberCoroutineScope()
 
     Row(
         modifier = modifier
@@ -206,9 +212,21 @@ fun SongRow(
             onEditLyrics = {
                 navController.navigate("fullLyrics/${song.id}")
             },
-            onShare = { /* TODO */ },
+            onShare = {
+                showMenu = false
+                val sendIntent: android.content.Intent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out this song: ${song.title} by ${song.artist}")
+                    type = "text/plain"
+                }
+                val shareIntent = android.content.Intent.createChooser(sendIntent, null)
+                context.startActivity(shareIntent)
+            },
             onSongInfo = { showInfo = true },
-            onDelete = { /* TODO Phase 6 */ }
+            onDelete = { 
+                showMenu = false
+                showDeleteConfirm = true 
+            }
         )
     }
 
@@ -223,6 +241,65 @@ fun SongRow(
         com.gratia.music.ui.components.AddToPlaylistSheet(
             song = song,
             onDismiss = { showAddToPlaylist = false }
+        )
+    }
+
+    if (showDeleteConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { 
+                androidx.compose.material3.Text(
+                    text = "Delete Song", 
+                    fontFamily = com.gratia.music.ui.theme.SpaceGrotesk, 
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, 
+                    color = GratiaTheme.colors.textPrimary
+                ) 
+            },
+            text = { 
+                androidx.compose.material3.Text(
+                    text = "Are you sure you want to delete '${song.title}' from your library?", 
+                    fontFamily = com.gratia.music.ui.theme.Inter, 
+                    color = GratiaTheme.colors.textSecondary
+                ) 
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        playerViewModel.deleteSong(song) {
+                            try {
+                                val uri = android.net.Uri.parse(song.localUri)
+                                val file = java.io.File(uri.path ?: "")
+                                if (file.exists()) file.delete()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Song deleted",
+                                actionLabel = "Undo",
+                                duration = androidx.compose.material3.SnackbarDuration.Short
+                            )
+                            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                playerViewModel.restoreSong(song)
+                            }
+                        }
+                    },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.error)
+                ) {
+                    androidx.compose.material3.Text("Delete", fontFamily = com.gratia.music.ui.theme.Inter, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = { showDeleteConfirm = false },
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
+                ) {
+                    androidx.compose.material3.Text("Cancel", fontFamily = com.gratia.music.ui.theme.Inter)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
         )
     }
 }

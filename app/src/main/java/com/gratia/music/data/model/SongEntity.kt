@@ -18,7 +18,6 @@ data class SongEntity(
     val language: String? = null,
     val tags: String? = null,
     val aliases: String? = null,
-    val lyrics: String? = null,
     val durationMs: Long = 0L,
     val coverArtUri: String? = null,
     val storageProvider: String = "local",
@@ -41,10 +40,6 @@ data class SongEntity(
     val coverArtPath: String? = null,
     val coverSource: String? = null, // "embedded", "user_selected", "generated"
 
-    // Lyrics modes — added in v2
-    val lyricsPlain: String? = null,
-    val lyricsSynced: String? = null,
-    val lyricsMode: String = "plain", // "plain" or "synced"
 
     // Audio quality metadata — added in v2
     val format: String? = null,
