@@ -34,6 +34,11 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import java.io.File
+import android.content.Intent
 
 /**
  * Premium Apple Music-style lyrics screen.
@@ -58,7 +63,12 @@ fun LyricsScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showExportConfirm by remember { mutableStateOf(false) }
     var showOffsetUI by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
     var currentOffsetMs by remember { mutableLongStateOf(currentLyrics?.offsetMs ?: 0L) }
+    
+    // Sing Karaoke Mode state
+    var showSingSlider by remember { mutableStateOf(false) }
+    var singVolume by remember { mutableFloatStateOf(1f) } // 1.0 = Full vocals, 0.0 = Instrumental
 
     // Update current offset state if currentLyrics changes
     LaunchedEffect(currentLyrics) {
@@ -67,6 +77,46 @@ fun LyricsScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val content = context.contentResolver.openInputStream(it)?.bufferedReader()?.use { reader ->
+                    reader.readText()
+                }
+                if (!content.isNullOrBlank()) {
+                    val isSynced = content.contains("[") && content.contains(":")
+                    playerViewModel.saveManualLyrics(content, isSynced)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val exportLrc = {
+        try {
+            val content = currentLyrics?.text ?: ""
+            if (content.isNotBlank()) {
+                val songTitle = currentSong?.title?.replace(Regex("[^a-zA-Z0-9.-]"), "_") ?: "lyrics"
+                val lyricsDir = File(context.cacheDir, "lyrics")
+                lyricsDir.mkdirs()
+                val file = File(lyricsDir, "${songTitle}.lrc")
+                file.writeText(content)
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/octet-stream"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Export LRC"))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     // Smooth interpolator for time tracking to avoid layout jumps between ticks
     var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
@@ -87,9 +137,28 @@ fun LyricsScreen(
 
     val song = currentSong
     if (song == null) {
-        EmptyLyricsState(onBack = onBack, message = "No song playing", detail = "Play a song to see lyrics")
+        EmptyLyricsState(
+            onBack = onBack,
+            onAddLyrics = { showEditor = true },
+            onImportLrc = { importLauncher.launch("*/*") },
+            onRetry = { playerViewModel.refreshLyrics(true) },
+            onSearchAgain = { /* TODO search modal */ },
+            message = "No song playing",
+            detail = "Play a song to see lyrics"
+        )
         return
     }
+
+    val lyricsRaw = currentLyrics?.text ?: ""
+    val parsedDocument = remember(lyricsRaw) {
+        if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
+            LyricsParser.parse(lyricsRaw)
+        } else if (lyricsRaw.isNotBlank()) {
+            LyricsDocument.Plain(lyricsRaw)
+        } else null
+    }
+
+
 
     // Dynamic background color extractor
     var coverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
@@ -107,17 +176,6 @@ fun LyricsScreen(
         animationSpec = tween(800),
         label = "darkMutedColor"
     )
-
-    // Parser integration
-    val lyricsRaw = currentLyrics?.text ?: ""
-
-    val parsedDocument = remember(lyricsRaw) {
-        if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
-            LyricsParser.parse(lyricsRaw)
-        } else if (lyricsRaw.isNotBlank()) {
-            LyricsDocument.Plain(lyricsRaw)
-        } else null
-    }
 
     Box(
         modifier = modifier
@@ -250,7 +308,7 @@ fun LyricsScreen(
                             text = { Text("Export .lrc", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
                             onClick = {
                                 showMenu = false
-                                showExportConfirm = true
+                                exportLrc()
                             }
                         )
                         DropdownMenuItem(
@@ -260,6 +318,15 @@ fun LyricsScreen(
                                 showDeleteConfirm = true
                             }
                         )
+                        if (currentLyrics != null) {
+                            DropdownMenuItem(
+                                text = { Text("Lyrics Info", color = GratiaTheme.colors.textPrimary, fontFamily = Inter) },
+                                onClick = {
+                                    showMenu = false
+                                    showInfoDialog = true
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -306,6 +373,48 @@ fun LyricsScreen(
                                 fontSize = 14.sp,
                                 color = Color.White.copy(alpha = 0.4f)
                             )
+                            
+                            Spacer(Modifier.height(32.dp))
+                            
+                            // Action Buttons
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                com.gratia.music.ui.components.GratiaButton(
+                                    text = "Add Lyrics",
+                                    onClick = { showEditor = true },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                com.gratia.music.ui.components.GratiaButton(
+                                    text = "Import LRC",
+                                    onClick = { importLauncher.launch("*/*") },
+                                    modifier = Modifier.weight(1f),
+                                    backgroundColor = Color.White.copy(alpha = 0.2f)
+                                )
+                            }
+                            
+                            Spacer(Modifier.height(16.dp))
+                            
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 40.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                com.gratia.music.ui.components.GratiaButton(
+                                    text = "Retry",
+                                    onClick = { playerViewModel.refreshLyrics(true) },
+                                    modifier = Modifier.weight(1f),
+                                    backgroundColor = Color.White.copy(alpha = 0.1f)
+                                )
+                                com.gratia.music.ui.components.GratiaButton(
+                                    text = "Search Again",
+                                    onClick = { /* TODO: Implement search again modal */ },
+                                    modifier = Modifier.weight(1f),
+                                    backgroundColor = Color.White.copy(alpha = 0.1f)
+                                )
+                            }
                         }
                     }
                 } else {
@@ -381,6 +490,57 @@ fun LyricsScreen(
                 currentTimeMs = visualTimeMs,
                 durationMs = durationMs
             )
+        }
+
+        // Apple Music Sing (Karaoke) UI
+        if (parsedDocument is LyricsDocument.WordSynced || parsedDocument is LyricsDocument.LineSynced) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 140.dp, end = 20.dp) // Float above controls
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .padding(8.dp)
+                ) {
+                    androidx.compose.animation.AnimatedVisibility(visible = showSingSlider) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Slider(
+                                value = singVolume,
+                                onValueChange = { singVolume = it },
+                                modifier = Modifier
+                                    .height(120.dp)
+                                    .padding(vertical = 12.dp)
+                                    .graphicsLayer { 
+                                        rotationZ = -90f
+                                        translationY = 50f
+                                    },
+                                colors = SliderDefaults.colors(
+                                    thumbColor = Color.White,
+                                    activeTrackColor = Color.White,
+                                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+                                )
+                            )
+                            Spacer(Modifier.height(16.dp))
+                        }
+                    }
+                    
+                    IconButton(
+                        onClick = { showSingSlider = !showSingSlider },
+                        modifier = Modifier.size(44.dp).background(if (singVolume < 0.9f) Color.White.copy(alpha=0.1f) else Color.Transparent, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Sing",
+                            tint = if (singVolume < 0.9f) Color.White else Color.White.copy(alpha=0.6f),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
         }
     }
     
@@ -561,6 +721,10 @@ private fun CompactControlsPanel(
 @Composable
 private fun EmptyLyricsState(
     onBack: () -> Unit,
+    onAddLyrics: () -> Unit,
+    onImportLrc: () -> Unit,
+    onRetry: () -> Unit,
+    onSearchAgain: () -> Unit,
     message: String,
     detail: String
 ) {
@@ -644,6 +808,48 @@ private fun EmptyLyricsState(
                     textAlign = TextAlign.Center,
                     lineHeight = 22.sp
                 )
+                
+                Spacer(Modifier.height(48.dp))
+                
+                // Action Buttons
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    com.gratia.music.ui.components.GratiaButton(
+                        text = "Add Lyrics",
+                        onClick = onAddLyrics,
+                        modifier = Modifier.weight(1f)
+                    )
+                    com.gratia.music.ui.components.GratiaButton(
+                        text = "Import LRC",
+                        onClick = onImportLrc,
+                        modifier = Modifier.weight(1f),
+                        backgroundColor = Color.White.copy(alpha = 0.2f)
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    com.gratia.music.ui.components.GratiaButton(
+                        text = "Retry",
+                        onClick = onRetry,
+                        modifier = Modifier.weight(1f),
+                        backgroundColor = Color.White.copy(alpha = 0.1f)
+                    )
+                    com.gratia.music.ui.components.GratiaButton(
+                        text = "Search Again",
+                        onClick = onSearchAgain,
+                        modifier = Modifier.weight(1f),
+                        backgroundColor = Color.White.copy(alpha = 0.1f)
+                    )
+                }
             }
         }
     }

@@ -16,5 +16,6 @@ data class LyricsEntity(
     val provider: String, // e.g. "LRCLIB", "manual"
     val offsetMs: Long = 0L,
     val isManuallyEdited: Boolean = false,
-    val downloadDate: Long = System.currentTimeMillis()
+    val downloadDate: Long = System.currentTimeMillis(),
+    val hash: String = "" // Optional hash for future validation
 )

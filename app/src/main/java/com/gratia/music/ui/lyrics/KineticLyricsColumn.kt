@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,20 +40,12 @@ fun KineticLyricsColumn(
     var autoScrollEnabled by remember { mutableStateOf(true) }
     var lastUserScrollTime by remember { mutableLongStateOf(0L) }
 
-    // Detect user-initiated scrolls
-    val isUserScrolling = listState.isScrollInProgress
-    LaunchedEffect(isUserScrolling) {
-        if (isUserScrolling) {
-            // User started scrolling — disable auto-scroll
-            autoScrollEnabled = false
-            lastUserScrollTime = System.currentTimeMillis()
-        }
-    }
+    // User-scroll detection is now handled via pointerInput directly on the container.
 
-    // Re-enable auto-scroll after 5s of inactivity
+    // Re-enable auto-scroll after 3s of inactivity
     LaunchedEffect(lastUserScrollTime) {
         if (!autoScrollEnabled && lastUserScrollTime > 0) {
-            delay(5000)
+            delay(3000)
             autoScrollEnabled = true
         }
     }
@@ -74,7 +69,15 @@ fun KineticLyricsColumn(
 
     LazyColumn(
         state = listState,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    autoScrollEnabled = false
+                    lastUserScrollTime = System.currentTimeMillis()
+                }
+            },
         contentPadding = PaddingValues(
             top = 280.dp,
             bottom = 280.dp,

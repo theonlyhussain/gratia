@@ -25,21 +25,12 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.JetBrainsMono
 
 /**
- * Custom premium progress bar — replaces Material Slider entirely.
+ * Custom premium progress bar — mimics Apple Music style.
  *
  * Design details:
- * - Very thin track (3dp)
- * - Soft rounded ends (StrokeCap.Round)
- * - Animated progress fill
- * - Large invisible touch area (48dp height for accessibility)
- * - Thumb: only appears while dragging (animated fade-in, 14dp circle)
- * - Time labels: small, muted, monospaced (JetBrains Mono)
- *
- * Interaction:
- * - Drag to seek
- * - Tap to seek
- * - Emits onDragStart / onDragEnd so parent can react
- *   (e.g., scale artwork down, pause background animation)
+ * - Very thin track
+ * - Thumb is always visible (small circle), grows slightly when dragging
+ * - Time labels: small, muted below the bar
  */
 @Composable
 fun GratiaProgressBar(
@@ -48,7 +39,7 @@ fun GratiaProgressBar(
     durationMs: Long,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
-    trackColor: Color = Color.White.copy(alpha = 0.12f),
+    trackColor: Color = Color.White.copy(alpha = 0.2f),
     activeColor: Color = Color.White,
     thumbColor: Color = Color.White,
     onDragStart: () -> Unit = {},
@@ -64,17 +55,10 @@ fun GratiaProgressBar(
     // Display progress: use drag value when dragging, otherwise animated real progress
     val displayProgress = if (isDragging) dragProgress else progress
 
-    // Thumb opacity — only visible when dragging
-    val thumbAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = tween(motion.normal, easing = motion.standardEasing),
-        label = "thumbAlpha"
-    )
-
-    // Thumb scale — pops in when dragging
+    // Thumb scale — small normally, pops in larger when dragging
     val thumbScale by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0.4f,
-        animationSpec = tween(motion.normal, easing = motion.standardEasing),
+        targetValue = if (isDragging) 1.2f else 0.8f,
+        animationSpec = tween(motion.fast, easing = motion.standardEasing),
         label = "thumbScale"
     )
 
@@ -87,7 +71,7 @@ fun GratiaProgressBar(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(GratiaTheme.spacing.heroSmall) // 48dp Large touch area
+                .height(40.dp) // Large touch area
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
                         val newProgress = (offset.x / size.width).coerceIn(0f, 1f)
@@ -119,7 +103,7 @@ fun GratiaProgressBar(
                 }
         ) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                val trackHeight = 3.dp.toPx()
+                val trackHeight = 4.dp.toPx()
                 val trackY = center.y
                 val trackWidth = size.width
                 val cornerRadius = trackHeight / 2f
@@ -143,25 +127,26 @@ fun GratiaProgressBar(
                     )
                 }
 
-                // Thumb — only when dragging (animated fade + scale)
-                if (thumbAlpha > 0.01f) {
-                    val thumbRadius = 7.dp.toPx() * thumbScale
-                    val thumbX = activeWidth.coerceIn(thumbRadius, trackWidth - thumbRadius)
+                // Always visible thumb
+                val baseThumbRadius = 6.dp.toPx()
+                val thumbRadius = baseThumbRadius * thumbScale
+                val thumbX = activeWidth.coerceIn(thumbRadius, trackWidth - thumbRadius)
 
-                    // Thumb glow
+                if (isDragging) {
+                    // Thumb glow when dragging
                     drawCircle(
-                        color = thumbColor.copy(alpha = thumbAlpha * 0.3f),
+                        color = thumbColor.copy(alpha = 0.3f),
                         radius = thumbRadius * 2f,
                         center = Offset(thumbX, trackY)
                     )
-
-                    // Thumb
-                    drawCircle(
-                        color = thumbColor.copy(alpha = thumbAlpha),
-                        radius = thumbRadius,
-                        center = Offset(thumbX, trackY)
-                    )
                 }
+
+                // Thumb
+                drawCircle(
+                    color = thumbColor,
+                    radius = thumbRadius,
+                    center = Offset(thumbX, trackY)
+                )
             }
         }
 
@@ -181,12 +166,17 @@ fun GratiaProgressBar(
             GratiaText(
                 text = formatTimePlayer(displayTime),
                 style = GratiaTheme.typography.caption.copy(fontFamily = JetBrainsMono),
-                color = Color.White.copy(alpha = 0.4f)
+                color = Color.White.copy(alpha = 0.5f)
             )
+            
+            // In Apple Music, remaining time is often shown with a negative sign (e.g. -2:30). 
+            // We can just show duration or remaining time. Let's show remaining time for a more authentic feel if we want,
+            // but the original app shows duration. Let's stick to duration or remaining. Let's do remaining.
+            val remainingTime = durationMs - displayTime
             GratiaText(
-                text = formatTimePlayer(durationMs),
+                text = "-${formatTimePlayer(remainingTime)}",
                 style = GratiaTheme.typography.caption.copy(fontFamily = JetBrainsMono),
-                color = Color.White.copy(alpha = 0.4f)
+                color = Color.White.copy(alpha = 0.5f)
             )
         }
     }
@@ -200,3 +190,4 @@ fun formatTimePlayer(ms: Long): String {
     val secs = totalSecs % 60
     return "$mins:${secs.toString().padStart(2, '0')}"
 }
+

@@ -4,8 +4,8 @@ package com.gratia.music.lyrics
  * Parser for Enhanced LRC (ELRC) format.
  */
 object EnhancedLrcParser {
-    // Matches [mm:ss.xx] or [m:ss.xx] or [mm:ss] followed by text
-    private val LRC_LINE_PATTERN = Regex("""^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$""")
+    // Matches one or more [mm:ss.xx] tags
+    private val TIME_TAG_PATTERN = Regex("""\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]""")
     // Matches word timestamp tags like <00:14.20>
     private val ELRC_WORD_PATTERN = Regex("""<(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?>""")
     // Matches metadata tags like [ti:Title], [ar:Artist], etc.
@@ -26,14 +26,10 @@ object EnhancedLrcParser {
                 continue
             }
 
-            val match = LRC_LINE_PATTERN.matchEntire(line)
-            if (match != null) {
-                val minutes = match.groupValues[1].toIntOrNull() ?: 0
-                val seconds = match.groupValues[2].toIntOrNull() ?: 0
-                val millisStr = match.groupValues[3]
-                val millis = if (millisStr.isEmpty()) 0 else millisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
-                val lineStartMs = (minutes * 60_000L) + (seconds * 1000L) + millis
-                val content = match.groupValues[4]
+            val timeTags = TIME_TAG_PATTERN.findAll(line).toList()
+            if (timeTags.isNotEmpty()) {
+                val lastTagEnd = timeTags.last().range.last + 1
+                val content = line.substring(lastTagEnd).trim()
 
                 // Parse word tokens in the content
                 val wordMatches = ELRC_WORD_PATTERN.findAll(content).toList()
@@ -62,9 +58,18 @@ object EnhancedLrcParser {
                     }
                 }
 
-                // Fall back to line level text if no word matches exist
                 val finalText = if (words.isEmpty()) content.trim() else lineTextBuilder.toString()
-                lines.add(LyricLine(text = finalText, startMs = lineStartMs, words = words))
+
+                for (tag in timeTags) {
+                    val minutes = tag.groupValues[1].toIntOrNull() ?: 0
+                    val seconds = tag.groupValues[2].toIntOrNull() ?: 0
+                    val millisStr = tag.groupValues[3]
+                    val millis = if (millisStr.isEmpty()) 0 else millisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
+                    val lineStartMs = (minutes * 60_000L) + (seconds * 1000L) + millis
+
+                    // Copy the words list (deep copy not strictly necessary since words are read-only data classes, but we do need new instances of the list)
+                    lines.add(LyricLine(text = finalText, startMs = lineStartMs, words = words.toList()))
+                }
             }
         }
 

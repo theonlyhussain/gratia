@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -162,10 +163,8 @@ fun ExpandedPlayer(
     ) {
         // --- Background ---
         PlayerBackground(
-            dominantColor = coverColors.dominant,
-            darkMutedColor = coverColors.darkMuted,
-            vibrantColor = coverColors.vibrant,
-            isPaused = isDragging
+            coverArtPath = song.coverArtPath,
+            dominantColor = coverColors.dominant
         )
 
         // Dark overlay for text readability
@@ -184,37 +183,19 @@ fun ExpandedPlayer(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Top bar
-            Row(
+            // Top bar (Pill indicator)
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.small),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(vertical = GratiaTheme.spacing.mediumLarge),
+                contentAlignment = Alignment.Center
             ) {
-                GratiaIconButton(
-                    icon = Icons.Default.KeyboardArrowDown,
-                    onClick = onDismiss,
-                    contentDescription = "Collapse",
-                    tint = Color.White,
-                    size = GratiaTheme.icons.large
-                )
-
-                // "PLAYING FROM" in top bar
-                AnimatedText(
-                    text = song.album ?: "Gratia",
-                    style = GratiaTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                    color = Color.White.copy(alpha = 0.7f),
-                    maxLines = 1
-                )
-
-                GratiaIconButton(
-                    icon = Icons.Default.MoreVert,
-                    onClick = { showSongMenu = true },
-                    contentDescription = "More",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    size = GratiaTheme.icons.normal
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(5.dp)
+                        .background(Color.White.copy(alpha = 0.4f), RoundedCornerShape(percent = 50))
                 )
             }
 
@@ -248,7 +229,8 @@ fun ExpandedPlayer(
                         onDismiss()
                         onNavigateToAlbum(song.album)
                     }
-                }
+                },
+                onMoreClick = { showSongMenu = true }
             )
 
             Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge)) // 16dp
@@ -283,6 +265,7 @@ fun ExpandedPlayer(
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 isFavorite = song.isFavorite,
+                hasLyrics = currentLyrics != null,
                 onToggleShuffle = { playerViewModel.toggleShuffle() },
                 onCycleRepeat = { playerViewModel.cycleRepeatMode() },
                 onToggleFavorite = { 
@@ -293,16 +276,6 @@ fun ExpandedPlayer(
                 onOpenQueue = onOpenQueue,
                 onOpenLyrics = onOpenLyrics,
                 accentColor = GratiaTheme.colors.accent
-            )
-
-            Spacer(Modifier.height(GratiaTheme.spacing.mediumSmall)) // 12dp
-
-            // --- Lyrics Preview Card ---
-            LyricsPreviewCard(
-                currentLyricPreview = currentLyricPreview,
-                hasLyrics = currentLyrics != null,
-                plainLyrics = currentLyrics?.text,
-                onClick = onOpenLyrics
             )
 
             Spacer(Modifier.weight(0.05f))
@@ -334,6 +307,7 @@ fun ExpandedPlayer(
                     onDismiss()
                     onNavigateToArtist(song.artist)
                 },
+                hasLyrics = currentLyrics != null,
                 onEditLyrics = { onOpenLyrics() },
                 onShare = { /* TODO Context sharing */ },
                 onSongInfo = { showSongInfo = true },
@@ -343,7 +317,7 @@ fun ExpandedPlayer(
                 }
             )
         }
-        
+
         if (showSongInfo) {
             SongInfoDialog(
                 song = song,
@@ -416,96 +390,6 @@ fun ExpandedPlayer(
                 },
                 containerColor = GratiaTheme.colors.surface
             )
-        }
-    }
-}
-
-/**
- * Glass-styled lyrics preview card at the bottom of the expanded player.
- */
-@Composable
-private fun LyricsPreviewCard(
-    currentLyricPreview: String?,
-    hasLyrics: Boolean,
-    plainLyrics: String?,
-    onClick: () -> Unit
-) {
-    GlassSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = GratiaTheme.spacing.large)
-            .clickable { onClick() },
-        shape = GratiaTheme.shapes.large,
-        backgroundColor = Color.White.copy(alpha = 0.06f),
-        borderColorStart = Color.White.copy(alpha = 0.15f),
-        borderColorEnd = Color.Transparent
-    ) {
-        Column(modifier = Modifier.padding(GratiaTheme.spacing.mediumLarge)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                GratiaText(
-                    text = "LYRICS",
-                    style = GratiaTheme.typography.caption.copy(
-                        letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp),
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
-                    ),
-                    color = Color.White.copy(alpha = 0.5f)
-                )
-                GratiaIcon(
-                    imageVector = Icons.Default.OpenInFull,
-                    contentDescription = "Expand volume slider",
-                    tint = Color.White.copy(alpha = 0.3f),
-                    size = GratiaTheme.icons.small
-                )
-            }
-
-            Spacer(Modifier.height(GratiaTheme.spacing.small))
-
-            if (!hasLyrics) {
-                GratiaText(
-                    text = "No lyrics added yet",
-                    style = GratiaTheme.typography.body,
-                    color = Color.White.copy(alpha = 0.35f)
-                )
-                GratiaText(
-                    text = "Tap to add lyrics",
-                    style = GratiaTheme.typography.caption,
-                    color = Color.White.copy(alpha = 0.2f)
-                )
-            } else if (currentLyricPreview != null) {
-                AnimatedText(
-                    text = currentLyricPreview,
-                    style = GratiaTheme.typography.section.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
-                    color = Color.White.copy(alpha = 0.9f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    fadeDurationMs = GratiaTheme.motion.slow
-                )
-                Spacer(Modifier.height(GratiaTheme.spacing.extraSmall))
-                GratiaText(
-                    text = "Tap to view full lyrics",
-                    style = GratiaTheme.typography.caption,
-                    color = Color.White.copy(alpha = 0.25f)
-                )
-            } else {
-                // Show plain lyrics preview
-                val previewText = plainLyrics ?: ""
-                val preview = previewText.lines().take(3)
-                preview.forEachIndexed { index, line ->
-                    GratiaText(
-                        text = line,
-                        style = GratiaTheme.typography.body.copy(fontWeight = if (index == 0) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal),
-                        color = when (index) {
-                            0 -> Color.White.copy(alpha = 0.85f)
-                            1 -> Color.White.copy(alpha = 0.35f)
-                            else -> Color.White.copy(alpha = 0.15f)
-                        }
-                    )
-                }
-            }
         }
     }
 }

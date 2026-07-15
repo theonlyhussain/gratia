@@ -32,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -43,14 +42,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 
 /**
  * Primary playback controls: Previous — Play/Pause — Next.
- *
- * Design details:
- * - Centered layout with generous spacing
- * - Play/Pause: largest element (72dp), filled white circle, soft glow + shadow
- * - Play/Pause icon morphs between states with crossfade
- * - Previous/Next: smaller (48dp), subtle fade when at queue edge
- * - Scale animation on tap (GDL normal, no bounce)
- * - Haptic feedback on every interaction
+ * Mimics Apple Music's large, icon-only style.
  */
 @Composable
 fun PlayerControls(
@@ -59,7 +51,7 @@ fun PlayerControls(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
-    glowColor: Color = Color.White,
+    glowColor: Color = Color.White, // Kept for signature compatibility
     canGoPrevious: Boolean = true,
     canGoNext: Boolean = true
 ) {
@@ -73,8 +65,8 @@ fun PlayerControls(
             icon = Icons.Default.SkipPrevious,
             onClick = onPrevious,
             contentDescription = "Previous",
-            size = GratiaTheme.spacing.heroMedium, // 56dp
-            iconSize = GratiaTheme.spacing.large, // 32dp
+            size = 64.dp, // Large touch area
+            iconSize = 40.dp, // Large icon
             tint = Color.White,
             enabled = canGoPrevious
         )
@@ -84,8 +76,7 @@ fun PlayerControls(
         // Play / Pause — hero button
         PlayPauseButton(
             isPlaying = isPlaying,
-            onClick = onPlayPause,
-            glowColor = glowColor
+            onClick = onPlayPause
         )
 
         Spacer(Modifier.width(GratiaTheme.spacing.large)) // 32dp
@@ -95,8 +86,8 @@ fun PlayerControls(
             icon = Icons.Default.SkipNext,
             onClick = onNext,
             contentDescription = "Next",
-            size = GratiaTheme.spacing.heroMedium,
-            iconSize = GratiaTheme.spacing.large,
+            size = 64.dp,
+            iconSize = 40.dp,
             tint = Color.White,
             enabled = canGoNext
         )
@@ -104,14 +95,13 @@ fun PlayerControls(
 }
 
 /**
- * The hero play/pause button — largest element, filled circle,
- * soft glow, shadow, scale animation, icon morph.
+ * The hero play/pause button.
+ * Large, icon-only, with press scale animation.
  */
 @Composable
 private fun PlayPauseButton(
     isPlaying: Boolean,
-    onClick: () -> Unit,
-    glowColor: Color
+    onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -120,39 +110,19 @@ private fun PlayPauseButton(
     val motion = GratiaTheme.motion
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
+        targetValue = if (isPressed) 0.9f else 1f,
         animationSpec = tween(motion.fast, easing = motion.standardEasing),
         label = "playBtnScale"
     )
 
-    val glowAlpha by animateFloatAsState(
-        targetValue = if (isPlaying) 0.25f else 0.1f,
-        animationSpec = tween(motion.normal),
-        label = "playGlow"
-    )
-
     Box(
         modifier = Modifier
-            .size(72.dp) // Intentionally slightly larger than hero spacing (64dp) for impact
+            .size(80.dp) // Large touch area
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            // Ambient glow behind the button
-            .drawBehind {
-                drawCircle(
-                    color = glowColor.copy(alpha = glowAlpha),
-                    radius = size.minDimension * 0.85f
-                )
-            }
-            .shadow(
-                elevation = GratiaTheme.elevation.hero, // 16dp
-                shape = GratiaTheme.shapes.pill,
-                spotColor = Color.Black.copy(alpha = 0.4f),
-                ambientColor = Color.Black.copy(alpha = 0.2f)
-            )
-            .clip(GratiaTheme.shapes.pill)
-            .background(Color.White)
+            .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -175,9 +145,10 @@ private fun PlayPauseButton(
             GratiaIcon(
                 imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (playing) "Pause" else "Play",
-                tint = Color.Black,
-                size = GratiaTheme.icons.hero // 36dp
+                tint = Color.White, // White icon for Apple Music style over dark blurred background
+                size = 52.dp // Very large icon
             )
         }
     }
 }
+

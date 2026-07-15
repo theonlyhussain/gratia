@@ -32,6 +32,7 @@ fun SongMenuSheet(
     onToggleLike: () -> Unit,
     onGoToAlbum: () -> Unit,
     onGoToArtist: () -> Unit,
+    hasLyrics: Boolean = true,
     onEditLyrics: () -> Unit,
     onShare: () -> Unit,
     onSongInfo: () -> Unit,
@@ -88,7 +89,9 @@ fun SongMenuSheet(
             )
             MenuActionRow(icon = Icons.Outlined.Album, text = "Go to Album", onClick = { onGoToAlbum(); onDismiss() })
             MenuActionRow(icon = Icons.Outlined.Person, text = "Go to Artist", onClick = { onGoToArtist(); onDismiss() })
-            MenuActionRow(icon = Icons.Outlined.Edit, text = "Edit Lyrics", onClick = { onEditLyrics(); onDismiss() })
+            if (hasLyrics) {
+                MenuActionRow(icon = Icons.Outlined.Edit, text = "Edit Lyrics", onClick = { onEditLyrics(); onDismiss() })
+            }
             MenuActionRow(icon = Icons.Outlined.Share, text = "Share", onClick = { onShare(); onDismiss() })
             MenuActionRow(icon = Icons.Outlined.Info, text = "Song Info", onClick = { onSongInfo(); onDismiss() })
             

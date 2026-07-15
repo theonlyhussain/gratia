@@ -32,10 +32,11 @@ fun PlainLyricsView(
                 Text(
                     text = paragraph,
                     fontFamily = Inter,
-                    fontSize = 20.sp,
-                    color = Color(0xFFEDEBDE).copy(alpha = 0.85f),
-                    lineHeight = 32.sp,
-                    modifier = Modifier.padding(bottom = 20.dp)
+                    fontSize = 22.sp,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.75f),
+                    lineHeight = 34.sp,
+                    modifier = Modifier.padding(bottom = 24.dp)
                 )
             }
         }

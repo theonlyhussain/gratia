@@ -28,7 +28,11 @@ class LyricsRepository(
 
         // 2. Fetch from providers
         for (provider in providers) {
-            val result = provider.fetchLyrics(song.title, song.artist, song.album)
+            val result = if (provider is LRCLIBProvider) {
+                provider.fetchLyricsWithDuration(song.title, song.artist, song.album, song.durationMs)
+            } else {
+                provider.fetchLyrics(song.title, song.artist, song.album)
+            }
             if (result != null) {
                 // We want to preserve existing offset if there was one, else 0
                 val existingOffset = localLyrics?.offsetMs ?: 0L

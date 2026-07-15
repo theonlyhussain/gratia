@@ -26,9 +26,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         GratiaApp.instance.database.songDao()
     )
     private val playlistDao = GratiaApp.instance.database.playlistDao()
-    private val lyricsRepository = LyricsRepository(
-        GratiaApp.instance.database.lyricsDao()
-    )
+    private val lyricsManager = GratiaApp.instance.lyricsManager
 
     val currentSong = playerManager.currentSong
     val isPlaying = playerManager.isPlaying
@@ -48,50 +46,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _lyricsOverlayOpen = MutableStateFlow(false)
     val lyricsOverlayOpen: StateFlow<Boolean> = _lyricsOverlayOpen.asStateFlow()
 
-    private val _currentLyrics = MutableStateFlow<LyricsEntity?>(null)
-    val currentLyrics: StateFlow<LyricsEntity?> = _currentLyrics.asStateFlow()
+    val currentLyrics: StateFlow<LyricsEntity?> = lyricsManager.currentLyrics
+    val isLyricsLoading: StateFlow<Boolean> = lyricsManager.isLoading
 
     init {
-        viewModelScope.launch {
-            currentSong.collectLatest { song ->
-                if (song != null) {
-                    _currentLyrics.value = lyricsRepository.getLyrics(song, forceRefresh = false)
-                } else {
-                    _currentLyrics.value = null
-                }
-            }
-        }
+        // PlayerViewModel doesn't need to observe currentSong for lyrics anymore, LyricsManager handles it.
     }
 
     fun refreshLyrics(force: Boolean = true) {
-        val song = currentSong.value ?: return
-        viewModelScope.launch {
-            _currentLyrics.value = lyricsRepository.getLyrics(song, forceRefresh = force)
+        if (force) {
+            lyricsManager.refreshLyrics()
         }
     }
 
     fun saveManualLyrics(text: String, isSynced: Boolean) {
-        val song = currentSong.value ?: return
-        viewModelScope.launch {
-            lyricsRepository.saveManualLyrics(song.id, text, isSynced)
-            refreshLyrics(force = false)
-        }
+        lyricsManager.saveLyrics(text, isSynced)
     }
 
     fun updateLyricsOffset(offsetMs: Long) {
-        val song = currentSong.value ?: return
-        viewModelScope.launch {
-            lyricsRepository.updateOffset(song.id, offsetMs)
-            refreshLyrics(force = false)
-        }
+        lyricsManager.setOffset(offsetMs)
     }
 
     fun deleteLyrics() {
-        val song = currentSong.value ?: return
-        viewModelScope.launch {
-            lyricsRepository.deleteLyrics(song.id)
-            _currentLyrics.value = null
-        }
+        lyricsManager.deleteLyrics()
     }
 
     fun playSong(song: SongEntity, songQueue: List<SongEntity>) {

@@ -1,29 +1,33 @@
 package com.gratia.music.ui.player
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.gratia.music.ui.components.AnimatedText
+import com.gratia.music.ui.components.GratiaIconButton
 import com.gratia.music.ui.theme.GratiaTheme
 
 /**
- * Song information hierarchy for the expanded player.
+ * Left-aligned song information hierarchy for the expanded player.
+ * Mimics Apple Music's header.
  *
  * Visual hierarchy (top → bottom):
- * 1. "PLAYING FROM" — tiny, tracked, muted label
- * 2. Song title — large, bold, bright
- * 3. Artist — medium, slightly muted
- * 4. Album / year — optional, very muted
- *
- * All text uses [AnimatedText] so changes crossfade — never snap.
- * Spacing is generous ("breathing") — not cramped.
+ * 1. Song title — large, bold, bright
+ * 2. Artist — medium, slightly muted
  */
 @Composable
 fun PlayerHeader(
@@ -34,57 +38,54 @@ fun PlayerHeader(
     onClickTitle: () -> Unit = {},
     onClickArtist: () -> Unit = {},
     onClickAlbum: () -> Unit = {},
+    onMoreClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = GratiaTheme.spacing.large) // 32dp instead of 28dp to align with tokens
+            .padding(horizontal = GratiaTheme.spacing.large),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // "PLAYING FROM" label
-        AnimatedText(
-            text = "PLAYING FROM $playingFrom",
-            style = GratiaTheme.typography.caption.copy(letterSpacing = androidx.compose.ui.unit.TextUnit(2f, androidx.compose.ui.unit.TextUnitType.Sp)),
-            color = Color.White.copy(alpha = 0.45f),
-            maxLines = 1
-        )
-
-        Spacer(Modifier.height(GratiaTheme.spacing.mediumSmall)) // 12dp
-
-        // Song title — hero text
-        AnimatedText(
-            text = title,
-            style = GratiaTheme.typography.largeTitle,
-            color = Color.White,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            fadeDurationMs = GratiaTheme.motion.slow,
-            modifier = Modifier.clickable { onClickTitle() }
-        )
-
-        Spacer(Modifier.height(GratiaTheme.spacing.extraSmall)) // 4dp
-
-        // Artist
-        AnimatedText(
-            text = artist,
-            style = GratiaTheme.typography.section,
-            color = Color.White.copy(alpha = 0.55f),
-            maxLines = 1,
-            fadeDurationMs = GratiaTheme.motion.slow,
-            modifier = Modifier.clickable { onClickArtist() }
-        )
-
-        // Album / year — only if present
-        if (!album.isNullOrBlank()) {
-            Spacer(Modifier.height(GratiaTheme.spacing.micro)) // 2dp
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            // Song title — hero text
             AnimatedText(
-                text = album,
-                style = GratiaTheme.typography.body,
-                color = Color.White.copy(alpha = 0.3f),
+                text = title,
+                style = GratiaTheme.typography.largeTitle,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fadeDurationMs = GratiaTheme.motion.slow,
+                modifier = Modifier.clickable { onClickTitle() }
+            )
+
+            Spacer(Modifier.height(GratiaTheme.spacing.micro)) // 2dp
+
+            // Artist
+            AnimatedText(
+                text = artist,
+                style = GratiaTheme.typography.section,
+                color = Color.White.copy(alpha = 0.55f),
                 maxLines = 1,
                 fadeDurationMs = GratiaTheme.motion.slow,
-                modifier = Modifier.clickable { onClickAlbum() }
+                modifier = Modifier.clickable { onClickArtist() }
             )
         }
+        
+        Spacer(Modifier.width(16.dp))
+
+        // More options button (mimicking Apple Music's layout)
+        GratiaIconButton(
+            icon = Icons.Default.MoreHoriz,
+            onClick = onMoreClick,
+            contentDescription = "More",
+            tint = Color.White.copy(alpha = 0.8f),
+            size = GratiaTheme.icons.normal,
+            modifier = Modifier.padding(8.dp)
+        )
     }
 }
+

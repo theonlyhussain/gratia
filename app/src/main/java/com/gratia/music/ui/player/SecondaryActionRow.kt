@@ -7,41 +7,37 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.gratia.music.player.RepeatMode
+import com.gratia.music.ui.components.GratiaIcon
 import com.gratia.music.ui.theme.GratiaTheme
 
 /**
  * Secondary action rows beneath the primary controls.
+ * Mimics Apple Music's bottom area:
  *
- * Row 1: Shuffle · Repeat · Favorite · Queue
- * Row 2: Lyrics
- *
- * All buttons use [PlayerButton] for consistent:
- * - Size (GDL heroSmall 48dp)
- * - Spacing
- * - Animation (press-scale + normal speed)
- * - Haptic feedback
- *
- * Active states (shuffle on, repeat on, favorited) use accent color.
+ * Row 1: Volume Slider (Placeholder)
+ * Row 2: Lyrics · Cast · Queue
  */
 @Composable
 fun SecondaryActionRow(
-    shuffleEnabled: Boolean,
-    repeatMode: RepeatMode,
-    isFavorite: Boolean,
+    shuffleEnabled: Boolean, // Kept in signature, but unused in this view to match Apple Music
+    repeatMode: RepeatMode, // Kept in signature, but unused
+    isFavorite: Boolean, // Kept in signature, but unused (moved to header or menu usually)
+    hasLyrics: Boolean = true,
     onToggleShuffle: () -> Unit,
     onCycleRepeat: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -56,43 +52,66 @@ fun SecondaryActionRow(
             .padding(horizontal = GratiaTheme.spacing.large), // 32dp
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Row 1: Shuffle · Repeat · Favorite · Queue
+        // Row 1: Volume Slider Placeholder
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Shuffle
+            GratiaIcon(
+                imageVector = Icons.AutoMirrored.Filled.VolumeDown,
+                contentDescription = "Volume down",
+                tint = Color.White.copy(alpha = 0.5f),
+                size = 16.dp
+            )
+            
+            Spacer(Modifier.width(8.dp))
+            
+            // Reusing GratiaProgressBar for a consistent look, static at 50% for now
+            GratiaProgressBar(
+                progress = 0.5f,
+                currentTimeMs = 0,
+                durationMs = 0,
+                onSeek = {},
+                modifier = Modifier.weight(1f).height(24.dp), // Thinner touch area for volume
+                thumbColor = Color.White
+            )
+            
+            Spacer(Modifier.width(8.dp))
+            
+            GratiaIcon(
+                imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                contentDescription = "Volume up",
+                tint = Color.White.copy(alpha = 0.5f),
+                size = 16.dp
+            )
+        }
+
+        Spacer(Modifier.height(GratiaTheme.spacing.large))
+
+        // Row 2: Lyrics · Cast (Placeholder) · Queue
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Lyrics
             PlayerButton(
-                icon = Icons.Default.Shuffle,
-                onClick = onToggleShuffle,
-                contentDescription = "Shuffle",
-                size = GratiaTheme.spacing.heroSmall,
-                iconSize = GratiaTheme.icons.normal,
-                tint = if (shuffleEnabled) accentColor else Color.White.copy(alpha = 0.5f)
+                icon = Icons.Default.ChatBubbleOutline, // Apple music uses a quote icon, ChatBubbleOutline is close
+                onClick = if (hasLyrics) onOpenLyrics else { {} },
+                contentDescription = "Lyrics",
+                size = 48.dp,
+                iconSize = 24.dp,
+                tint = if (hasLyrics) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f)
             )
 
-            // Repeat
+            // Cast (Placeholder for Airplay/Cast)
             PlayerButton(
-                icon = when (repeatMode) {
-                    RepeatMode.ONE -> Icons.Default.RepeatOne
-                    else -> Icons.Default.Repeat
-                },
-                onClick = onCycleRepeat,
-                contentDescription = "Repeat",
-                size = GratiaTheme.spacing.heroSmall,
-                iconSize = GratiaTheme.icons.normal,
-                tint = if (repeatMode != RepeatMode.OFF) accentColor else Color.White.copy(alpha = 0.5f)
-            )
-
-            // Favorite
-            PlayerButton(
-                icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                onClick = onToggleFavorite,
-                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                size = GratiaTheme.spacing.heroSmall,
-                iconSize = GratiaTheme.icons.normal,
-                tint = if (isFavorite) accentColor else Color.White.copy(alpha = 0.5f)
+                icon = Icons.Default.Cast,
+                onClick = { /* TODO: Implement Cast */ },
+                contentDescription = "Cast",
+                size = 48.dp,
+                iconSize = 24.dp,
+                tint = Color.White.copy(alpha = 0.6f)
             )
 
             // Queue
@@ -100,28 +119,11 @@ fun SecondaryActionRow(
                 icon = Icons.AutoMirrored.Filled.QueueMusic,
                 onClick = onOpenQueue,
                 contentDescription = "Queue",
-                size = GratiaTheme.spacing.heroSmall,
-                iconSize = GratiaTheme.icons.normal,
-                tint = Color.White.copy(alpha = 0.5f)
-            )
-        }
-
-        Spacer(Modifier.height(GratiaTheme.spacing.extraSmall))
-
-        // Row 2: Lyrics (centered)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            PlayerButton(
-                icon = Icons.Default.Lyrics,
-                onClick = onOpenLyrics,
-                contentDescription = "Lyrics",
-                size = GratiaTheme.spacing.heroSmall,
-                iconSize = GratiaTheme.icons.normal,
-                tint = Color.White.copy(alpha = 0.5f)
+                size = 48.dp,
+                iconSize = 24.dp,
+                tint = Color.White.copy(alpha = 0.6f)
             )
         }
     }
 }
+

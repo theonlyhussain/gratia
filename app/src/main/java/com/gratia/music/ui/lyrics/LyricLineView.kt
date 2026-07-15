@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
@@ -163,30 +164,30 @@ fun LyricLineView(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
+    val scope = rememberCoroutineScope()
+    val flashAnim = remember { Animatable(0f) }
+
     // Target States
     val targetScale = when {
-        isActive -> 1.04f
-        isPast -> 0.95f
-        else -> 0.93f
+        isActive -> 1.0f
+        else -> 0.9f
     }
 
     val targetAlpha = when {
         isActive -> 1.0f
-        isPast -> 0.12f
-        else -> 0.30f
+        isPast -> 0.35f
+        else -> 0.35f
     }
 
     val targetBlur = when {
         isActive -> 0.dp
-        isPast -> 1.5.dp
-        else -> 2.5.dp
+        isPast -> 3.dp
+        else -> 3.dp
     }
 
-    // Cubic Bezier Easing
-    val floatEasing = CubicBezierEasing(0.25f, 1f, 0.4f, 1f)
-    val scaleSpec = tween<Float>(durationMillis = 600, easing = floatEasing)
-    val alphaSpec = tween<Float>(durationMillis = 600, easing = floatEasing)
-    val blurSpec = tween<Dp>(durationMillis = 600, easing = floatEasing)
+    val scaleSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
+    val alphaSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
+    val blurSpec = spring<Dp>(stiffness = Spring.StiffnessMediumLow)
 
     val scale by animateFloatAsState(targetValue = targetScale, animationSpec = scaleSpec, label = "lineScale")
     val alpha by animateFloatAsState(targetValue = targetAlpha, animationSpec = alphaSpec, label = "lineAlpha")
@@ -197,17 +198,24 @@ fun LyricLineView(
     val lineModifier = modifier
         .fillMaxWidth()
         .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+            val currentScale = scale + flashAnim.value * 0.02f
+            scaleX = currentScale
+            scaleY = currentScale
         }
-        .alpha(alpha)
+        .alpha((alpha + flashAnim.value).coerceAtMost(1f))
         .let {
             if (blurRadius > 0.dp) it.blur(blurRadius) else it
         }
         .clickable(
             interactionSource = interactionSource,
             indication = null,
-            onClick = onClick
+            onClick = {
+                scope.launch {
+                    flashAnim.snapTo(0.8f)
+                    flashAnim.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
+                }
+                onClick()
+            }
         )
 
     if (line.text.isBlank() || line.text == " ") {

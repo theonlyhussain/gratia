@@ -4,8 +4,8 @@ package com.gratia.music.lyrics
  * Parser for Standard LRC format.
  */
 object LrcParser {
-    // Matches [mm:ss.xx] or [m:ss.xx] or [mm:ss] followed by text
-    private val LRC_LINE_PATTERN = Regex("""^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$""")
+    // Matches one or more [mm:ss.xx] tags
+    private val TIME_TAG_PATTERN = Regex("""\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]""")
     // Matches metadata tags like [ti:Title], [ar:Artist], etc.
     private val METADATA_PATTERN = Regex("""^\[([a-zA-Z]+):(.*)\]$""")
 
@@ -24,20 +24,24 @@ object LrcParser {
                 continue
             }
 
-            val match = LRC_LINE_PATTERN.matchEntire(line)
-            if (match != null) {
-                val minutes = match.groupValues[1].toIntOrNull() ?: 0
-                val seconds = match.groupValues[2].toIntOrNull() ?: 0
-                val millisStr = match.groupValues[3]
-                val millis = if (millisStr.isEmpty()) {
-                    0
-                } else {
-                    millisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
-                }
-                val startMs = (minutes * 60_000L) + (seconds * 1000L) + millis
-                val text = match.groupValues[4].trim()
+            val timeTags = TIME_TAG_PATTERN.findAll(line).toList()
+            if (timeTags.isNotEmpty()) {
+                val lastTagEnd = timeTags.last().range.last + 1
+                val text = line.substring(lastTagEnd).trim()
 
-                lines.add(LyricLine(text = text, startMs = startMs))
+                for (tag in timeTags) {
+                    val minutes = tag.groupValues[1].toIntOrNull() ?: 0
+                    val seconds = tag.groupValues[2].toIntOrNull() ?: 0
+                    val millisStr = tag.groupValues[3]
+                    val millis = if (millisStr.isEmpty()) {
+                        0
+                    } else {
+                        millisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
+                    }
+                    val startMs = (minutes * 60_000L) + (seconds * 1000L) + millis
+
+                    lines.add(LyricLine(text = text, startMs = startMs))
+                }
             }
         }
 
