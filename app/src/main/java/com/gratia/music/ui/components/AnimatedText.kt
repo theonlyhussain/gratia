@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import com.gratia.music.ui.theme.Easings
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -34,8 +35,8 @@ fun AnimatedText(
     AnimatedContent(
         targetState = text,
         transitionSpec = {
-            fadeIn(animationSpec = tween(duration)) togetherWith
-                fadeOut(animationSpec = tween(duration))
+            fadeIn(animationSpec = tween(duration, easing = Easings.FastEaseOut)) togetherWith
+                fadeOut(animationSpec = tween(duration, easing = Easings.FastEaseOut))
         },
         label = "animatedText",
         modifier = modifier

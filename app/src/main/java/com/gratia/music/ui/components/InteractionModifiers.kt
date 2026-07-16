@@ -28,8 +28,11 @@ fun Modifier.clickableWithScale(
     val motion = GratiaTheme.motion
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = tween(durationMillis = motion.fast, easing = motion.standardEasing),
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.6f, 
+            stiffness = 400f
+        ),
         label = "press_scale"
     )
 
@@ -38,11 +41,11 @@ fun Modifier.clickableWithScale(
             scaleX = scale
             scaleY = scale
             // Optional: slight opacity drop for more feedback
-            alpha = if (isPressed) 0.95f else 1f
+            alpha = if (isPressed) 0.97f else 1f
         }
         .clickable(
             interactionSource = interactionSource,
-            indication = androidx.compose.foundation.LocalIndication.current,
+            indication = null, // Removed default ripple in favor of scale feedback
             onClick = {
                 haptics.light(view)
                 onClick()

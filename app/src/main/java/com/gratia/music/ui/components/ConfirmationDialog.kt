@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import com.gratia.music.ui.components.clickableWithScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,37 +50,40 @@ fun ConfirmationDialog(
             )
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm()
-                    onDismiss()
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isDestructive) GratiaTheme.colors.error else GratiaTheme.colors.accent,
-                    contentColor = GratiaTheme.colors.background
-                ),
-                shape = RoundedCornerShape(12.dp)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isDestructive) GratiaTheme.colors.error else GratiaTheme.colors.accent)
+                    .clickableWithScale(onClick = {
+                        onConfirm()
+                        onDismiss()
+                    })
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = confirmText,
                     fontFamily = Inter,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    color = GratiaTheme.colors.background
                 )
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = GratiaTheme.colors.textPrimary
-                )
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickableWithScale(onClick = onDismiss)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = dismissText,
                     fontFamily = Inter,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    color = GratiaTheme.colors.textPrimary
                 )
             }
         }

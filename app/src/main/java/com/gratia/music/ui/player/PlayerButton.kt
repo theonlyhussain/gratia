@@ -53,8 +53,11 @@ fun PlayerButton(
     val motion = GratiaTheme.motion
 
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.95f else 1f,
-        animationSpec = tween(durationMillis = motion.fast, easing = motion.standardEasing),
+        targetValue = if (isPressed && enabled) 0.97f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.6f, 
+            stiffness = 400f
+        ),
         label = "btnScale"
     )
 

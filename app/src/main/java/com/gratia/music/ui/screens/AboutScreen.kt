@@ -51,8 +51,8 @@ fun AboutScreen(
 
     val songCount by playerViewModel.songCount.collectAsState(initial = 0)
     val playlistCount by playerViewModel.playlistCount.collectAsState(initial = 0)
-    val albumCount by songRepo.getAllSongs().map { songs -> songs.mapNotNull { it.album }.distinct().size }.collectAsState(initial = 0)
-    val artistCount by songRepo.getAllSongs().map { songs -> songs.map { it.artist }.distinct().size }.collectAsState(initial = 0)
+    val albumCount by remember(songRepo) { songRepo.getAllSongs().map { songs -> songs.mapNotNull { it.album }.distinct().size } }.collectAsState(initial = 0)
+    val artistCount by remember(songRepo) { songRepo.getAllSongs().map { songs -> songs.map { it.artist }.distinct().size } }.collectAsState(initial = 0)
     
     var storageUsed by remember { mutableStateOf("Calculating...") }
     
@@ -124,7 +124,7 @@ fun AboutScreen(
                     color = GratiaTheme.colors.textPrimary
                 )
                 Text(
-                    text = "Version 2.1.1",
+                    text = "Version 2.2.2",
                     fontFamily = Inter,
                     fontSize = 14.sp,
                     color = GratiaTheme.colors.accent,
@@ -186,7 +186,7 @@ fun AboutScreen(
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
                 AboutActionRow(
                     title = "Changelog",
-                    subtitle = "What's new in v2.1.1",
+                    subtitle = "What's new in v2.2.2",
                     onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/releases")))
                     }

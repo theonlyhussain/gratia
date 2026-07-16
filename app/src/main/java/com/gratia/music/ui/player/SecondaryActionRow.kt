@@ -52,41 +52,7 @@ fun SecondaryActionRow(
             .padding(horizontal = GratiaTheme.spacing.large), // 32dp
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Row 1: Volume Slider Placeholder
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            GratiaIcon(
-                imageVector = Icons.AutoMirrored.Filled.VolumeDown,
-                contentDescription = "Volume down",
-                tint = Color.White.copy(alpha = 0.5f),
-                size = 16.dp
-            )
-            
-            Spacer(Modifier.width(8.dp))
-            
-            // Reusing GratiaProgressBar for a consistent look, static at 50% for now
-            GratiaProgressBar(
-                progress = 0.5f,
-                currentTimeMs = 0,
-                durationMs = 0,
-                onSeek = {},
-                modifier = Modifier.weight(1f).height(24.dp), // Thinner touch area for volume
-                thumbColor = Color.White
-            )
-            
-            Spacer(Modifier.width(8.dp))
-            
-            GratiaIcon(
-                imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                contentDescription = "Volume up",
-                tint = Color.White.copy(alpha = 0.5f),
-                size = 16.dp
-            )
-        }
-
-        Spacer(Modifier.height(GratiaTheme.spacing.large))
+        // Removed Volume Slider Placeholder
 
         // Row 2: Lyrics · Cast (Placeholder) · Queue
         Row(

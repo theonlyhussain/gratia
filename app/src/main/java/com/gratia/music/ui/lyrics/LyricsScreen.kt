@@ -66,9 +66,6 @@ fun LyricsScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var currentOffsetMs by remember { mutableLongStateOf(currentLyrics?.offsetMs ?: 0L) }
     
-    // Sing Karaoke Mode state
-    var showSingSlider by remember { mutableStateOf(false) }
-    var singVolume by remember { mutableFloatStateOf(1f) } // 1.0 = Full vocals, 0.0 = Instrumental
 
     // Update current offset state if currentLyrics changes
     LaunchedEffect(currentLyrics) {
@@ -490,57 +487,6 @@ fun LyricsScreen(
                 currentTimeMs = visualTimeMs,
                 durationMs = durationMs
             )
-        }
-
-        // Apple Music Sing (Karaoke) UI
-        if (parsedDocument is LyricsDocument.WordSynced || parsedDocument is LyricsDocument.LineSynced) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 140.dp, end = 20.dp) // Float above controls
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(32.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .padding(8.dp)
-                ) {
-                    androidx.compose.animation.AnimatedVisibility(visible = showSingSlider) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Slider(
-                                value = singVolume,
-                                onValueChange = { singVolume = it },
-                                modifier = Modifier
-                                    .height(120.dp)
-                                    .padding(vertical = 12.dp)
-                                    .graphicsLayer { 
-                                        rotationZ = -90f
-                                        translationY = 50f
-                                    },
-                                colors = SliderDefaults.colors(
-                                    thumbColor = Color.White,
-                                    activeTrackColor = Color.White,
-                                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-                                )
-                            )
-                            Spacer(Modifier.height(16.dp))
-                        }
-                    }
-                    
-                    IconButton(
-                        onClick = { showSingSlider = !showSingSlider },
-                        modifier = Modifier.size(44.dp).background(if (singVolume < 0.9f) Color.White.copy(alpha=0.1f) else Color.Transparent, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Sing",
-                            tint = if (singVolume < 0.9f) Color.White else Color.White.copy(alpha=0.6f),
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
         }
     }
     
