@@ -33,6 +33,7 @@ import com.gratia.music.data.model.UserProfileEntity
 import com.gratia.music.data.repository.ListeningEventRepository
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.ui.components.AppleLargeTitleHeader
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
@@ -130,25 +131,10 @@ fun ProfileScreen(
             .verticalScroll(rememberScrollState())
     ) {
         // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(GratiaTheme.colors.surface)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", Modifier.size(16.dp), tint = GratiaTheme.colors.textSecondary)
-            }
-            Text("Profile", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = GratiaTheme.colors.textPrimary)
-        }
+        AppleLargeTitleHeader(
+            title = "Profile",
+            onBack = onNavigateBack
+        )
 
         // Banner image
         Box(

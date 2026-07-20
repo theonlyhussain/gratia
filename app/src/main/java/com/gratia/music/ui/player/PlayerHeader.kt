@@ -59,6 +59,7 @@ fun PlayerHeader(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fadeDurationMs = GratiaTheme.motion.slow,
+                isMarquee = true,
                 modifier = Modifier.clickable { onClickTitle() }
             )
 
@@ -71,6 +72,7 @@ fun PlayerHeader(
                 color = Color.White.copy(alpha = 0.55f),
                 maxLines = 1,
                 fadeDurationMs = GratiaTheme.motion.slow,
+                isMarquee = true,
                 modifier = Modifier.clickable { onClickArtist() }
             )
         }

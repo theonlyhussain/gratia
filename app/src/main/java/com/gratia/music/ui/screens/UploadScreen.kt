@@ -30,6 +30,7 @@ import com.gratia.music.GratiaApp
 import com.gratia.music.data.CoverArtManager
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
+import com.gratia.music.ui.components.AppleLargeTitleHeader
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.data.repository.LyricsRepository
 import com.gratia.music.ui.theme.GratiaTheme
@@ -77,34 +78,12 @@ fun UploadScreen(
             if (lyricsInput.isBlank()) {
                 ""
             } else {
-                val mode = com.gratia.music.lyrics.LyricsModeDetector.detectMode(lyricsInput)
                 try {
                     val parsed = com.gratia.music.lyrics.LyricsParser.parse(lyricsInput)
-                    when (mode) {
-                        com.gratia.music.lyrics.LyricsMode.JSON -> {
-                            if (parsed is com.gratia.music.lyrics.LyricsDocument.WordSynced && parsed.lines.isNotEmpty()) {
-                                "Detected: JSON word sync"
-                            } else {
-                                "Invalid lyric format"
-                            }
-                        }
-                        com.gratia.music.lyrics.LyricsMode.ELRC -> {
-                            if (parsed is com.gratia.music.lyrics.LyricsDocument.WordSynced && parsed.lines.isNotEmpty()) {
-                                "Detected: Enhanced LRC word sync"
-                            } else {
-                                "Invalid lyric format"
-                            }
-                        }
-                        com.gratia.music.lyrics.LyricsMode.LRC -> {
-                            if (parsed is com.gratia.music.lyrics.LyricsDocument.LineSynced && parsed.lines.isNotEmpty()) {
-                                "Detected: LRC line sync"
-                            } else {
-                                "Invalid lyric format"
-                            }
-                        }
-                        com.gratia.music.lyrics.LyricsMode.PLAIN -> {
-                            "Detected: Plain lyrics"
-                        }
+                    when (parsed) {
+                        is com.gratia.music.lyrics.LyricsDocument.WordSynced -> "Detected: Word-synced lyrics"
+                        is com.gratia.music.lyrics.LyricsDocument.LineSynced -> "Detected: Line-synced lyrics"
+                        is com.gratia.music.lyrics.LyricsDocument.Plain -> "Detected: Plain lyrics"
                     }
                 } catch (_: Exception) {
                     "Invalid lyric format"
@@ -384,36 +363,12 @@ fun UploadScreen(
             .verticalScroll(rememberScrollState())
     ) {
         // Header
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier
-                    .size(36.dp)
-                    .border(1.dp, GratiaTheme.colors.glassBorder, CircleShape)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(16.dp), tint = GratiaTheme.colors.textSecondary)
-            }
-            Text(
-                if (isEditMode) "Edit Song" else "Upload to ",
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 18.sp,
-                color = GratiaTheme.colors.textPrimary
-            )
-            if (!isEditMode) {
-                Text(
-                    "Gratia",
-                    fontFamily = SpaceGrotesk,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
-                    color = GratiaTheme.colors.accent
-                )
-            }
-        }
+        AppleLargeTitleHeader(
+            title = if (isEditMode) "Edit Song" else "Upload to Gratia",
+            onBack = onNavigateBack
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
 
         // Glass panel
         Surface(

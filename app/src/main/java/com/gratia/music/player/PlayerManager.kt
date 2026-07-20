@@ -16,6 +16,10 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.ListeningEventRepository
+import com.gratia.music.data.worker.MetadataSyncWorker
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -74,6 +78,7 @@ class PlayerManager(private val context: Context) {
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
     private var progressJob: Job? = null
+    private var backgroundSyncJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
 
     // Pending playback request — used when we need to reconnect before playing
@@ -111,8 +116,10 @@ class PlayerManager(private val context: Context) {
             if (playing) {
                 currentSessionStartTimeMs = System.currentTimeMillis()
                 startProgressUpdates()
+                scheduleBackgroundSync()
             } else {
                 stopProgressUpdates()
+                cancelBackgroundSync()
                 logListeningEvent("pause")
                 currentSessionStartTimeMs = 0L
             }
@@ -128,6 +135,32 @@ class PlayerManager(private val context: Context) {
     init {
         Log.d(TAG, "PlayerManager init — connecting to PlaybackService")
         connect()
+        
+        scope.launch {
+            kotlinx.coroutines.flow.combine(currentSong, isPlaying) { song, playing ->
+                Pair(song, playing)
+            }.collect { (song, playing) ->
+                try {
+                    androidx.glance.appwidget.GlanceAppWidgetManager(context)
+                        .getGlanceIds(com.gratia.music.ui.widget.GratiaMusicWidget::class.java)
+                        .forEach { glanceId ->
+                            androidx.glance.appwidget.state.updateAppWidgetState(context, glanceId) { prefs ->
+                                prefs[com.gratia.music.ui.widget.GratiaMusicWidget.KEY_SONG_TITLE] = song?.title ?: "Not Playing"
+                                prefs[com.gratia.music.ui.widget.GratiaMusicWidget.KEY_ARTIST_NAME] = song?.artist ?: "Gratia"
+                                if (song?.coverArtPath != null) {
+                                    prefs[com.gratia.music.ui.widget.GratiaMusicWidget.KEY_COVER_PATH] = song.coverArtPath
+                                } else {
+                                    prefs.remove(com.gratia.music.ui.widget.GratiaMusicWidget.KEY_COVER_PATH)
+                                }
+                                prefs[com.gratia.music.ui.widget.GratiaMusicWidget.KEY_IS_PLAYING] = playing
+                            }
+                            com.gratia.music.ui.widget.GratiaMusicWidget().update(context, glanceId)
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to update widget", e)
+                }
+            }
+        }
     }
 
     /**
@@ -226,6 +259,14 @@ class PlayerManager(private val context: Context) {
         }
     }
 
+    private fun updatePreloadManager() {
+        try {
+            GratiaApp.instance.preloadManager.updateQueue(_queue.value, _currentSong.value?.id)
+        } catch (e: Exception) {
+            Log.e(TAG, "updatePreloadManager failed: ${e.message}")
+        }
+    }
+
     fun playSong(song: SongEntity, songQueue: List<SongEntity>) {
         Log.d(TAG, "playSong: '${song.title}' by ${song.artist}")
         
@@ -240,6 +281,7 @@ class PlayerManager(private val context: Context) {
         _queue.value = songQueue
         _currentTimeMs.value = 0L
         _playbackError.value = null
+        updatePreloadManager()
 
         val uri = song.localUri
         if (uri == null) {
@@ -262,16 +304,7 @@ class PlayerManager(private val context: Context) {
                 .setAlbumTitle(song.album ?: "Gratia")
             
             if (!song.coverArtPath.isNullOrBlank()) {
-                try {
-                    val bitmap = BitmapFactory.decodeFile(song.coverArtPath)
-                    if (bitmap != null) {
-                        val stream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-                        metadataBuilder.setArtworkData(stream.toByteArray(), MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "playSong: failed to load cover art: ${e.message}")
-                }
+                metadataBuilder.setArtworkUri(Uri.parse("file://${song.coverArtPath}"))
             }
 
             val mediaItem = MediaItem.Builder()
@@ -315,6 +348,12 @@ class PlayerManager(private val context: Context) {
         mediaController?.play()
     }
 
+    /** Set playback volume (0.0 to 1.0) for fade effects. */
+    fun setVolume(volume: Float) {
+        if (!ensureConnected()) return
+        mediaController?.volume = volume.coerceIn(0f, 1f)
+    }
+
     fun seekTo(positionMs: Long) {
         if (!ensureConnected()) return
         val controller = mediaController ?: return
@@ -328,6 +367,7 @@ class PlayerManager(private val context: Context) {
         mediaController?.clearMediaItems()
         _currentSong.value = null
         _queue.value = emptyList()
+        updatePreloadManager()
     }
 
     fun nextSong() {
@@ -398,6 +438,7 @@ class PlayerManager(private val context: Context) {
         if (current?.id == songId) return
         val newQueue = _queue.value.filterNot { it.id == songId }
         _queue.value = newQueue
+        updatePreloadManager()
         Log.d(TAG, "removeFromQueue: removed $songId, queue size=${newQueue.size}")
     }
 
@@ -410,12 +451,14 @@ class PlayerManager(private val context: Context) {
             currentQueue.add(0, song)
         }
         _queue.value = currentQueue
+        updatePreloadManager()
     }
 
     fun addToQueue(song: SongEntity) {
         val currentQueue = _queue.value.toMutableList()
         currentQueue.add(song)
         _queue.value = currentQueue
+        updatePreloadManager()
     }
 
     /** Move a song within the queue from one position to another. */
@@ -425,6 +468,7 @@ class PlayerManager(private val context: Context) {
         val item = q.removeAt(from)
         q.add(to, item)
         _queue.value = q
+        updatePreloadManager()
         Log.d(TAG, "moveInQueue: $from -> $to")
     }
 
@@ -526,6 +570,46 @@ class PlayerManager(private val context: Context) {
         controllerFuture = null
         isConnecting = false
     }
+
+    private fun scheduleBackgroundSync() {
+        cancelBackgroundSync()
+        backgroundSyncJob = scope.launch {
+            Log.d(TAG, "Waiting 10s before triggering background metadata sync...")
+            delay(10000L) // Wait 10 seconds of playback
+            if (isActive && _isPlaying.value) {
+                Log.d(TAG, "Triggering WorkManager for MetadataSyncWorker")
+                val request = OneTimeWorkRequestBuilder<MetadataSyncWorker>().build()
+                WorkManager.getInstance(context).enqueue(request)
+            }
+        }
+    }
+
+    private fun cancelBackgroundSync() {
+        backgroundSyncJob?.cancel()
+        backgroundSyncJob = null
+    }
+}
+
+/**
+ * Extension to convert a SongEntity to a MediaItem that matches perfectly 
+ * between the PlayerManager and PreloadManager for caching.
+ */
+fun SongEntity.toMediaItem(): MediaItem {
+    val uri = localUri ?: ""
+    val metadataBuilder = androidx.media3.common.MediaMetadata.Builder()
+        .setTitle(title)
+        .setArtist(artist)
+        .setAlbumTitle(album ?: "Gratia")
+
+    if (!coverArtPath.isNullOrBlank()) {
+        metadataBuilder.setArtworkUri(android.net.Uri.parse("file://${coverArtPath}"))
+    }
+
+    return MediaItem.Builder()
+        .setUri(android.net.Uri.parse(uri))
+        .setMediaId(id)
+        .setMediaMetadata(metadataBuilder.build())
+        .build()
 }
 
 enum class RepeatMode {

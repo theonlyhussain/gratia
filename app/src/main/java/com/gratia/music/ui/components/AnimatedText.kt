@@ -27,7 +27,8 @@ fun AnimatedText(
     color: Color = GratiaTheme.colors.textPrimary,
     maxLines: Int = 1,
     overflow: TextOverflow = TextOverflow.Ellipsis,
-    fadeDurationMs: Int? = null
+    fadeDurationMs: Int? = null,
+    isMarquee: Boolean = false
 ) {
     val motion = GratiaTheme.motion
     val duration = fadeDurationMs ?: motion.normal
@@ -41,12 +42,20 @@ fun AnimatedText(
         label = "animatedText",
         modifier = modifier
     ) { animatedText ->
-        GratiaText(
-            text = animatedText,
-            color = color,
-            style = style,
-            maxLines = maxLines,
-            overflow = overflow
-        )
+        if (isMarquee) {
+            MarqueeText(
+                text = animatedText,
+                color = color,
+                style = style
+            )
+        } else {
+            GratiaText(
+                text = animatedText,
+                color = color,
+                style = style,
+                maxLines = maxLines,
+                overflow = overflow
+            )
+        }
     }
 }

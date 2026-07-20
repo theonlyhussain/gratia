@@ -14,6 +14,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -24,8 +27,6 @@ import com.gratia.music.ui.LocalPlayerViewModel
 import com.gratia.music.ui.components.SongMenuSheet
 import com.gratia.music.ui.components.SongInfoDialog
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 import com.gratia.music.ui.player.formatTime
 import kotlinx.coroutines.launch
 
@@ -56,18 +57,41 @@ fun SongRow(
     val context = androidx.compose.ui.platform.LocalContext.current
     val snackbarHostState = com.gratia.music.ui.LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
+    
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val haptics = GratiaTheme.haptics
+    val view = androidx.compose.ui.platform.LocalView.current
+
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1.0f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 1.0f, stiffness = 400f),
+        label = "rowScale"
+    )
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(8.dp))
             .then(
                 if (isActive) Modifier.background(GratiaTheme.colors.glassBorder)
                 else Modifier
             )
             .combinedClickable(
-                onClick = onClick,
-                onLongClick = { showMenu = true }
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    haptics.light(view)
+                    onClick()
+                },
+                onLongClick = { 
+                    haptics.heavy(view)
+                    onLongClick?.invoke() ?: run { showMenu = true } 
+                }
             )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -75,12 +99,11 @@ fun SongRow(
         // Track number or playing bars
         Box(modifier = Modifier.width(24.dp), contentAlignment = Alignment.Center) {
             if (isPlaying) {
-                PlayingBars()
+                PlayingIndicator(isPaused = false)
             } else {
                 Text(
                     "${index + 1}",
-                    fontFamily = Inter,
-                    fontSize = 11.sp,
+                    style = GratiaTheme.typography.caption,
                     color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
                 )
             }
@@ -96,9 +119,9 @@ fun SongRow(
                 coverArtPath = song.coverArtPath,
                 title = song.title,
                 artist = song.artist,
-                size = 40.dp,
-                cornerRadius = 6.dp,
-                fontSize = 10.sp
+                size = 48.dp,
+                cornerRadius = 4.dp,
+                fontSize = 12.sp
             )
         }
 
@@ -108,9 +131,8 @@ fun SongRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 song.title,
-                fontFamily = Inter,
+                style = GratiaTheme.typography.body,
                 fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
                 color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -118,8 +140,7 @@ fun SongRow(
             Row {
                 Text(
                     song.artist,
-                    fontFamily = Inter,
-                    fontSize = 11.sp,
+                    style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -128,9 +149,8 @@ fun SongRow(
                 if (song.album != null) {
                     Text(" · ", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
                     Text(
-                        song.album!!,
-                        fontFamily = Inter,
-                        fontSize = 11.sp,
+                        " • ${song.album}",
+                        style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -142,8 +162,7 @@ fun SongRow(
             if (badge != null) {
                 Text(
                     badge,
-                    fontFamily = Inter,
-                    fontSize = 9.sp,
+                    style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.accent,
                     fontWeight = FontWeight.Medium
                 )
@@ -161,8 +180,7 @@ fun SongRow(
             ) {
                 Text(
                     firstMood,
-                    fontFamily = Inter,
-                    fontSize = 9.sp,
+                    style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                 )
@@ -173,8 +191,7 @@ fun SongRow(
         // Duration
         Text(
             formatTime(song.durationMs),
-            fontFamily = Inter,
-            fontSize = 11.sp,
+            style = GratiaTheme.typography.caption,
             color = GratiaTheme.colors.textSecondary
         )
         
@@ -211,16 +228,6 @@ fun SongRow(
             onGoToArtist = { navController.navigate("artist/${song.artist}") },
             onEditLyrics = {
                 navController.navigate("fullLyrics/${song.id}")
-            },
-            onShare = {
-                showMenu = false
-                val sendIntent: android.content.Intent = android.content.Intent().apply {
-                    action = android.content.Intent.ACTION_SEND
-                    putExtra(android.content.Intent.EXTRA_TEXT, "Check out this song: ${song.title} by ${song.artist}")
-                    type = "text/plain"
-                }
-                val shareIntent = android.content.Intent.createChooser(sendIntent, null)
-                context.startActivity(shareIntent)
             },
             onSongInfo = { showInfo = true },
             onDelete = { 
@@ -304,50 +311,4 @@ fun SongRow(
     }
 }
 
-/**
- * Animated playing bars (equalizer animation).
- */
-@Composable
-fun PlayingBars() {
-    val infiniteTransition = rememberInfiniteTransition(label = "playingBars")
 
-    val bar1Height by infiniteTransition.animateFloat(
-        initialValue = 4f, targetValue = 14f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse
-        ), label = "bar1"
-    )
-    val bar2Height by infiniteTransition.animateFloat(
-        initialValue = 8f, targetValue = 4f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = EaseInOut, delayMillis = 150),
-            repeatMode = RepeatMode.Reverse
-        ), label = "bar2"
-    )
-    val bar3Height by infiniteTransition.animateFloat(
-        initialValue = 6f, targetValue = 12f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = EaseInOut, delayMillis = 300),
-            repeatMode = RepeatMode.Reverse
-        ), label = "bar3"
-    )
-
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.Bottom,
-        modifier = Modifier.height(14.dp)
-    ) {
-        listOf(bar1Height, bar2Height, bar3Height).forEach { height ->
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height(height.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(GratiaTheme.colors.accent)
-            )
-        }
-    }
-}
-
-private val EaseInOut = CubicBezierEasing(0.42f, 0f, 0.58f, 1f)

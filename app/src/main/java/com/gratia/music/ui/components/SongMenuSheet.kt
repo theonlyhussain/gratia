@@ -34,7 +34,6 @@ fun SongMenuSheet(
     onGoToArtist: () -> Unit,
     hasLyrics: Boolean = true,
     onEditLyrics: () -> Unit,
-    onShare: () -> Unit,
     onSongInfo: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -92,7 +91,6 @@ fun SongMenuSheet(
             if (hasLyrics) {
                 MenuActionRow(icon = Icons.Outlined.Edit, text = "Edit Lyrics", onClick = { onEditLyrics(); onDismiss() })
             }
-            MenuActionRow(icon = Icons.Outlined.Share, text = "Share", onClick = { onShare(); onDismiss() })
             MenuActionRow(icon = Icons.Outlined.Info, text = "Song Info", onClick = { onSongInfo(); onDismiss() })
             
             HorizontalDivider(color = GratiaTheme.colors.glassBorder)

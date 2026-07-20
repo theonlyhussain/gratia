@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
@@ -15,8 +16,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -57,6 +59,9 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
 
     val song = currentSong ?: return
     val progress = if (durationMs > 0) currentTimeMs.toFloat() / durationMs.toFloat() else 0f
+
+    val sleepTimerActive by playerViewModel.sleepTimerActive.collectAsState()
+    val sleepTimerRemainingMs by playerViewModel.sleepTimerRemainingMs.collectAsState()
 
     val view = LocalView.current
     val haptics = GratiaTheme.haptics
@@ -119,15 +124,36 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Album art
-                CoverArtImage(
-                    coverArtPath = song.coverArtPath,
-                    title = song.title,
-                    artist = song.artist,
-                    size = GratiaTheme.spacing.heroSmall, // ~48dp
-                    cornerRadius = 10.dp, // Or GratiaTheme.shapes.small equivalent
-                    fontSize = 12.sp
-                )
+                // Album art with playing indicator overlay
+                Box(contentAlignment = Alignment.Center) {
+                    CoverArtImage(
+                        coverArtPath = song.coverArtPath,
+                        title = song.title,
+                        artist = song.artist,
+                        size = GratiaTheme.spacing.heroSmall, // ~48dp
+                        cornerRadius = 10.dp, // Or GratiaTheme.shapes.small equivalent
+                        fontSize = 12.sp
+                    )
+                    
+                    // Semi-transparent overlay when playing
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isPlaying,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(GratiaTheme.spacing.heroSmall)
+                                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            com.gratia.music.ui.components.PlayingIndicator(
+                                isPaused = false,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
 
                 Spacer(Modifier.width(GratiaTheme.spacing.mediumSmall))
 
@@ -139,7 +165,8 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                         color = GratiaTheme.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fadeDurationMs = motion.normal
+                        fadeDurationMs = motion.normal,
+                        isMarquee = true
                     )
                     AnimatedText(
                         text = song.artist,
@@ -172,6 +199,43 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                             },
                             tint = GratiaTheme.colors.textPrimary,
                             size = GratiaTheme.icons.normal
+                        )
+                    }
+                }
+
+                // Sleep Timer Countdown
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = sleepTimerActive,
+                    enter = fadeIn() + androidx.compose.animation.expandHorizontally(),
+                    exit = fadeOut() + androidx.compose.animation.shrinkHorizontally()
+                ) {
+                    val totalSeconds = sleepTimerRemainingMs / 1000
+                    val minutes = totalSeconds / 60
+                    val seconds = totalSeconds % 60
+                    val timeString = String.format("%d:%02d", minutes, seconds)
+
+                    Row(
+                        modifier = Modifier
+                            .padding(start = GratiaTheme.spacing.small)
+                            .background(GratiaTheme.colors.surfaceHover, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Outlined.Bedtime,
+                            contentDescription = "Sleep Timer",
+                            modifier = Modifier.size(12.dp),
+                            tint = GratiaTheme.colors.accent
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        com.gratia.music.ui.components.GratiaText(
+                            text = timeString,
+                            style = GratiaTheme.typography.caption.copy(
+                                fontFamily = com.gratia.music.ui.theme.JetBrainsMono,
+                                fontSize = 10.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                            ),
+                            color = GratiaTheme.colors.accent
                         )
                     }
                 }

@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,13 +49,13 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.components.liquidGlass
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
-    data object Home : Screen("home", "Home", Icons.Outlined.Home, Icons.Filled.Home)
-    data object Search : Screen("search", "Search", Icons.Outlined.Search, Icons.Filled.Search)
+    data object Home : Screen("home", "Listen Now", Icons.Outlined.PlayCircleOutline, Icons.Filled.PlayCircle)
+    data object Browse : Screen("browse", "Browse", Icons.Outlined.Explore, Icons.Filled.Explore)
     data object Library : Screen("library", "Library", Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic)
-    data object Playlists : Screen("playlists", "Playlists", Icons.AutoMirrored.Outlined.QueueMusic, Icons.AutoMirrored.Filled.QueueMusic)
+    data object Search : Screen("search", "Search", Icons.Outlined.Search, Icons.Filled.Search)
 }
 
-val bottomNavItems = listOf(Screen.Home, Screen.Search, Screen.Library, Screen.Playlists)
+val bottomNavItems = listOf(Screen.Home, Screen.Browse, Screen.Library, Screen.Search)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,11 +66,13 @@ fun GratiaAppRoot() {
     val expandedPlayerOpen by playerViewModel.expandedPlayerOpen.collectAsState()
     val lyricsOverlayOpen by playerViewModel.lyricsOverlayOpen.collectAsState()
     var queueSheetOpen by remember { mutableStateOf(false) }
+    var sleepTimerSheetOpen by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val themeOption by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
     val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val onboardingCompleted by settingsDataStore.onboardingCompletedFlow.collectAsState(initial = null)
     
     val isDark = when (themeOption) {
         com.gratia.music.data.ThemeOption.LIGHT -> false
@@ -86,7 +89,15 @@ fun GratiaAppRoot() {
             LocalPlayerViewModel provides playerViewModel
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                Scaffold(
+                if (onboardingCompleted == null) {
+                    Box(modifier = Modifier.fillMaxSize().background(GratiaTheme.colors.background))
+                } else if (onboardingCompleted == false) {
+                    com.gratia.music.ui.onboarding.PermissionIntroScreen(
+                        onFinished = { /* Automatically handled by flow update */ },
+                        settingsDataStore = settingsDataStore
+                    )
+                } else {
+                    Scaffold(
                     containerColor = GratiaTheme.colors.background,
                     snackbarHost = { 
                         SnackbarHost(hostState = snackbarHostState) { data ->
@@ -112,44 +123,29 @@ fun GratiaAppRoot() {
                         MiniPlayer(playerViewModel = playerViewModel)
                     }
 
-                    // Glassmorphism Bottom Navigation
-                    BoxWithConstraints(
+                    // Apple Music Style Bottom Navigation
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
-                            .shadow(24.dp, RoundedCornerShape(32.dp), spotColor = GratiaTheme.colors.accent.copy(alpha = 0.15f), ambientColor = GratiaTheme.colors.accent.copy(alpha = 0.05f))
-                            .liquidGlass(
-                                shape = RoundedCornerShape(32.dp),
-                                backgroundColor = if (isDark) androidx.compose.ui.graphics.Color(0xFF0D0D0D).copy(alpha = 0.96f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.88f),
-                                borderColorStart = if (isDark) androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.4f),
-                                borderColorEnd = if (isDark) androidx.compose.ui.graphics.Color.Transparent else androidx.compose.ui.graphics.Color.White.copy(alpha = 0.1f)
+                            .background(GratiaTheme.colors.surface.copy(alpha = 0.85f))
+                            .border(
+                                width = 0.5.dp,
+                                color = GratiaTheme.colors.textSecondary.copy(alpha = 0.2f),
+                                shape = androidx.compose.ui.graphics.RectangleShape
                             )
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
-                            .height(64.dp)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
                     ) {
                         val navIndex = bottomNavItems.indexOfFirst { screen ->
                             currentDestination?.hierarchy?.any { it.route == screen.route } == true
                         }.coerceAtLeast(0)
-                        
-                        val tabWidth = maxWidth / bottomNavItems.size
-                        val indicatorOffsetX by animateDpAsState(
-                            targetValue = tabWidth * navIndex,
-                            animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
-                            label = "indicatorOffset"
-                        )
 
-                        // The sliding glass pill highlight
-                        Box(
+                        Row(
                             modifier = Modifier
-                                .offset { androidx.compose.ui.unit.IntOffset(indicatorOffsetX.roundToPx(), 0) }
-                                .width(tabWidth)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(GratiaTheme.colors.accent.copy(alpha = 0.15f))
-                        )
-
-                        // Tab icons and labels
-                        Row(modifier = Modifier.fillMaxSize()) {
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
                             bottomNavItems.forEachIndexed { index, screen ->
                                 val selected = index == navIndex
                                 Column(
@@ -158,7 +154,7 @@ fun GratiaAppRoot() {
                                         .fillMaxHeight()
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
+                                            indication = null, // Apple has no ripple
                                             onClick = {
                                                 navController.navigate(screen.route) {
                                                     popUpTo(navController.graph.findStartDestination().id) {
@@ -172,20 +168,26 @@ fun GratiaAppRoot() {
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
-                                    val iconTint by androidx.compose.animation.animateColorAsState(if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary, label = "iconTint")
-                                    val textTint by androidx.compose.animation.animateColorAsState(if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary, label = "textTint")
+                                    val iconTint by androidx.compose.animation.animateColorAsState(
+                                        targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                                        label = "iconTint"
+                                    )
+                                    val textTint by androidx.compose.animation.animateColorAsState(
+                                        targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                                        label = "textTint"
+                                    )
                                     Icon(
                                         imageVector = if (selected) screen.selectedIcon else screen.icon,
                                         contentDescription = screen.label,
-                                        modifier = Modifier.size(24.dp),
+                                        modifier = Modifier.size(26.dp),
                                         tint = iconTint
                                     )
-                                    Spacer(Modifier.height(4.dp))
+                                    Spacer(Modifier.height(2.dp))
                                     Text(
                                         text = screen.label,
                                         fontSize = 10.sp,
-                                        fontFamily = Inter,
-                                        fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Normal,
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
+                                        fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal,
                                         color = textTint,
                                         maxLines = 1
                                     )
@@ -250,11 +252,14 @@ fun GratiaAppRoot() {
                 composable("favorites") { // Favorites is still accessible from Home
                     FavoritesScreen(playerViewModel = playerViewModel)
                 }
-                composable(Screen.Playlists.route) {
+                composable("playlists") {
                     PlaylistsScreen(onNavigateToPlaylist = { navController.navigate("playlist/$it") })
                 }
                 composable("upload") {
                     UploadScreen(onNavigateBack = { navController.popBackStack() })
+                }
+                composable(Screen.Browse.route) {
+                    BrowseScreen(playerViewModel = playerViewModel)
                 }
                 composable(
                     "editSong/{songId}",
@@ -297,7 +302,13 @@ fun GratiaAppRoot() {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateToAbout = { navController.navigate("about") },
-                        onNavigateToLicenses = { navController.navigate("licenses") }
+                        onNavigateToLicenses = { navController.navigate("licenses") },
+                        onNavigateToEqualizer = { navController.navigate("equalizer") }
+                    )
+                }
+                composable("equalizer") {
+                    EqualizerScreen(
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable(
@@ -381,6 +392,9 @@ fun GratiaAppRoot() {
                 onOpenQueue = {
                     queueSheetOpen = true
                 },
+                onOpenSleepTimer = {
+                    sleepTimerSheetOpen = true
+                },
                 onNavigateToAlbum = { albumName ->
                     navController.navigate("album/$albumName")
                 },
@@ -408,6 +422,21 @@ fun GratiaAppRoot() {
             }
         }
 
+        // Sleep Timer Bottom Sheet
+        if (sleepTimerSheetOpen) {
+            androidx.compose.material3.ModalBottomSheet(
+                onDismissRequest = { sleepTimerSheetOpen = false },
+                containerColor = GratiaTheme.colors.surface,
+                scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
+                shape = GratiaTheme.shapes.sheet
+            ) {
+                com.gratia.music.ui.player.SleepTimerSheet(
+                    playerViewModel = playerViewModel,
+                    onDismiss = { sleepTimerSheetOpen = false }
+                )
+            }
+        }
+
         // Lyrics overlay (from lyrics button in expanded player)
         AnimatedVisibility(
             visible = lyricsOverlayOpen && currentSong != null,
@@ -426,6 +455,8 @@ fun GratiaAppRoot() {
                 onBack = { playerViewModel.setLyricsOverlayOpen(false) }
             )
         }
+
+        } // end of main app else block
 
         // Splash Transition Overlay
         var showSplash by remember { mutableStateOf(true) }

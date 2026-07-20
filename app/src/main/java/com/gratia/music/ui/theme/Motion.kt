@@ -23,20 +23,20 @@ data class GratiaMotion(
     /** 500ms - Special animations, player entry */
     val hero: Int = 500,
     
-    // Custom easings
-    val emphasizedEasing: Easing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f),
-    val standardEasing: Easing = CubicBezierEasing(0.4f, 0.0f, 0.2f, 1.0f)
+    // Custom easings (Apple / Emil Kowalski)
+    val emphasizedEasing: Easing = CubicBezierEasing(0.23f, 1.0f, 0.32f, 1.0f), // Strong ease-out
+    val standardEasing: Easing = CubicBezierEasing(0.77f, 0.0f, 0.175f, 1.0f) // Strong ease-in-out
 ) {
-    /** stiffness = 300, dampingRatio = 0.8 */
+    /** Apple Default Spring: Damping 1.0 (Critically damped, no bounce) */
     fun <T> springStandard() = spring<T>(
-        dampingRatio = 0.8f,
-        stiffness = 300f
+        dampingRatio = 1.0f,
+        stiffness = 400f // Snappy response
     )
 
-    /** stiffness = 500, dampingRatio = 0.9 */
+    /** Apple Momentum Spring: Damping 0.8 (Slight bounce for physical interactions) */
     fun <T> springStiff() = spring<T>(
-        dampingRatio = 0.9f,
-        stiffness = 500f
+        dampingRatio = 0.8f,
+        stiffness = 300f
     )
 }
 

@@ -27,6 +27,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     )
     private val playlistDao = GratiaApp.instance.database.playlistDao()
     private val lyricsManager = GratiaApp.instance.lyricsManager
+    val sleepTimerManager = GratiaApp.instance.sleepTimerManager
 
     val currentSong = playerManager.currentSong
     val isPlaying = playerManager.isPlaying
@@ -48,6 +49,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     val currentLyrics: StateFlow<LyricsEntity?> = lyricsManager.currentLyrics
     val isLyricsLoading: StateFlow<Boolean> = lyricsManager.isLoading
+
+    val sleepTimerActive = sleepTimerManager.isActive
+    val sleepTimerRemainingMs = sleepTimerManager.remainingMs
+    val sleepTimerDurationMs = sleepTimerManager.durationMs
+    val sleepTimerAction = sleepTimerManager.action
 
     init {
         // PlayerViewModel doesn't need to observe currentSong for lyrics anymore, LyricsManager handles it.
@@ -100,6 +106,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun moveInQueue(from: Int, to: Int) = playerManager.moveInQueue(from, to)
     fun playFromQueue(index: Int) = playerManager.playFromQueue(index)
     fun clearQueue() = playerManager.clearQueue()
+    
+    fun startSleepTimer(minutes: Int, action: com.gratia.music.player.SleepAction) {
+        sleepTimerManager.startTimer(minutes, action)
+    }
+    
+    fun stopSleepTimer() {
+        sleepTimerManager.stopTimer()
+    }
+
     fun playNext(song: SongEntity) = playerManager.playNext(song)
     fun addToQueue(song: SongEntity) = playerManager.addToQueue(song)
 

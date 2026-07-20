@@ -10,7 +10,7 @@
     <!-- Foreground service for background playback -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />`n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <!-- Internet (for future cloud providers) -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -59,6 +59,17 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <receiver
+            android:name=".ui.widget.GratiaWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/gratia_widget_info" />
+        </receiver>
 
     </application>
 

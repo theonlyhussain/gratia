@@ -1,5 +1,12 @@
 package com.gratia.music.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,11 +36,13 @@ import com.gratia.music.data.model.SongEntity
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.EmptyStateView
-import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.components.GratiaText
 import com.gratia.music.ui.components.GratiaIcon
 import com.gratia.music.ui.components.GratiaIconButton
 import com.gratia.music.ui.components.GratiaButton
+import com.gratia.music.ui.selection.SelectableSongRow
+import com.gratia.music.ui.selection.SelectionManager
+import com.gratia.music.ui.selection.SelectionToolbar
 import com.gratia.music.ui.theme.GratiaTheme
 import kotlinx.coroutines.launch
 
@@ -52,6 +61,10 @@ fun PlaylistDetailScreen(
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val scope = rememberCoroutineScope()
 
+    val selectionManager = remember { SelectionManager() }
+    val selectedIds by selectionManager.selectedIds.collectAsState()
+    val isSelectionMode by selectionManager.isSelectionMode.collectAsState()
+
     var showMenu by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -69,7 +82,7 @@ fun PlaylistDetailScreen(
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(
-                        top = 64.dp, // extra for status bar + top bar
+                        top = 64.dp,
                         bottom = GratiaTheme.spacing.large,
                         start = GratiaTheme.spacing.large,
                         end = GratiaTheme.spacing.large
@@ -77,10 +90,10 @@ fun PlaylistDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     val paths = playlistSongs.take(4).map { it.coverArtPath }
-                    Box(modifier = Modifier.shadow(24.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent)) {
+                    Box(modifier = Modifier.shadow(32.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent)) {
                         CollageArtwork(
                             paths = paths,
-                            size = 200.dp,
+                            size = 240.dp,
                             cornerRadius = 24.dp
                         )
                     }
@@ -141,32 +154,36 @@ fun PlaylistDetailScreen(
                 item {
                     EmptyStateView(
                         icon = Icons.Default.QueueMusic,
-                        headline = "It's a bit empty here",
-                        description = "Add some songs from your library to this playlist."
+                        headline = "Empty Playlist",
+                        description = "Add some songs to this playlist to start listening."
                     )
                 }
             } else {
                 itemsIndexed(playlistSongs, key = { _, s -> s.id }) { index, song ->
-                    SongRow(
+                    SelectableSongRow(
                         song = song,
                         index = index,
                         isActive = currentSong?.id == song.id,
                         isPlaying = currentSong?.id == song.id && isPlaying,
-                        onClick = { playerViewModel.playSong(song, playlistSongs) },
+                        isSelectionMode = isSelectionMode,
+                        isSelected = selectedIds.contains(song.id),
+                        onPlay = { playerViewModel.playSong(song, playlistSongs) },
+                        onLongPress = { selectionManager.startSelection(song.id) },
+                        onToggleSelection = { selectionManager.toggle(song.id) },
                         modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
                     )
                 }
             }
         }
 
-        // Header Top Bar
+        // Top Bar Overlay
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.medium),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             GratiaIconButton(
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -175,20 +192,20 @@ fun PlaylistDetailScreen(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(GratiaTheme.colors.surface.copy(alpha = 0.8f)),
-                tint = GratiaTheme.colors.textPrimary
+                    .background(GratiaTheme.colors.surface),
+                tint = GratiaTheme.colors.textSecondary
             )
             
             Box {
                 GratiaIconButton(
                     icon = Icons.Default.MoreVert,
-                    contentDescription = "More Options",
+                    contentDescription = "Options",
                     onClick = { showMenu = true },
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(GratiaTheme.colors.surface.copy(alpha = 0.8f)),
-                    tint = GratiaTheme.colors.textPrimary
+                        .background(GratiaTheme.colors.surface),
+                    tint = GratiaTheme.colors.textSecondary
                 )
                 
                 DropdownMenu(
@@ -197,97 +214,60 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.background(GratiaTheme.colors.surface)
                 ) {
                     DropdownMenuItem(
-                        text = { GratiaText("Rename", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
-                        onClick = {
-                            showMenu = false
-                            showRenameDialog = true
-                        }
+                        text = { GratiaText("Rename Playlist", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
+                        onClick = { showMenu = false; showRenameDialog = true }
                     )
                     DropdownMenuItem(
                         text = { GratiaText("Delete Playlist", style = GratiaTheme.typography.body, color = GratiaTheme.colors.error) },
-                        onClick = {
-                            showMenu = false
-                            showDeleteConfirm = true
-                        }
+                        onClick = { showMenu = false; showDeleteConfirm = true }
                     )
                 }
             }
         }
-    }
-
-    if (showRenameDialog) {
-        var newName by remember { mutableStateOf(playlist.name) }
-        AlertDialog(
-            onDismissRequest = { showRenameDialog = false },
-            title = { GratiaText("Rename Playlist", style = GratiaTheme.typography.title, color = GratiaTheme.colors.textPrimary) },
-            text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GratiaTheme.colors.accent,
-                        unfocusedBorderColor = GratiaTheme.colors.glassBorder,
-                        cursorColor = GratiaTheme.colors.accent
-                    )
+        
+        // Selection Toolbar
+        AnimatedVisibility(
+            visible = isSelectionMode,
+            enter = slideInVertically(
+                initialOffsetY = { -it },
+                animationSpec = spring(
+                    dampingRatio = 0.8f,
+                    stiffness = Spring.StiffnessMediumLow
                 )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (newName.isNotBlank()) {
-                            scope.launch {
-                                playlistDao.insertPlaylist(playlist.copy(name = newName))
-                                showRenameDialog = false
-                            }
+            ) + fadeIn(),
+            exit = slideOutVertically(
+                targetOffsetY = { -it }
+            ) + fadeOut()
+        ) {
+            SelectionToolbar(
+                selectedCount = selectedIds.size,
+                totalCount = playlistSongs.size,
+                onAddToQueue = {
+                    val selectedSongs = playlistSongs.filter { selectedIds.contains(it.id) }
+                    selectedSongs.forEach { playerViewModel.addToQueue(it) }
+                    selectionManager.clearSelection()
+                },
+                onAddToPlaylist = {
+                    selectionManager.clearSelection()
+                },
+                onDelete = {
+                    val selectedSongs = playlistSongs.filter { selectedIds.contains(it.id) }
+                    scope.launch {
+                        selectedSongs.forEach { song ->
+                            playlistDao.removeSongFromPlaylist(com.gratia.music.data.model.PlaylistSongCrossRef(playlistId, song.id))
                         }
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.accent)
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showRenameDialog = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
-                ) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = GratiaTheme.colors.surface,
-            textContentColor = GratiaTheme.colors.textSecondary
-        )
-    }
-    
-    if (showDeleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { GratiaText("Delete Playlist?", style = GratiaTheme.typography.title, color = GratiaTheme.colors.textPrimary) },
-            text = { GratiaText("Are you sure you want to delete '${playlist.name}'? This cannot be undone.", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textSecondary) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            playlistDao.deletePlaylist(playlist)
-                            showDeleteConfirm = false
-                            onBack()
-                        }
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.error)
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showDeleteConfirm = false },
-                    colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
-                ) {
-                    Text("Cancel")
-                }
-            },
-            containerColor = GratiaTheme.colors.surface
-        )
+                    }
+                    selectionManager.clearSelection()
+                },
+                onSelectAll = {
+                    if (selectedIds.size == playlistSongs.size) {
+                        selectionManager.clearSelection()
+                    } else {
+                        selectionManager.selectAll(playlistSongs.map { it.id })
+                    }
+                },
+                onClose = { selectionManager.clearSelection() }
+            )
+        }
     }
 }

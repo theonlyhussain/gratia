@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,23 +15,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalContext
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.SettingsDataStore
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
-import com.gratia.music.ui.components.EmptyStateView
-import com.gratia.music.ui.components.SongRow
+import com.gratia.music.ui.components.*
 import com.gratia.music.ui.theme.GratiaTheme
-import com.gratia.music.ui.theme.Inter
-import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(playerViewModel: PlayerViewModel) {
     val context = LocalContext.current
@@ -78,70 +77,90 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
     ) {
-        // Header
-        Text(
-            "Search",
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Bold,
-            fontSize = 28.sp,
-            color = GratiaTheme.colors.textPrimary,
-            modifier = Modifier.padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 12.dp)
-        )
+        AppleLargeTitleHeader(title = "Search")
 
-        // Search field
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = { Text("Songs, artists, albums, lyrics…", fontSize = 13.sp, color = GratiaTheme.colors.textSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(18.dp)) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            shape = RoundedCornerShape(12.dp),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = GratiaTheme.colors.accent.copy(alpha = 0.4f),
-                unfocusedBorderColor = GratiaTheme.colors.surfaceHover,
-                focusedContainerColor = GratiaTheme.colors.surface,
-                unfocusedContainerColor = GratiaTheme.colors.surface,
-                focusedTextColor = GratiaTheme.colors.textPrimary,
-                unfocusedTextColor = GratiaTheme.colors.textPrimary,
-                cursorColor = GratiaTheme.colors.accent,
-            ),
-            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp, fontFamily = Inter)
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        // Filter Chips
-        androidx.compose.foundation.lazy.LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Apple style search bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .height(36.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(GratiaTheme.colors.surface),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            items(filters) { filter ->
-                val isSelected = selectedFilter == filter
-                Surface(
-                    modifier = Modifier.clickable { selectedFilter = filter },
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isSelected) GratiaTheme.colors.accent else GratiaTheme.colors.surface,
-                    border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, GratiaTheme.colors.glassBorder)
-                ) {
-                    Text(
-                        text = filter,
-                        fontFamily = Inter,
-                        fontSize = 13.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                        color = if (isSelected) GratiaTheme.colors.background else GratiaTheme.colors.textPrimary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = GratiaTheme.colors.textSecondary,
+                modifier = Modifier.padding(start = 8.dp).size(20.dp)
+            )
+            
+            Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.CenterStart) {
+                if (query.isEmpty()) {
+                    GratiaText(
+                        text = "Artists, Songs, Lyrics, and More",
+                        style = GratiaTheme.typography.body,
+                        color = GratiaTheme.colors.textSecondary,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                 }
+                androidx.compose.foundation.text.BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    textStyle = GratiaTheme.typography.body.copy(color = GratiaTheme.colors.textPrimary),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    singleLine = true,
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(GratiaTheme.colors.accent)
+                )
+            }
+            
+            if (query.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Clear",
+                    tint = GratiaTheme.colors.textSecondary,
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(16.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(GratiaTheme.colors.textSecondary.copy(alpha = 0.2f))
+                        .clickable { query = "" }
+                        .padding(2.dp)
+                )
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
+
+        if (query.isNotEmpty()) {
+            // Filter Pills Apple Style (small rounded rectangles)
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(filters) { filter ->
+                    val isSelected = selectedFilter == filter
+                    Surface(
+                        modifier = Modifier.clickable { selectedFilter = filter },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) GratiaTheme.colors.textPrimary else GratiaTheme.colors.surface,
+                    ) {
+                        GratiaText(
+                            text = filter,
+                            style = GratiaTheme.typography.caption.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium),
+                            color = if (isSelected) GratiaTheme.colors.background else GratiaTheme.colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
 
         if (query.isBlank()) {
             if (searchHistory.isEmpty()) {
-                // Empty search state
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     EmptyStateView(
                         icon = Icons.Default.Search,
@@ -150,69 +169,48 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
                     )
                 }
             } else {
-                // Search History
-                Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Recent Searches",
-                            fontFamily = SpaceGrotesk,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp,
-                            color = GratiaTheme.colors.textPrimary
-                        )
-                        Text(
-                            text = "CLEAR",
-                            fontFamily = Inter,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
+                // Search History Apple Style
+                AppleSectionHeader(
+                    title = "Recent Searches",
+                    action = {
+                        GratiaText(
+                            text = "Clear",
+                            style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Medium),
                             color = GratiaTheme.colors.accent,
-                            modifier = Modifier
-                                .clickable { scope.launch { settingsDataStore.clearSearchHistory() } }
-                                .padding(4.dp)
+                            modifier = Modifier.clickable { scope.launch { settingsDataStore.clearSearchHistory() } }.padding(4.dp)
                         )
                     }
-
-                    @OptIn(ExperimentalLayoutApi::class)
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        searchHistory.forEach { historyQuery ->
-                            InputChip(
-                                selected = false,
-                                onClick = { query = historyQuery },
-                                label = { Text(historyQuery, fontFamily = Inter, fontSize = 13.sp) },
-                                trailingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Remove",
-                                        modifier = Modifier
-                                            .size(16.dp)
-                                            .clickable { scope.launch { settingsDataStore.removeSearchHistory(historyQuery) } }
-                                    )
-                                },
-                                colors = InputChipDefaults.inputChipColors(
-                                    containerColor = GratiaTheme.colors.surface,
-                                    labelColor = GratiaTheme.colors.textPrimary,
-                                    trailingIconColor = GratiaTheme.colors.textSecondary
-                                ),
-                                border = InputChipDefaults.inputChipBorder(
-                                    borderColor = GratiaTheme.colors.glassBorder,
-                                    enabled = true,
-                                    selected = false
+                )
+                
+                LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    items(searchHistory.toList().reversed()) { historyQuery ->
+                        AppleListRow(
+                            title = historyQuery,
+                            leadingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = GratiaTheme.colors.textSecondary,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                            )
-                        }
+                            },
+                            trailingContent = {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove",
+                                    tint = GratiaTheme.colors.textSecondary,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clickable { scope.launch { settingsDataStore.removeSearchHistory(historyQuery) } }
+                                        .padding(2.dp)
+                                )
+                            },
+                            onClick = { query = historyQuery }
+                        )
                     }
                 }
             }
         } else if (displayResults.isEmpty()) {
-            // No results
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 EmptyStateView(
                     icon = Icons.Default.Search,
@@ -222,13 +220,6 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
             }
         } else {
             // Results
-            Text(
-                "${displayResults.size} result${if (displayResults.size > 1) "s" else ""}",
-                fontFamily = Inter,
-                fontSize = 11.sp,
-                color = GratiaTheme.colors.textSecondary,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-            )
             LazyColumn(
                 contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp)
             ) {
@@ -243,7 +234,7 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
                             playerViewModel.playSong(song, displayResults.distinctBy { it.id }) 
                         },
                         badge = if (song.id in lyricsMatchIds) "Lyrics match" else null,
-                        modifier = Modifier.padding(horizontal = 24.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     )
                 }
             }

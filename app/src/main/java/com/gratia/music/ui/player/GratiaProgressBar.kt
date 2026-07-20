@@ -1,7 +1,7 @@
 package com.gratia.music.ui.player
 
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -48,7 +48,6 @@ fun GratiaProgressBar(
     var isDragging by remember { mutableStateOf(false) }
     var dragProgress by remember { mutableFloatStateOf(progress) }
 
-    val motion = GratiaTheme.motion
     val haptics = GratiaTheme.haptics
     val view = androidx.compose.ui.platform.LocalView.current
 
@@ -58,8 +57,16 @@ fun GratiaProgressBar(
     // Thumb scale — small normally, pops in larger when dragging
     val thumbScale by animateFloatAsState(
         targetValue = if (isDragging) 1.2f else 0.8f,
-        animationSpec = tween(motion.fast, easing = motion.standardEasing),
+        animationSpec = GratiaTheme.motion.springStandard(),
         label = "thumbScale"
+    )
+
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    // Track height — thin normally, thicker when dragging
+    val trackHeight by animateFloatAsState(
+        targetValue = with(density) { if (isDragging) 12.dp.toPx() else 4.dp.toPx() },
+        animationSpec = GratiaTheme.motion.springStandard(),
+        label = "trackHeight"
     )
 
     Column(
@@ -103,7 +110,6 @@ fun GratiaProgressBar(
                 }
         ) {
             Canvas(modifier = Modifier.matchParentSize()) {
-                val trackHeight = 4.dp.toPx()
                 val trackY = center.y
                 val trackWidth = size.width
                 val cornerRadius = trackHeight / 2f
@@ -128,7 +134,7 @@ fun GratiaProgressBar(
                 }
 
                 // Always visible thumb
-                val baseThumbRadius = 6.dp.toPx()
+                val baseThumbRadius = trackHeight / 2f + 2.dp.toPx()
                 val thumbRadius = baseThumbRadius * thumbScale
                 val thumbX = activeWidth.coerceIn(thumbRadius, trackWidth - thumbRadius)
 

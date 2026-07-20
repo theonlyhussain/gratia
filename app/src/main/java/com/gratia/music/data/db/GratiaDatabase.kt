@@ -15,7 +15,15 @@ import com.gratia.music.data.model.UserProfileEntity
 import com.gratia.music.data.model.ListeningEventEntity
 import com.gratia.music.data.dao.ListeningEventDao
 import com.gratia.music.data.dao.LyricsDao
+import com.gratia.music.data.dao.ArtistDao
+import com.gratia.music.data.dao.AlbumDao
+import com.gratia.music.data.dao.ArtworkDao
+import com.gratia.music.data.dao.SyncQueueDao
 import com.gratia.music.data.model.LyricsEntity
+import com.gratia.music.data.model.ArtistEntity
+import com.gratia.music.data.model.AlbumEntity
+import com.gratia.music.data.model.ArtworkEntity
+import com.gratia.music.data.model.SyncQueueEntity
 
 /**
  * Room migration from v1 to v2.
@@ -167,6 +175,74 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Create new tables
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS artists (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                pictureUrl TEXT DEFAULT NULL,
+                localPicturePath TEXT DEFAULT NULL,
+                pictureHash TEXT DEFAULT NULL,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                updatedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS albums (
+                id TEXT NOT NULL PRIMARY KEY,
+                title TEXT NOT NULL,
+                artistId TEXT DEFAULT NULL,
+                releaseDate TEXT DEFAULT NULL,
+                coverUrl TEXT DEFAULT NULL,
+                localCoverPath TEXT DEFAULT NULL,
+                coverHash TEXT DEFAULT NULL,
+                createdAt INTEGER NOT NULL DEFAULT 0,
+                updatedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS artwork_cache (
+                id TEXT NOT NULL PRIMARY KEY,
+                url TEXT NOT NULL,
+                localPath TEXT NOT NULL,
+                hash TEXT DEFAULT NULL,
+                lastUpdated INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS sync_queue (
+                id TEXT NOT NULL PRIMARY KEY,
+                songId TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'QUEUED',
+                retryCount INTEGER NOT NULL DEFAULT 0,
+                queuedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        
+        // Add new columns to songs table
+        db.execSQL("ALTER TABLE songs ADD COLUMN albumArtistId TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN trackNumber INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN discNumber INTEGER DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN genre TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN releaseDate TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN isrc TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN bpm REAL DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN composer TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN explicit INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE songs ADD COLUMN popularity INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE songs ADD COLUMN label TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE songs ADD COLUMN copyright TEXT DEFAULT NULL")
+        
+        db.execSQL("ALTER TABLE songs ADD COLUMN lastMetadataSync INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE songs ADD COLUMN metadataSource TEXT NOT NULL DEFAULT 'local'")
+    }
+}
+
 @Database(
     entities = [
         SongEntity::class,
@@ -177,8 +253,12 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         UserProfileEntity::class,
         ListeningEventEntity::class,
         LyricsEntity::class,
+        ArtistEntity::class,
+        AlbumEntity::class,
+        ArtworkEntity::class,
+        SyncQueueEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class GratiaDatabase : RoomDatabase() {
@@ -189,6 +269,10 @@ abstract class GratiaDatabase : RoomDatabase() {
     abstract fun playlistDao(): com.gratia.music.data.dao.PlaylistDao
     abstract fun collectionDao(): com.gratia.music.data.dao.CollectionDao
     abstract fun lyricsDao(): LyricsDao
+    abstract fun artistDao(): ArtistDao
+    abstract fun albumDao(): AlbumDao
+    abstract fun artworkDao(): ArtworkDao
+    abstract fun syncQueueDao(): SyncQueueDao
 
     companion object {
         @Volatile
@@ -201,7 +285,7 @@ abstract class GratiaDatabase : RoomDatabase() {
                     GratiaDatabase::class.java,
                     "gratia_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance

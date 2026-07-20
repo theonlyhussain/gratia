@@ -16,8 +16,8 @@ android {
         applicationId = "com.gratia.music"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "2.2.2"
+        versionCode = 9
+        versionName = "2.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -140,6 +140,13 @@ dependencies {
 
     // Drag-to-reorder for lists
     implementation("org.burnoutcrew.composereorderable:reorderable:0.9.6")
+
+    // Jetpack Glance (Widgets)
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
+
+    // WorkManager (Background Sync)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Debug tools
     debugImplementation("androidx.compose.ui:ui-tooling")

@@ -1,7 +1,7 @@
 package com.gratia.music.lyrics
 
 /**
- * Canonical documents representing parsed lyrics.
+ * Canonical models for parsed lyrics in Gratia.
  */
 sealed class LyricsDocument {
     data class Plain(
@@ -18,17 +18,20 @@ sealed class LyricsDocument {
 }
 
 /**
- * Represents a single line in synced lyrics with timing information.
+ * A single timed lyrics line.
  */
 data class LyricLine(
     val text: String,
     val startMs: Long,
     val endMs: Long? = null,
-    val words: List<LyricWord> = emptyList()
+    val words: List<LyricWord> = emptyList(),
+    val translation: String? = null,
+    val romanization: String? = null,
+    val voiceTag: String? = null
 )
 
 /**
- * Represents a single word in a word-synced line.
+ * A single timed word within a synced line.
  */
 data class LyricWord(
     val text: String,

@@ -41,6 +41,19 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    private val ONBOARDING_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("onboarding_completed")
+
+    val onboardingCompletedFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[ONBOARDING_KEY] ?: false
+        }
+
+    suspend fun setOnboardingCompleted(completed: Boolean = true) {
+        context.dataStore.edit { preferences ->
+            preferences[ONBOARDING_KEY] = completed
+        }
+    }
+
     private val SEARCH_HISTORY_KEY = stringSetPreferencesKey("search_history")
 
     val searchHistoryFlow: Flow<Set<String>> = context.dataStore.data

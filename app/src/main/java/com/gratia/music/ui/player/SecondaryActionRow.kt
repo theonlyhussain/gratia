@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,6 +43,7 @@ fun SecondaryActionRow(
     onCycleRepeat: () -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
     onOpenLyrics: () -> Unit,
     modifier: Modifier = Modifier,
     accentColor: Color = GratiaTheme.colors.accent
@@ -70,11 +72,11 @@ fun SecondaryActionRow(
                 tint = if (hasLyrics) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f)
             )
 
-            // Cast (Placeholder for Airplay/Cast)
+            // Sleep Timer
             PlayerButton(
-                icon = Icons.Default.Cast,
-                onClick = { /* TODO: Implement Cast */ },
-                contentDescription = "Cast",
+                icon = Icons.Outlined.Bedtime,
+                onClick = onOpenSleepTimer,
+                contentDescription = "Sleep Timer",
                 size = 48.dp,
                 iconSize = 24.dp,
                 tint = Color.White.copy(alpha = 0.6f)

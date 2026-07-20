@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -139,7 +141,6 @@ fun LyricsScreen(
             onAddLyrics = { showEditor = true },
             onImportLrc = { importLauncher.launch("*/*") },
             onRetry = { playerViewModel.refreshLyrics(true) },
-            onSearchAgain = { /* TODO search modal */ },
             message = "No song playing",
             detail = "Play a song to see lyrics"
         )
@@ -405,36 +406,49 @@ fun LyricsScreen(
                                     modifier = Modifier.weight(1f),
                                     backgroundColor = Color.White.copy(alpha = 0.1f)
                                 )
-                                com.gratia.music.ui.components.GratiaButton(
-                                    text = "Search Again",
-                                    onClick = { /* TODO: Implement search again modal */ },
-                                    modifier = Modifier.weight(1f),
-                                    backgroundColor = Color.White.copy(alpha = 0.1f)
-                                )
                             }
                         }
                     }
                 } else {
                     when (parsedDocument) {
                         is LyricsDocument.Plain -> {
-                            PlainLyricsView(
-                                text = parsedDocument.text,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                androidx.compose.foundation.layout.Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = 28.dp, vertical = 24.dp)
+                                ) {
+                                    val paragraphs = parsedDocument.text.split("\n\n")
+                                    paragraphs.forEach { paragraph ->
+                                        Text(
+                                            text = paragraph,
+                                            fontFamily = Inter,
+                                            fontSize = 22.sp,
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                                            color = Color.White.copy(alpha = 0.75f),
+                                            lineHeight = 34.sp,
+                                            modifier = Modifier.padding(bottom = 24.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                         is LyricsDocument.LineSynced -> {
-                            KineticLyricsColumn(
-                                lines = parsedDocument.lines,
-                                currentTimeMs = visualTimeMs,
-                                onLineClick = { seekMs -> playerViewModel.seekTo(seekMs) },
+                            SyncedLyricsView(
+                                lyrics = lyricsRaw, parsedLyricsInput = parsedDocument.lines,
+                                currentPlaybackTime = visualTimeMs,
+                                onSeek = { seekMs -> playerViewModel.seekTo(seekMs) },
+                                syncOffset = currentOffsetMs,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                         is LyricsDocument.WordSynced -> {
-                            KineticLyricsColumn(
-                                lines = parsedDocument.lines,
-                                currentTimeMs = visualTimeMs,
-                                onLineClick = { seekMs -> playerViewModel.seekTo(seekMs) },
+                            SyncedLyricsView(
+                                lyrics = lyricsRaw, parsedLyricsInput = parsedDocument.lines,
+                                currentPlaybackTime = visualTimeMs,
+                                onSeek = { seekMs -> playerViewModel.seekTo(seekMs) },
+                                syncOffset = currentOffsetMs,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -443,7 +457,7 @@ fun LyricsScreen(
             }
 
             // Offset UI if requested
-            if (showOffsetUI && parsedDocument is LyricsDocument.LineSynced) {
+            if (showOffsetUI && (parsedDocument is LyricsDocument.LineSynced || parsedDocument is LyricsDocument.WordSynced)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -491,12 +505,12 @@ fun LyricsScreen(
     }
     
     if (showEditor) {
-        LyricsEditorDialog(
+        LyricsEditorSheet(
             song = song,
             initialLyrics = lyricsRaw,
+            currentTimeMs = visualTimeMs,
             onDismiss = { showEditor = false },
-            onSave = { newLyrics ->
-                val isSynced = newLyrics.contains("[00:") || newLyrics.contains("[01:") || newLyrics.contains("[02:")
+            onSave = { newLyrics, isSynced ->
                 playerViewModel.saveManualLyrics(newLyrics, isSynced)
                 showEditor = false
             }
@@ -670,7 +684,6 @@ private fun EmptyLyricsState(
     onAddLyrics: () -> Unit,
     onImportLrc: () -> Unit,
     onRetry: () -> Unit,
-    onSearchAgain: () -> Unit,
     message: String,
     detail: String
 ) {
@@ -786,12 +799,6 @@ private fun EmptyLyricsState(
                     com.gratia.music.ui.components.GratiaButton(
                         text = "Retry",
                         onClick = onRetry,
-                        modifier = Modifier.weight(1f),
-                        backgroundColor = Color.White.copy(alpha = 0.1f)
-                    )
-                    com.gratia.music.ui.components.GratiaButton(
-                        text = "Search Again",
-                        onClick = onSearchAgain,
                         modifier = Modifier.weight(1f),
                         backgroundColor = Color.White.copy(alpha = 0.1f)
                     )

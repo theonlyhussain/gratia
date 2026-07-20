@@ -30,7 +30,7 @@ fun Modifier.clickableWithScale(
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.97f else 1f,
         animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = 0.6f, 
+            dampingRatio = 1.0f, 
             stiffness = 400f
         ),
         label = "press_scale"

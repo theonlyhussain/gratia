@@ -32,77 +32,42 @@ fun MusicCard(
     isPlaying: Boolean,
     onClick: () -> Unit
 ) {
-    Surface(
+    Column(
         modifier = Modifier
             .width(148.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = GratiaTheme.colors.surface,
-        border = ButtonDefaults.outlinedButtonBorder.copy(
-            brush = androidx.compose.ui.graphics.SolidColor(
-                if (isActive) GratiaTheme.colors.glassBorder else androidx.compose.ui.graphics.Color.Transparent
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null, // Custom scale animation should be applied for press feedback ideally
+                onClick = onClick
             )
-        )
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            // Cover art
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                CoverArtImage(
-                    coverArtPath = song.coverArtPath,
-                    title = song.title,
-                    artist = song.artist,
-                    size = 128.dp,
-                    cornerRadius = 8.dp,
-                    fontSize = 22.sp,
-                    modifier = Modifier.fillMaxSize()
-                )
+        // Cover art
+        CoverArtImage(
+            coverArtPath = song.coverArtPath,
+            title = song.title,
+            artist = song.artist,
+            size = 148.dp,
+            cornerRadius = 8.dp, // Apple Music uses slight corner radii for albums
+            fontSize = 22.sp,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+        )
 
-                // Play button overlay
-                if (!isPlaying) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(GratiaTheme.colors.accent),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Play",
-                            tint = GratiaTheme.colors.background,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
+        Spacer(Modifier.height(8.dp))
 
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                song.title,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.Bold,
-                fontSize = 13.sp,
-                color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                song.artist,
-                fontFamily = Inter,
-                fontSize = 11.sp,
-                color = GratiaTheme.colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Text(
+            song.title,
+            style = GratiaTheme.typography.body,
+            fontWeight = FontWeight.Medium,
+            color = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            song.artist,
+            style = GratiaTheme.typography.caption,
+            color = GratiaTheme.colors.textSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.gratia.music.data.CoverColorCache
 import com.gratia.music.lyrics.LyricsDocument
 import com.gratia.music.lyrics.LyricsParser
-import com.gratia.music.lyrics.LyricsTimingEngine
+
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.AnimatedText
 import com.gratia.music.ui.components.GlassSurface
@@ -60,6 +60,7 @@ fun ExpandedPlayer(
     playerViewModel: PlayerViewModel,
     onOpenLyrics: () -> Unit = {},
     onOpenQueue: () -> Unit = {},
+    onOpenSleepTimer: () -> Unit = {},
     onNavigateToAlbum: (String) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {},
     onDismiss: () -> Unit = { playerViewModel.setExpandedPlayerOpen(false) }
@@ -99,10 +100,10 @@ fun ExpandedPlayer(
     val motion = GratiaTheme.motion
 
     // --- Swipe-to-dismiss state ---
-    var dismissOffsetY by remember { mutableFloatStateOf(0f) }
+    val dismissOffsetY = remember { androidx.compose.animation.core.Animatable(0f) }
     val dismissAlpha by animateFloatAsState(
-        targetValue = if (dismissOffsetY > 0f) {
-            (1f - (dismissOffsetY / 800f)).coerceIn(0.3f, 1f)
+        targetValue = if (dismissOffsetY.value > 0f) {
+            (1f - (dismissOffsetY.value / 800f)).coerceIn(0.3f, 1f)
         } else 1f,
         animationSpec = tween(motion.instant),
         label = "dismissAlpha"
@@ -121,11 +122,11 @@ fun ExpandedPlayer(
             if (doc != null) {
                 when (doc) {
                     is LyricsDocument.LineSynced -> {
-                        val idx = LyricsTimingEngine.findActiveLineIndex(doc.lines, currentTimeMs)
+                        val idx = doc.lines.indexOfLast { it.startMs <= currentTimeMs }
                         doc.lines.getOrNull(idx)?.text
                     }
                     is LyricsDocument.WordSynced -> {
-                        val idx = LyricsTimingEngine.findActiveLineIndex(doc.lines, currentTimeMs)
+                        val idx = doc.lines.indexOfLast { it.startMs <= currentTimeMs }
                         doc.lines.getOrNull(idx)?.text
                     }
                     else -> null
@@ -138,24 +139,39 @@ fun ExpandedPlayer(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer {
-                translationY = dismissOffsetY
+                translationY = dismissOffsetY.value
                 alpha = dismissAlpha
             }
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onDragEnd = {
-                        if (dismissOffsetY > 300f) {
-                            onDismiss()
+                        scope.launch {
+                            if (dismissOffsetY.value > 300f) {
+                                onDismiss()
+                                dismissOffsetY.snapTo(0f)
+                            } else {
+                                dismissOffsetY.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = motion.springStiff()
+                                )
+                            }
                         }
-                        dismissOffsetY = 0f
                     },
                     onDragCancel = {
-                        dismissOffsetY = 0f
+                        scope.launch {
+                            dismissOffsetY.animateTo(
+                                targetValue = 0f,
+                                animationSpec = motion.springStiff()
+                            )
+                        }
                     },
                     onVerticalDrag = { _, dragAmount ->
-                        // Only allow downward drag
-                        if (dragAmount > 0 || dismissOffsetY > 0) {
-                            dismissOffsetY = (dismissOffsetY + dragAmount).coerceAtLeast(0f)
+                        scope.launch {
+                            // Only allow downward drag
+                            if (dragAmount > 0 || dismissOffsetY.value > 0) {
+                                val newValue = (dismissOffsetY.value + dragAmount).coerceAtLeast(0f)
+                                dismissOffsetY.snapTo(newValue)
+                            }
                         }
                     }
                 )
@@ -274,9 +290,15 @@ fun ExpandedPlayer(
                     scope.launch { snackbarHostState.showSnackbar(msg) }
                 },
                 onOpenQueue = onOpenQueue,
+                onOpenSleepTimer = onOpenSleepTimer,
                 onOpenLyrics = onOpenLyrics,
                 accentColor = GratiaTheme.colors.accent
             )
+            
+            Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge))
+
+            // --- Volume Slider ---
+            com.gratia.music.ui.components.VolumeSlider()
 
             Spacer(Modifier.weight(0.05f))
             Spacer(Modifier.navigationBarsPadding())
@@ -309,7 +331,6 @@ fun ExpandedPlayer(
                 },
                 hasLyrics = currentLyrics != null,
                 onEditLyrics = { onOpenLyrics() },
-                onShare = { /* TODO Context sharing */ },
                 onSongInfo = { showSongInfo = true },
                 onDelete = { 
                     showSongMenu = false

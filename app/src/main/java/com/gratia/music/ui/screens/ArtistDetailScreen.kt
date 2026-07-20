@@ -82,8 +82,8 @@ fun ArtistDetailScreen(
                         coverArtPath = coverArtPath,
                         title = artistName,
                         artist = artistName,
-                        size = 180.dp,
-                        cornerRadius = 90.dp, // Circle for Artist
+                        size = 240.dp,
+                        cornerRadius = 120.dp, // Circle for Artist
                         fontSize = 40.sp
                     )
                     Spacer(Modifier.height(GratiaTheme.spacing.large))
@@ -103,13 +103,18 @@ fun ArtistDetailScreen(
                     )
                     Spacer(Modifier.height(GratiaTheme.spacing.medium))
                     
-                    // Play Button
-                    GratiaButton(
-                        text = "Play",
-                        icon = Icons.Default.PlayArrow,
-                        onClick = { if (artistSongs.isNotEmpty()) playerViewModel.playSong(artistSongs.first(), artistSongs) },
-                        modifier = Modifier.fillMaxWidth(0.6f)
-                    )
+                    // Apple Style Play Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = GratiaTheme.spacing.medium),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GratiaButton(
+                            text = "Play",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = { if (artistSongs.isNotEmpty()) playerViewModel.playSong(artistSongs.first(), artistSongs) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     Spacer(Modifier.height(GratiaTheme.spacing.large))
                 }
             }

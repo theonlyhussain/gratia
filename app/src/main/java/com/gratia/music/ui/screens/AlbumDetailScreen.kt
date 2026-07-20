@@ -83,8 +83,8 @@ fun AlbumDetailScreen(
                         coverArtPath = coverArtPath,
                         title = albumName,
                         artist = artistName,
-                        size = 200.dp,
-                        cornerRadius = 16.dp,
+                        size = 240.dp,
+                        cornerRadius = 8.dp,
                         fontSize = 40.sp
                     )
                     Spacer(Modifier.height(GratiaTheme.spacing.large))
@@ -98,19 +98,24 @@ fun AlbumDetailScreen(
                     GratiaText(
                         text = artistName,
                         style = GratiaTheme.typography.body,
-                        color = GratiaTheme.colors.textSecondary,
+                        color = GratiaTheme.colors.accent,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(GratiaTheme.spacing.medium))
                     
-                    // Play Button
-                    GratiaButton(
-                        text = "Play",
-                        icon = Icons.Default.PlayArrow,
-                        onClick = { if (albumSongs.isNotEmpty()) playerViewModel.playSong(albumSongs.first(), albumSongs) },
-                        modifier = Modifier.fillMaxWidth(0.6f)
-                    )
+                    // Apple Style Play/Shuffle Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = GratiaTheme.spacing.medium),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        GratiaButton(
+                            text = "Play",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = { if (albumSongs.isNotEmpty()) playerViewModel.playSong(albumSongs.first(), albumSongs) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     Spacer(Modifier.height(GratiaTheme.spacing.large))
                 }
             }

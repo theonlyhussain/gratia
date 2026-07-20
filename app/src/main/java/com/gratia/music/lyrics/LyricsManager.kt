@@ -7,7 +7,7 @@ import com.gratia.music.data.repository.LyricsRepository
 import com.gratia.music.player.PlayerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +23,7 @@ class LyricsManager(
     private val lyricsRepository: LyricsRepository
 ) {
     private val TAG = "LyricsManager"
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val _currentLyrics = MutableStateFlow<LyricsEntity?>(null)
     val currentLyrics: StateFlow<LyricsEntity?> = _currentLyrics.asStateFlow()

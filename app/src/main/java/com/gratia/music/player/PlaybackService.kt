@@ -2,12 +2,17 @@ package com.gratia.music.player
 
 import android.content.Intent
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.gratia.music.GratiaApp
+import com.gratia.music.player.transition.GratiaPlayerEngine
+import com.gratia.music.player.transition.TransitionController
 
 /**
  * Foreground service for background audio playback.
@@ -24,28 +29,66 @@ class PlaybackService : MediaSessionService() {
     }
 
     private var mediaSession: MediaSession? = null
-    private var exoPlayer: ExoPlayer? = null
+    private var playerEngine: GratiaPlayerEngine? = null
+    private var transitionController: TransitionController? = null
 
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "PlaybackService.onCreate()")
         
-        exoPlayer = ExoPlayer.Builder(this)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                true
-            )
-            .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_LOCAL)
+        val engine = GratiaPlayerEngine(this).apply {
+            initialize()
+        }
+        playerEngine = engine
+        
+        val masterPlayer = engine.masterPlayer
+
+        // Attach the equalizer to ExoPlayer's audio session
+        val audioSessionId = engine.getAudioSessionId()
+        if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId != 0) {
+            Log.d(TAG, "PlaybackService: attaching EQ to session $audioSessionId")
+            GratiaApp.instance.equalizerManager.attachToSession(audioSessionId)
+        }
+
+        // Listen for audio session changes (e.g. after codec re-init)
+        masterPlayer.addListener(object : Player.Listener {
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                Log.d(TAG, "PlaybackService: audio session changed to $audioSessionId")
+                if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId != 0) {
+                    GratiaApp.instance.equalizerManager.attachToSession(audioSessionId)
+                }
+            }
+        })
+            
+        mediaSession = MediaSession.Builder(this, masterPlayer)
             .build()
             
-        mediaSession = MediaSession.Builder(this, exoPlayer!!)
-            .build()
+        engine.addPlayerSwapListener { newPlayer ->
+            Log.d(TAG, "Player swapped during transition. Updating MediaSession.")
+            mediaSession?.player = newPlayer
+            
+            // Need to re-listen for session ID changes on the new player
+            newPlayer.addListener(object : Player.Listener {
+                override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                    Log.d(TAG, "PlaybackService: audio session changed to $audioSessionId (after swap)")
+                    if (audioSessionId != C.AUDIO_SESSION_ID_UNSET && audioSessionId != 0) {
+                        GratiaApp.instance.equalizerManager.attachToSession(audioSessionId)
+                    }
+                }
+            })
+            
+            // Also update EQ immediately just in case
+            val newSessionId = engine.getAudioSessionId()
+            if (newSessionId != C.AUDIO_SESSION_ID_UNSET && newSessionId != 0) {
+                GratiaApp.instance.equalizerManager.attachToSession(newSessionId)
+            }
+        }
         
-        Log.d(TAG, "PlaybackService: ExoPlayer + MediaSession created")
+        transitionController = TransitionController(engine)
+        transitionController?.initialize()
+        
+        Log.d(TAG, "PlaybackService: GratiaPlayerEngine + MediaSession created")
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -58,8 +101,11 @@ class PlaybackService : MediaSessionService() {
             player.release()
             release()
         }
+        transitionController?.release()
+        playerEngine?.release()
         mediaSession = null
-        exoPlayer = null
+        transitionController = null
+        playerEngine = null
         super.onDestroy()
     }
 
@@ -74,3 +120,4 @@ class PlaybackService : MediaSessionService() {
         }
     }
 }
+
