@@ -1,43 +1,7 @@
-# Gratia
+# Gratia (under devlopment)
 
-> A modern, private Android music player focused on beautiful design, smooth playback, and a personal listening experience.
+> A modern, private Android music player focused on smooth playback and a personal listening experience.
 > 
-### Playback
-* Gapless-inspired playback
-* Queue support
-* Shuffle
-* Repeat
-* Mini Player
-* Expanded Player
-* Media notification
-* Lock screen controls
-* Reliable playback
-
-### Library
-* Songs
-* Albums
-* Artists
-* Folders
-* Playlists
-* Favorites
-* Recently Played
-
-### Experience
-* Dynamic backgrounds
-* Glassmorphism
-* Smooth animations
-* Theme switching
-* Light mode
-* Dark mode
-* Adaptive artwork colors
-
-### Lyrics
-* Synced lyrics
-* Smooth scrolling
-* Tap to seek
-* Manual lyric support
-* Beautiful empty state
-
 ## Technology
 
 | Component            | Technology              |
@@ -83,26 +47,6 @@ app/src/main/java/com/gratia/music/
       └── theme/
 ```
 
-## Roadmap
-
-**Completed**
-* [x] Local music playback
-* [x] Queue
-* [x] Playlist support
-* [x] Dynamic player
-* [x] Light theme
-* [x] Dark theme
-* [x] Lyrics
-* [x] Media notification
-
-**Planned**
-* [ ] Android Auto
-* [ ] Wear OS
-* [ ] Equalizer
-* [ ] Chromecast improvements
-* [ ] Smart recommendations
-* [ ] Folder artwork generation
-* [ ] More lyric providers
 
 ## Contributing
 
