@@ -13,6 +13,9 @@ import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.ExistingWorkPolicy
 
 object MediaStoreScanner {
 
@@ -143,6 +146,14 @@ object MediaStoreScanner {
                 importedCount++
             }
         }
+
+        // Trigger background sync for missing cover art from Deezer
+        val syncRequest = OneTimeWorkRequestBuilder<CoverArtSyncWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "CoverArtSync",
+            ExistingWorkPolicy.REPLACE,
+            syncRequest
+        )
 
         importedCount
     }

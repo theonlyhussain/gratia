@@ -9,23 +9,34 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.launch
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.data.scan.MediaStoreScanner
 import com.gratia.music.ui.components.AppleLargeTitleHeader
 import com.gratia.music.ui.components.AppleSectionHeader
 import com.gratia.music.ui.components.CoverArtImage
+import com.gratia.music.ui.components.GratiaEmptyState
 import com.gratia.music.ui.components.GratiaText
-import com.gratia.music.ui.components.MusicCard
+import com.gratia.music.ui.components.TopPickCard
+import com.gratia.music.ui.components.RecentCard
 import com.gratia.music.ui.theme.GratiaTheme
 import java.util.Calendar
 
@@ -44,6 +55,30 @@ fun HomeScreen(
     val lastAdded by songRepo.getLastAdded(10).collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
+
+    val context = LocalContext.current
+    val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val initialScanCompleted by settingsDataStore.initialScanCompletedFlow.collectAsState(initial = false)
+    var isScanning by remember { mutableStateOf(false) }
+
+    LaunchedEffect(initialScanCompleted) {
+        if (!initialScanCompleted) {
+            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Manifest.permission.READ_MEDIA_AUDIO
+            } else {
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            }
+            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+                isScanning = true
+                try {
+                    MediaStoreScanner.scanLocalMusic(context, songRepo)
+                } finally {
+                    isScanning = false
+                    settingsDataStore.setInitialScanCompleted(true)
+                }
+            }
+        }
+    }
 
     val profileDao = remember { GratiaApp.instance.database.userProfileDao() }
     val profileFlow by profileDao.getProfile().collectAsState(initial = null)
@@ -107,10 +142,8 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(mostPlayed) { song ->
-                        MusicCard(
+                        TopPickCard(
                             song = song,
-                            isActive = currentSong?.id == song.id,
-                            isPlaying = currentSong?.id == song.id && isPlaying,
                             onClick = { playerViewModel.playSong(song, mostPlayed) }
                         )
                     }
@@ -127,10 +160,8 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(recentlyPlayed) { song ->
-                        MusicCard(
+                        RecentCard(
                             song = song,
-                            isActive = currentSong?.id == song.id,
-                            isPlaying = currentSong?.id == song.id && isPlaying,
                             onClick = { playerViewModel.playSong(song, recentlyPlayed) }
                         )
                     }
@@ -147,15 +178,36 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(lastAdded) { song ->
-                        MusicCard(
+                        RecentCard(
                             song = song,
-                            isActive = currentSong?.id == song.id,
-                            isPlaying = currentSong?.id == song.id && isPlaying,
                             onClick = { playerViewModel.playSong(song, lastAdded) }
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+
+        if (mostPlayed.isEmpty() && recentlyPlayed.isEmpty() && lastAdded.isEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(64.dp))
+                if (isScanning) {
+                    GratiaEmptyState(
+                        icon = Icons.Default.Search,
+                        headline = "Looking for music...",
+                        description = "Scanning your device for audio files.",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    GratiaEmptyState(
+                        icon = Icons.Default.LibraryMusic,
+                        headline = "Your Library is Empty",
+                        description = "No local music found. Try syncing from settings if you just added files.",
+                        actionLabel = "Go to Settings",
+                        onActionClick = onNavigateToSettings,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }

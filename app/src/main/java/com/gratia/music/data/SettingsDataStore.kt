@@ -48,9 +48,22 @@ class SettingsDataStore(private val context: Context) {
             preferences[ONBOARDING_KEY] ?: false
         }
 
+    private val INITIAL_SCAN_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("initial_scan_completed")
+
+    val initialScanCompletedFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[INITIAL_SCAN_KEY] ?: false
+        }
+
     suspend fun setOnboardingCompleted(completed: Boolean = true) {
         context.dataStore.edit { preferences ->
             preferences[ONBOARDING_KEY] = completed
+        }
+    }
+
+    suspend fun setInitialScanCompleted(completed: Boolean = true) {
+        context.dataStore.edit { preferences ->
+            preferences[INITIAL_SCAN_KEY] = completed
         }
     }
 
