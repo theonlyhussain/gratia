@@ -1,7 +1,16 @@
-# Gratia (under devlopment)
+# 🎵 Gratia
 
-> A modern, private Android music player focused on smooth playback and a personal listening experience.
+> **🚧 Under Active Development 🚧**
 > 
+> A modern, private Android music player focused on smooth playback, a beautiful Apple Music-inspired UI, and a personal listening experience.
+
+## Features
+
+- 🎨 **Apple Music-Style UI**: Edge-to-edge player, smooth spring animations, and a gorgeous glassmorphic queue sheet.
+- 🎵 **Synced Lyrics**: Dynamic, scrolling synced lyrics that overlay directly on the player.
+- 🏷️ **Automated Genre Detection**: Automatically fetches cover art and metadata (including genres) via Deezer API.
+- 🔒 **Local-First**: Complete privacy, offline listening, and no data tracking.
+
 ## Technology
 
 | Component            | Technology              |
@@ -11,7 +20,7 @@
 | Architecture         | MVVM                    |
 | Database             | Room                    |
 | Media                | Media3 / ExoPlayer      |
-| Image Loading        | Coil                    |
+| API Integration      | Deezer (Cover Art & Metadata) |
 
 ## Installation
 
