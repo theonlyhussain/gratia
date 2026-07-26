@@ -91,4 +91,13 @@ interface SongDao {
 
     @Query("UPDATE songs SET coverArtPath = :path, coverSource = :source, updatedAt = :now WHERE id = :id")
     suspend fun updateCoverArt(id: String, path: String, source: String, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE songs SET genre = :genre, updatedAt = :now WHERE id = :id")
+    suspend fun updateGenre(id: String, genre: String, now: Long = System.currentTimeMillis())
+
+    @Query("SELECT DISTINCT genre FROM songs WHERE genre IS NOT NULL AND genre != '' ORDER BY genre ASC")
+    fun getDistinctGenres(): Flow<List<String>>
+
+    @Query("SELECT * FROM songs WHERE genre = :genre ORDER BY title ASC")
+    fun getSongsByGenre(genre: String): Flow<List<SongEntity>>
 }

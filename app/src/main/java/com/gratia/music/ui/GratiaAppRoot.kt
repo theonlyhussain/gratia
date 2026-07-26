@@ -239,7 +239,10 @@ fun GratiaAppRoot() {
                     )
                 }
                 composable(Screen.Search.route) {
-                    SearchScreen(playerViewModel = playerViewModel)
+                    SearchScreen(
+                        playerViewModel = playerViewModel,
+                        onNavigateToGenre = { navController.navigate("genre/$it") }
+                    )
                 }
                 composable(Screen.Library.route) {
                     LibraryScreen(
@@ -247,6 +250,17 @@ fun GratiaAppRoot() {
                         onNavigateToAlbum = { navController.navigate("album/$it") },
                         onNavigateToArtist = { navController.navigate("artist/$it") },
                         onNavigateToFolder = { navController.navigate("folder/$it") }
+                    )
+                }
+                composable(
+                    "genre/{genreName}",
+                    arguments = listOf(navArgument("genreName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val genre = backStackEntry.arguments?.getString("genreName") ?: return@composable
+                    GenreDetailScreen(
+                        genre = genre,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 composable("favorites") { // Favorites is still accessible from Home

@@ -3,30 +3,37 @@ package com.gratia.music.ui.player
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.gratia.music.ui.components.CoverArtImage
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.gratia.music.ui.components.CoverArtFallback
 import com.gratia.music.ui.theme.GratiaTheme
+import java.io.File
 
 /**
- * Hero album artwork with floating shadow and distinct scale animation.
- * Mimics Apple Music's artwork behavior.
+ * Hero album artwork — full-width, edge-to-edge with a gradient fade at the bottom.
+ * Mimics Apple Music's immersive artwork experience.
  *
  * Design details:
  * - Scale 0.85 → 1.0 on play (distinct pop effect)
- * - Shadow deepens when playing
- * - GDL Hero rounded corners (32dp or smaller if preferred, sticking to theme)
+ * - Bottom gradient fades artwork into the dominant color background
+ * - No horizontal padding — artwork bleeds to edges
  */
 @Composable
 fun ArtworkView(
@@ -34,11 +41,12 @@ fun ArtworkView(
     title: String,
     artist: String,
     isPlaying: Boolean,
-    glowColor: Color, // Kept for compatibility but unused
+    glowColor: Color,
     modifier: Modifier = Modifier,
     isDragging: Boolean = false
 ) {
     val motion = GratiaTheme.motion
+    val context = LocalContext.current
 
     // Scale: paused/dragging -> 0.85, playing -> 1.0
     val targetScale = when {
@@ -56,38 +64,51 @@ fun ArtworkView(
         label = "artworkScale"
     )
 
-    // Shadow depth animates between states
-    val shadowElevation by animateFloatAsState(
-        targetValue = if (isPlaying) 24f else 8f,
-        animationSpec = tween(motion.normal),
-        label = "artworkShadow"
-    )
+    val hasCover = !coverArtPath.isNullOrBlank() && File(coverArtPath).exists()
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp)
             .aspectRatio(1f)
             .scale(scale),
         contentAlignment = Alignment.Center
     ) {
-        // The artwork itself with shadow
-        CoverArtImage(
-            coverArtPath = coverArtPath,
-            title = title,
-            artist = artist,
-            size = 340.dp,
-            cornerRadius = 16.dp, // Apple Music has slightly tighter rounded corners, e.g., 12dp-16dp
-            fontSize = GratiaTheme.typography.display.fontSize,
+        if (hasCover) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(File(coverArtPath!!))
+                    .crossfade(300)
+                    .build(),
+                contentDescription = "$title cover art",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            CoverArtFallback(
+                title = title,
+                artist = artist,
+                size = 400.dp,
+                cornerRadius = 0.dp,
+                fontSize = GratiaTheme.typography.display.fontSize,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Bottom gradient fade — artwork dissolves into the background color
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .shadow(
-                    elevation = shadowElevation.dp,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    spotColor = Color.Black.copy(alpha = 0.5f),
-                    ambientColor = Color.Black.copy(alpha = 0.25f)
+                .fillMaxWidth()
+                .height(160.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            glowColor.copy(alpha = 0.5f),
+                            glowColor.copy(alpha = 0.9f)
+                        )
+                    )
                 )
         )
     }
 }
-

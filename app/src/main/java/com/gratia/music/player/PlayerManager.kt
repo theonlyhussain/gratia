@@ -421,9 +421,9 @@ class PlayerManager(private val context: Context) {
 
     fun cycleRepeatMode() {
         _repeatMode.value = when (_repeatMode.value) {
-            RepeatMode.OFF -> RepeatMode.ALL
-            RepeatMode.ALL -> RepeatMode.ONE
-            RepeatMode.ONE -> RepeatMode.OFF
+            RepeatMode.OFF -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.TWO
+            RepeatMode.TWO -> RepeatMode.OFF
         }
         Log.d(TAG, "cycleRepeatMode: ${_repeatMode.value}")
     }
@@ -483,15 +483,22 @@ class PlayerManager(private val context: Context) {
     private fun handleSongEnded() {
         when (_repeatMode.value) {
             RepeatMode.ONE -> {
-                Log.d(TAG, "handleSongEnded: REPEAT_ONE — restarting")
+                // Repeat once, then go back to OFF and continue queue
+                Log.d(TAG, "handleSongEnded: REPEAT_ONE — restarting once, then OFF")
+                _repeatMode.value = RepeatMode.OFF
                 if (!ensureConnected()) return
                 val controller = mediaController ?: return
                 controller.seekTo(0)
                 controller.play()
             }
-            RepeatMode.ALL -> {
-                Log.d(TAG, "handleSongEnded: REPEAT_ALL — next song")
-                nextSong()
+            RepeatMode.TWO -> {
+                // Repeat twice: first replay decrements to ONE
+                Log.d(TAG, "handleSongEnded: REPEAT_TWO — restarting, decrement to ONE")
+                _repeatMode.value = RepeatMode.ONE
+                if (!ensureConnected()) return
+                val controller = mediaController ?: return
+                controller.seekTo(0)
+                controller.play()
             }
             RepeatMode.OFF -> {
                 val current = _currentSong.value ?: return
@@ -613,5 +620,5 @@ fun SongEntity.toMediaItem(): MediaItem {
 }
 
 enum class RepeatMode {
-    OFF, ALL, ONE
+    OFF, ONE, TWO
 }

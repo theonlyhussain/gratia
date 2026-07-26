@@ -7,13 +7,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,11 +24,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.gratia.music.data.CoverColorCache
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.RepeatMode
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -38,15 +42,14 @@ import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 
 /**
- * Queue bottom sheet showing the current playback queue.
+ * Redesigned queue bottom sheet matching the Apple Music reference.
  *
- * Design:
- * - Current song pinned at top with accent highlight
- * - Upcoming songs listed below
- * - Tap any song to play it
- * - Drag handle for reorder (visual, functional reorder via buttons)
- * - Swipe to remove (via close button per row)
- * - Beautiful empty state when queue is empty
+ * Layout:
+ * - Current song info at top
+ * - Shuffle / Repeat pill buttons
+ * - "Continue Playing" section with song list
+ * - Drag handles for reorder
+ * - Tinted background from current song's dominant color
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +60,8 @@ fun QueueSheet(
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
+    val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
+    val repeatMode by playerViewModel.repeatMode.collectAsState()
 
     val current = currentSong
     val upcomingStartIndex = if (current != null) {
@@ -64,12 +69,27 @@ fun QueueSheet(
         if (idx >= 0) idx + 1 else 0
     } else 0
 
+    // Extract dominant color for tinted background
+    var coverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
+    LaunchedEffect(current?.id, current?.coverArtPath) {
+        if (current != null) {
+            coverColors = CoverColorCache.getColors(current.id, current.coverArtPath)
+        }
+    }
+
+    val tintedBg by animateColorAsState(
+        targetValue = coverColors.dominant.copy(alpha = 0.15f),
+        animationSpec = tween(500),
+        label = "queueBgTint"
+    )
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight(0.75f)
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(GratiaTheme.colors.surface)
+            .background(tintedBg) // Tinted overlay
             .padding(top = 12.dp)
     ) {
         // Drag indicator
@@ -84,60 +104,109 @@ fun QueueSheet(
 
         Spacer(Modifier.height(16.dp))
 
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                "QUEUE",
-                fontFamily = Inter,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp,
-                letterSpacing = 2.sp,
-                color = GratiaTheme.colors.textSecondary
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${queue.size} songs",
-                    fontFamily = Inter,
-                    fontSize = 12.sp,
-                    color = GratiaTheme.colors.textSecondary.copy(alpha = 0.6f)
+        // --- Current song info header ---
+        if (current != null) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CoverArtImage(
+                    coverArtPath = current.coverArtPath,
+                    title = current.title,
+                    artist = current.artist,
+                    size = 48.dp,
+                    cornerRadius = 10.dp,
+                    fontSize = 14.sp
                 )
-                if (queue.isNotEmpty()) {
-                    Spacer(Modifier.width(12.dp))
+
+                Spacer(Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "CLEAR",
-                        fontFamily = Inter,
+                        current.title,
+                        fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp,
-                        color = GratiaTheme.colors.accent,
-                        modifier = Modifier.clickable { 
-                            playerViewModel.clearQueue()
-                            onDismiss()
-                        }.padding(4.dp)
+                        fontSize = 15.sp,
+                        color = GratiaTheme.colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        current.artist,
+                        fontFamily = Inter,
+                        fontSize = 12.sp,
+                        color = GratiaTheme.colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Three-dots menu
+                IconButton(onClick = { /* Could open song menu */ }) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = "Now playing",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+
+            // --- Shuffle / Repeat pill buttons ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Shuffle pill
+                ShufflePill(
+                    isActive = shuffleEnabled,
+                    onClick = { playerViewModel.toggleShuffle() },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Repeat pill
+                RepeatPill(
+                    repeatMode = repeatMode,
+                    onClick = { playerViewModel.cycleRepeatMode() },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // --- "Continue Playing" header ---
+            Text(
+                "Continue Playing",
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = GratiaTheme.colors.textPrimary,
+                modifier = Modifier.padding(horizontal = 24.dp)
+            )
+            Text(
+                "From ${current.album ?: "your library"}",
+                fontFamily = Inter,
+                fontSize = 12.sp,
+                color = GratiaTheme.colors.textSecondary,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+            )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
 
         if (queue.isEmpty()) {
-            // Empty state
             QueueEmptyState()
         } else {
             val listState = rememberReorderableLazyListState(
                 onMove = { from, to ->
-                    // Reorder the queue via viewmodel
-                    // Note: from.index and to.index are based on LazyColumn items
-                    // We need to adjust by the number of headers
-                    val headerCount = if (current != null) 2 else 0
-                    val fromAdjusted = from.index - headerCount + upcomingStartIndex
-                    val toAdjusted = to.index - headerCount + upcomingStartIndex
+                    val fromAdjusted = from.index + upcomingStartIndex
+                    val toAdjusted = to.index + upcomingStartIndex
                     if (fromAdjusted >= upcomingStartIndex && toAdjusted >= upcomingStartIndex && fromAdjusted < queue.size && toAdjusted < queue.size) {
                         playerViewModel.moveInQueue(fromAdjusted, toAdjusted)
                     }
@@ -151,30 +220,6 @@ fun QueueSheet(
                     .reorderable(listState),
                 contentPadding = PaddingValues(bottom = 32.dp)
             ) {
-                // Current song — pinned with highlight
-                if (current != null) {
-                    item(key = "now_playing_${current.id}") {
-                        NowPlayingRow(
-                            song = current,
-                            modifier = Modifier.animateItem()
-                        )
-                    }
-
-                    item {
-                        // "Up Next" divider
-                        Text(
-                            "UP NEXT",
-                            fontFamily = Inter,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 10.sp,
-                            letterSpacing = 2.sp,
-                            color = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                        )
-                    }
-                }
-
-                // Upcoming songs
                 val upcoming = if (upcomingStartIndex < queue.size) {
                     queue.subList(upcomingStartIndex, queue.size)
                 } else emptyList()
@@ -236,57 +281,99 @@ fun QueueSheet(
 }
 
 /**
- * Now Playing row — highlighted with accent color.
+ * Shuffle pill button — rounded, filled when active.
  */
 @Composable
-private fun NowPlayingRow(
-    song: SongEntity,
+private fun ShufflePill(
+    isActive: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    val hapticFeedback = LocalHapticFeedback.current
+    val bgColor by animateColorAsState(
+        targetValue = if (isActive) GratiaTheme.colors.accent.copy(alpha = 0.3f) else GratiaTheme.colors.surfaceHover,
+        animationSpec = tween(200),
+        label = "shuffleBg"
+    )
+
+    Box(
         modifier = modifier
-            .fillMaxWidth()
-            .background(GratiaTheme.colors.accent.copy(alpha = 0.08f))
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(bgColor)
+            .clickable {
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
     ) {
-        CoverArtImage(
-            coverArtPath = song.coverArtPath,
-            title = song.title,
-            artist = song.artist,
-            size = 44.dp,
-            cornerRadius = 10.dp,
-            fontSize = 12.sp
-        )
-
-        Spacer(Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                song.title,
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
-                color = GratiaTheme.colors.accent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                song.artist,
-                fontFamily = Inter,
-                fontSize = 12.sp,
-                color = GratiaTheme.colors.textSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
         Icon(
-            Icons.Default.PlayArrow,
-            contentDescription = "Now playing",
-            tint = GratiaTheme.colors.accent,
+            Icons.Default.Shuffle,
+            contentDescription = "Shuffle",
+            tint = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+/**
+ * Repeat pill button with badge showing repeat count.
+ * OFF: dimmed icon, no badge
+ * ONE: highlighted icon + "1" badge
+ * TWO: highlighted icon + "2" badge
+ */
+@Composable
+private fun RepeatPill(
+    repeatMode: RepeatMode,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hapticFeedback = LocalHapticFeedback.current
+    val isActive = repeatMode != RepeatMode.OFF
+    val bgColor by animateColorAsState(
+        targetValue = if (isActive) GratiaTheme.colors.accent.copy(alpha = 0.3f) else GratiaTheme.colors.surfaceHover,
+        animationSpec = tween(200),
+        label = "repeatBg"
+    )
+
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(bgColor)
+            .clickable {
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Repeat,
+                contentDescription = "Repeat",
+                tint = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                modifier = Modifier.size(20.dp)
+            )
+
+            // Show badge with count
+            if (isActive) {
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = when (repeatMode) {
+                        RepeatMode.ONE -> "1"
+                        RepeatMode.TWO -> "2"
+                        else -> ""
+                    },
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    color = GratiaTheme.colors.accent
+                )
+            }
+        }
     }
 }
 
@@ -318,7 +405,7 @@ private fun QueueRow(
             coverArtPath = song.coverArtPath,
             title = song.title,
             artist = song.artist,
-            size = 40.dp,
+            size = 44.dp,
             cornerRadius = 8.dp,
             fontSize = 11.sp
         )
@@ -330,7 +417,7 @@ private fun QueueRow(
                 song.title,
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
+                fontSize = 14.sp,
                 color = GratiaTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -338,30 +425,14 @@ private fun QueueRow(
             Text(
                 song.artist,
                 fontFamily = Inter,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = GratiaTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
 
-        // Remove button
-        IconButton(
-            onClick = {
-                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                onRemove()
-            },
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "Remove from queue",
-                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
-                modifier = Modifier.size(16.dp)
-            )
-        }
-
-        // Drag handle (visual cue)
+        // Drag handle
         Icon(
             Icons.Default.DragHandle,
             contentDescription = "Reorder",
@@ -386,7 +457,7 @@ private fun QueueEmptyState() {
         ) {
             Icon(
                 Icons.Default.MusicNote,
-                contentDescription = "Drag handle",
+                contentDescription = "Empty queue",
                 tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.2f),
                 modifier = Modifier.size(64.dp)
             )
@@ -410,7 +481,7 @@ private fun QueueEmptyState() {
                 color = GratiaTheme.colors.textSecondary.copy(alpha = 0.6f),
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(horizontal = 32.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
         }
     }

@@ -14,6 +14,10 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 
+/**
+ * Background worker that syncs missing cover art and genre data from Deezer.
+ * Runs after every media scan to fill in gaps.
+ */
 class CoverArtSyncWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -25,34 +29,51 @@ class CoverArtSyncWorker(
             val db = GratiaDatabase.getInstance(applicationContext)
             val songRepo = SongRepository(db.songDao())
 
-            val missingCoverSongs = songRepo.getSongsWithoutCover()
-            if (missingCoverSongs.isEmpty()) {
-                Log.d("CoverArtSync", "No songs missing cover art.")
+            // Fetch all songs to check for missing cover art AND genre
+            val allSongs = songRepo.getAllSongsOnce()
+            val songsNeedingWork = allSongs.filter { song ->
+                song.coverArtPath.isNullOrBlank() || song.genre.isNullOrBlank()
+            }
+
+            if (songsNeedingWork.isEmpty()) {
+                Log.d("CoverArtSync", "No songs need cover art or genre sync.")
                 return@withContext Result.success()
             }
 
-            var successCount = 0
-            for (song in missingCoverSongs) {
+            var coverCount = 0
+            var genreCount = 0
+
+            for (song in songsNeedingWork) {
                 if (isStopped) break
 
-                val coverUrl = CoverArtFetcher.searchDeezerArt(song.artist, song.title)
-                if (coverUrl != null) {
-                    val bitmap = downloadBitmap(coverUrl)
-                    if (bitmap != null) {
-                        val path = CoverArtManager.saveCoverToInternal(applicationContext, song.id, bitmap)
-                        songRepo.updateCoverArt(song.id, path, "deezer")
-                        successCount++
+                val result = CoverArtFetcher.searchDeezer(song.artist, song.title)
+
+                if (result != null) {
+                    // Save cover art if missing
+                    if (song.coverArtPath.isNullOrBlank() && result.coverUrl != null) {
+                        val bitmap = downloadBitmap(result.coverUrl)
+                        if (bitmap != null) {
+                            val path = CoverArtManager.saveCoverToInternal(applicationContext, song.id, bitmap)
+                            songRepo.updateCoverArt(song.id, path, "deezer")
+                            coverCount++
+                        }
+                    }
+
+                    // Save genre if missing
+                    if (song.genre.isNullOrBlank() && !result.genre.isNullOrBlank()) {
+                        songRepo.updateGenre(song.id, result.genre)
+                        genreCount++
                     }
                 }
-                
+
                 // Throttle to avoid rate limits
-                delay(300)
+                delay(400)
             }
 
-            Log.d("CoverArtSync", "Finished syncing cover art. Found $successCount new covers.")
+            Log.d("CoverArtSync", "Finished syncing. Covers: $coverCount, Genres: $genreCount")
             Result.success()
         } catch (e: Exception) {
-            Log.e("CoverArtSync", "Error syncing covers", e)
+            Log.e("CoverArtSync", "Error syncing", e)
             Result.failure()
         }
     }

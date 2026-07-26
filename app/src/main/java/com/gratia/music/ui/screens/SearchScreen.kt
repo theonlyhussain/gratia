@@ -5,6 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,11 +30,17 @@ import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.*
 import com.gratia.music.ui.theme.GratiaTheme
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(playerViewModel: PlayerViewModel) {
+fun SearchScreen(
+    playerViewModel: PlayerViewModel,
+    onNavigateToGenre: (String) -> Unit = {}
+) {
     val context = LocalContext.current
     val settingsDataStore = remember { SettingsDataStore(context) }
     val searchHistory by settingsDataStore.searchHistoryFlow.collectAsState(initial = emptySet())
@@ -39,6 +48,7 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     var query by remember { mutableStateOf("") }
     val results by songRepo.search(query.ifBlank { "§§NOMATCH§§" }).collectAsState(initial = emptyList())
+    val genres by songRepo.getDistinctGenres().collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val scope = rememberCoroutineScope()
@@ -161,12 +171,34 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
 
         if (query.isBlank()) {
             if (searchHistory.isEmpty()) {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    EmptyStateView(
-                        icon = Icons.Default.Search,
-                        headline = "Search your library",
-                        description = "Find any song, artist, album, or matching lyric."
-                    )
+                // Show genre cards grid
+                if (genres.isNotEmpty()) {
+                    AppleSectionHeader(title = "Browse Categories")
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 120.dp)
+                    ) {
+                        items(genres) { genre ->
+                            GenreCard(
+                                genre = genre,
+                                onClick = { onNavigateToGenre(genre) }
+                            )
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                        EmptyStateView(
+                            icon = Icons.Default.Search,
+                            headline = "Search your library",
+                            description = "Find any song, artist, album, or matching lyric."
+                        )
+                    }
                 }
             } else {
                 // Search History Apple Style
@@ -239,5 +271,49 @@ fun SearchScreen(playerViewModel: PlayerViewModel) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Genre card with gradient background for the browse categories grid.
+ * Uses a deterministic color based on the genre name hash.
+ */
+@Composable
+private fun GenreCard(
+    genre: String,
+    onClick: () -> Unit
+) {
+    val hash = abs(genre.hashCode())
+    val palette = listOf(
+        listOf(Color(0xFF810100), Color(0xFFA65D03)), // Red → Amber
+        listOf(Color(0xFF1DB954), Color(0xFF0D7041)), // Green tones
+        listOf(Color(0xFF2D46B9), Color(0xFF1F3179)), // Blue
+        listOf(Color(0xFF8B4513), Color(0xFFA0522D)), // Brown → Sienna
+        listOf(Color(0xFF6B3FA0), Color(0xFF9C27B0)), // Purple
+        listOf(Color(0xFF00838F), Color(0xFF006064)), // Teal
+        listOf(Color(0xFFE65100), Color(0xFFBF360C)), // Deep Orange
+        listOf(Color(0xFF283593), Color(0xFF1A237E)), // Indigo
+    )
+    val gradientColors = palette[hash % palette.size]
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                Brush.linearGradient(gradientColors)
+            )
+            .clickable { onClick() }
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(
+            text = genre,
+            fontFamily = com.gratia.music.ui.theme.SpaceGrotesk,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = Color.White
+        )
     }
 }

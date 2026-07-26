@@ -53,4 +53,11 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun updateCoverArt(id: String, path: String, source: String) =
         songDao.updateCoverArt(id, path, source)
+
+    suspend fun updateGenre(id: String, genre: String) =
+        songDao.updateGenre(id, genre)
+
+    fun getDistinctGenres(): Flow<List<String>> = songDao.getDistinctGenres()
+
+    fun getSongsByGenre(genre: String): Flow<List<SongEntity>> = songDao.getSongsByGenre(genre)
 }

@@ -1,97 +1,60 @@
 package com.gratia.music.ui.player
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.gratia.music.player.RepeatMode
-import com.gratia.music.ui.components.GratiaIcon
 import com.gratia.music.ui.theme.GratiaTheme
 
 /**
- * Secondary action rows beneath the primary controls.
- * Mimics Apple Music's bottom area:
- *
- * Row 1: Volume Slider (Placeholder)
- * Row 2: Lyrics · Cast · Queue
+ * Bottom action row with only two buttons: Lyrics and Queue.
+ * Matches Apple Music's minimalist bottom bar.
  */
 @Composable
 fun SecondaryActionRow(
-    shuffleEnabled: Boolean, // Kept in signature, but unused in this view to match Apple Music
-    repeatMode: RepeatMode, // Kept in signature, but unused
-    isFavorite: Boolean, // Kept in signature, but unused (moved to header or menu usually)
     hasLyrics: Boolean = true,
-    onToggleShuffle: () -> Unit,
-    onCycleRepeat: () -> Unit,
-    onToggleFavorite: () -> Unit,
-    onOpenQueue: () -> Unit,
-    onOpenSleepTimer: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
-    accentColor: Color = GratiaTheme.colors.accent
+    isLyricsActive: Boolean = false
 ) {
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = GratiaTheme.spacing.large), // 32dp
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(horizontal = GratiaTheme.spacing.large),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Removed Volume Slider Placeholder
+        // Lyrics
+        PlayerButton(
+            icon = Icons.Default.ChatBubbleOutline,
+            onClick = if (hasLyrics) onOpenLyrics else { {} },
+            contentDescription = "Lyrics",
+            size = 48.dp,
+            iconSize = 24.dp,
+            tint = when {
+                isLyricsActive -> Color.White
+                hasLyrics -> Color.White.copy(alpha = 0.6f)
+                else -> Color.White.copy(alpha = 0.2f)
+            }
+        )
 
-        // Row 2: Lyrics · Cast (Placeholder) · Queue
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Lyrics
-            PlayerButton(
-                icon = Icons.Default.ChatBubbleOutline, // Apple music uses a quote icon, ChatBubbleOutline is close
-                onClick = if (hasLyrics) onOpenLyrics else { {} },
-                contentDescription = "Lyrics",
-                size = 48.dp,
-                iconSize = 24.dp,
-                tint = if (hasLyrics) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f)
-            )
-
-            // Sleep Timer
-            PlayerButton(
-                icon = Icons.Outlined.Bedtime,
-                onClick = onOpenSleepTimer,
-                contentDescription = "Sleep Timer",
-                size = 48.dp,
-                iconSize = 24.dp,
-                tint = Color.White.copy(alpha = 0.6f)
-            )
-
-            // Queue
-            PlayerButton(
-                icon = Icons.AutoMirrored.Filled.QueueMusic,
-                onClick = onOpenQueue,
-                contentDescription = "Queue",
-                size = 48.dp,
-                iconSize = 24.dp,
-                tint = Color.White.copy(alpha = 0.6f)
-            )
-        }
+        // Queue
+        PlayerButton(
+            icon = Icons.AutoMirrored.Filled.QueueMusic,
+            onClick = onOpenQueue,
+            contentDescription = "Queue",
+            size = 48.dp,
+            iconSize = 24.dp,
+            tint = Color.White.copy(alpha = 0.6f)
+        )
     }
 }
-
