@@ -2,11 +2,11 @@
 
 > **🚧 Under Active Development 🚧**
 > 
-> A modern, private Android music player focused on smooth playback, a beautiful Apple Music-inspired UI, and a personal listening experience.
+> A modern, private Android music player focused on smooth playback, a beautiful fluid UI, and a personal listening experience.
 
 ## Features
 
-- 🎨 **Apple Music-Style UI**: Edge-to-edge player, smooth spring animations, and a gorgeous glassmorphic queue sheet.
+- 🎨 **Immersive Player**: Edge-to-edge player with beautiful artwork, smooth spring animations, and a sleek queue sheet.
 - 🎵 **Synced Lyrics**: Dynamic, scrolling synced lyrics that overlay directly on the player.
 - 🏷️ **Automated Genre Detection**: Automatically fetches cover art and metadata (including genres) via Deezer API.
 - 🔒 **Local-First**: Complete privacy, offline listening, and no data tracking.
