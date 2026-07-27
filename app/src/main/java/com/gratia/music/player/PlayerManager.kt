@@ -555,6 +555,7 @@ class PlayerManager(private val context: Context) {
         if (listenedSec <= (if (reason == "pause") 1 else 0)) return
         scope.launch(Dispatchers.IO) {
             listeningRepo.logEvent(current.id, reason, listenedSec, completed = completed, skipped = skipped)
+            GratiaApp.instance.database.songDao().incrementListenTime(current.id, listenedSec * 1000)
         }
     }
 

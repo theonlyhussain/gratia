@@ -87,10 +87,22 @@ object GratiaTheme {
 
 @Composable
 fun GratiaTheme(
-    isDark: Boolean = isSystemInDarkTheme(),
+    themeOption: com.gratia.music.data.ThemeOption = com.gratia.music.data.ThemeOption.SYSTEM,
     content: @Composable () -> Unit
 ) {
-    val targetColors = if (isDark) darkGratiaColors else lightGratiaColors
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = when (themeOption) {
+        com.gratia.music.data.ThemeOption.LIGHT -> false
+        com.gratia.music.data.ThemeOption.DARK, com.gratia.music.data.ThemeOption.AMOLED -> true
+        com.gratia.music.data.ThemeOption.SYSTEM -> isSystemDark
+    }
+
+    val targetColors = when (themeOption) {
+        com.gratia.music.data.ThemeOption.AMOLED -> amoledGratiaColors
+        com.gratia.music.data.ThemeOption.LIGHT -> lightGratiaColors
+        com.gratia.music.data.ThemeOption.DARK -> darkGratiaColors
+        com.gratia.music.data.ThemeOption.SYSTEM -> if (isSystemDark) darkGratiaColors else lightGratiaColors
+    }
 
     val background by androidx.compose.animation.animateColorAsState(targetColors.background, label = "background")
     val surface by androidx.compose.animation.animateColorAsState(targetColors.surface, label = "surface")

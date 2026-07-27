@@ -67,58 +67,7 @@ fun StorageScreen(onNavigateBack: () -> Unit) {
             onClick = { }
         )
 
-        StorageCard(
-            icon = Icons.Default.Cloud,
-            title = "Google Drive",
-            subtitle = "Not connected",
-            isActive = false,
-            accentColor = Color(0xFF4285F4),
-            onClick = { showCloudDialog = "Google Drive" }
-        )
-
-        StorageCard(
-            icon = Icons.Default.CloudSync,
-            title = "Nextcloud / WebDAV",
-            subtitle = "Not connected",
-            isActive = false,
-            accentColor = Color(0xFF0082C9),
-            onClick = { showCloudDialog = "Nextcloud" }
-        )
-
-        StorageCard(
-            icon = Icons.Default.Settings,
-            title = "Advanced",
-            subtitle = "Not configured",
-            isActive = false,
-            accentColor = GratiaTheme.colors.textSecondary,
-            onClick = { showCloudDialog = "Advanced storage" }
-        )
-
         Spacer(Modifier.height(32.dp))
-    }
-
-    // Cloud not-configured dialog
-    if (showCloudDialog != null) {
-        AlertDialog(
-            onDismissRequest = { showCloudDialog = null },
-            containerColor = GratiaTheme.colors.surface,
-            title = {
-                Text("$showCloudDialog", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary)
-            },
-            text = {
-                Text(
-                    "$showCloudDialog connection is not configured yet.\n\nUse Local Device mode for now.",
-                    fontFamily = Inter,
-                    fontSize = 14.sp,
-                    color = GratiaTheme.colors.textSecondary
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showCloudDialog = null }) {
-                    Text("OK", color = GratiaTheme.colors.accent, fontFamily = Inter)
-                }
-            }
-        )
     }
 }
 

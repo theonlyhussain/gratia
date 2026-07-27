@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.map
 enum class ThemeOption(val value: String) {
     SYSTEM("system"),
     LIGHT("light"),
-    DARK("dark");
+    DARK("dark"),
+    AMOLED("amoled");
 
     companion object {
         fun fromValue(value: String): ThemeOption {

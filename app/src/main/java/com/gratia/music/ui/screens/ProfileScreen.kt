@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.*
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -72,6 +74,17 @@ fun ProfileScreen(
     var hasChanges by remember { mutableStateOf(false) }
     var saveSuccess by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+    val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val currentTheme by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
+    val versionName = remember {
+        try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName
+        } catch (e: Exception) {
+            "Unknown"
+        }
+    }
 
     // Load profile data
     LaunchedEffect(profileFlow) {
@@ -281,26 +294,36 @@ fun ProfileScreen(
                             .edit()
                             .putString("display_name", profile.displayName)
                             .apply()
-                        hasChanges = false
+                        
                         saveSuccess = true
+                        delay(1500)
+                        hasChanges = false
+                        saveSuccess = false
                     }
                 },
                 enabled = hasChanges && displayName.isNotBlank(),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = GratiaTheme.colors.accent,
+                    containerColor = if (saveSuccess) GratiaTheme.colors.success else GratiaTheme.colors.accent,
                     contentColor = GratiaTheme.colors.background,
                     disabledContainerColor = GratiaTheme.colors.surfaceHover,
                     disabledContentColor = GratiaTheme.colors.textSecondary
                 ),
                 modifier = Modifier.fillMaxWidth(0.6f).height(44.dp)
             ) {
-                Text("Save", fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            }
-
-            if (saveSuccess) {
-                Spacer(Modifier.height(8.dp))
-                Text("Profile saved!", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.success)
+                AnimatedContent(
+                    targetState = saveSuccess,
+                    transitionSpec = {
+                        (scaleIn(initialScale = 0.8f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.8f) + fadeOut())
+                    },
+                    label = "SaveButtonAnimation"
+                ) { isSuccess ->
+                    if (isSuccess) {
+                        Icon(Icons.Default.Check, contentDescription = "Saved", modifier = Modifier.size(20.dp))
+                    } else {
+                        Text("Save", fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+                }
             }
         }
 
@@ -335,15 +358,13 @@ fun ProfileScreen(
 
         ProfileSection(title = "PLAYBACK") {
             ProfileItem(icon = Icons.Default.Headset, label = "Total Listening Time", detail = "$listenMinutes minutes")
-            ProfileItem(icon = Icons.Default.HighQuality, label = "Audio Quality", detail = "Original quality preserved")
-            ProfileItem(icon = Icons.Default.Lyrics, label = "Lyrics", detail = "Plain & synced support")
         }
 
         ProfileSection(title = "ABOUT") {
-            ProfileItem(icon = Icons.Default.Palette, label = "Appearance", detail = "Gratia Warm Premium")
+            ProfileItem(icon = Icons.Default.Palette, label = "Appearance", detail = currentTheme.name.lowercase().replaceFirstChar { it.uppercase() }, onClick = { showThemeDialog = true })
             ProfileItem(icon = Icons.Default.PrivacyTip, label = "Privacy", detail = "All data stays on your device")
             ProfileItem(icon = Icons.Default.CalendarMonth, label = "Clear Listening History", detail = "Remove local calendar data", onClick = { showClearHistoryDialog = true })
-            ProfileItem(icon = Icons.Default.Info, label = "About Gratia", detail = "Version 1.0.0")
+            ProfileItem(icon = Icons.Default.Info, label = "About Gratia", detail = "Version $versionName")
         }
 
         Spacer(Modifier.height(32.dp))
@@ -357,7 +378,58 @@ fun ProfileScreen(
             Text("Your personal music library", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
         }
 
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(56.dp))
+    }
+
+    // Theme Selection Dialog
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            containerColor = GratiaTheme.colors.surface,
+            title = {
+                Text("Select Theme", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary)
+            },
+            text = {
+                Column {
+                    com.gratia.music.data.ThemeOption.values().forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    scope.launch {
+                                        settingsDataStore.setThemeOption(option)
+                                        showThemeDialog = false
+                                    }
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = option == currentTheme,
+                                onClick = {
+                                    scope.launch {
+                                        settingsDataStore.setThemeOption(option)
+                                        showThemeDialog = false
+                                    }
+                                },
+                                colors = RadioButtonDefaults.colors(selectedColor = GratiaTheme.colors.accent)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = option.name.lowercase().replaceFirstChar { it.uppercase() },
+                                fontFamily = Inter,
+                                color = GratiaTheme.colors.textPrimary
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showThemeDialog = false }) {
+                    Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = Inter)
+                }
+            }
+        )
     }
 
     if (showClearHistoryDialog) {

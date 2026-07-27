@@ -49,7 +49,7 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.components.liquidGlass
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
-    data object Home : Screen("home", "Listen Now", Icons.Outlined.PlayCircleOutline, Icons.Filled.PlayCircle)
+    data object Home : Screen("home", "Home", Icons.Outlined.PlayCircleOutline, Icons.Filled.PlayCircle)
     data object Browse : Screen("browse", "Browse", Icons.Outlined.Explore, Icons.Filled.Explore)
     data object Library : Screen("library", "Library", Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic)
     data object Search : Screen("search", "Search", Icons.Outlined.Search, Icons.Filled.Search)
@@ -72,17 +72,15 @@ fun GratiaAppRoot() {
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val themeOption by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
     val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val onboardingCompleted by settingsDataStore.onboardingCompletedFlow.collectAsState(initial = null)
-    
     val isDark = when (themeOption) {
         com.gratia.music.data.ThemeOption.LIGHT -> false
-        com.gratia.music.data.ThemeOption.DARK -> true
+        com.gratia.music.data.ThemeOption.DARK, com.gratia.music.data.ThemeOption.AMOLED -> true
         com.gratia.music.data.ThemeOption.SYSTEM -> isSystemDark
     }
-
+    val onboardingCompleted by settingsDataStore.onboardingCompletedFlow.collectAsState(initial = null)
     val snackbarHostState = remember { SnackbarHostState() }
 
-    GratiaTheme(isDark = isDark) {
+    GratiaTheme(themeOption = themeOption) {
         CompositionLocalProvider(
             LocalSnackbarHostState provides snackbarHostState,
             LocalNavController provides navController,

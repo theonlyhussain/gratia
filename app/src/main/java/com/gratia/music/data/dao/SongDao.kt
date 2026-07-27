@@ -86,6 +86,9 @@ interface SongDao {
     @Query("UPDATE songs SET playCount = playCount + 1, lastPlayedAt = :now WHERE id = :id")
     suspend fun incrementPlayCount(id: String, now: Long = System.currentTimeMillis())
 
+    @Query("UPDATE songs SET totalListenTime = totalListenTime + :timeMs WHERE id = :id")
+    suspend fun incrementListenTime(id: String, timeMs: Long)
+
     @Query("SELECT COUNT(*) FROM songs")
     fun getSongCount(): Flow<Int>
 

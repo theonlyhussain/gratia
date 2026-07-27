@@ -102,7 +102,7 @@ fun HomeScreen(
     ) {
         item {
             AppleLargeTitleHeader(
-                title = "Listen Now",
+                title = "Home",
                 action = {
                     Box(
                         modifier = Modifier
