@@ -27,7 +27,7 @@ fun CollageArtwork(
 
         if (validPaths.isEmpty()) {
             PlaylistFallback(size = size, cornerRadius = cornerRadius, modifier = Modifier.size(size))
-        } else if (validPaths.size == 1) {
+        } else if (validPaths.size < 4) {
             CoverArtImage(
                 coverArtPath = validPaths[0],
                 title = "Playlist",
@@ -35,24 +35,6 @@ fun CollageArtwork(
                 cornerRadius = 0.dp,
                 modifier = Modifier.size(size)
             )
-        } else if (validPaths.size in 2..3) {
-            val halfSize = size / 2
-            Row {
-                CoverArtImage(
-                    coverArtPath = validPaths[0],
-                    title = "Playlist",
-                    size = size,
-                    cornerRadius = 0.dp,
-                    modifier = Modifier.size(width = halfSize, height = size)
-                )
-                CoverArtImage(
-                    coverArtPath = validPaths[1],
-                    title = "Playlist",
-                    size = size,
-                    cornerRadius = 0.dp,
-                    modifier = Modifier.size(width = halfSize, height = size)
-                )
-            }
         } else {
             val halfSize = size / 2
             Column {

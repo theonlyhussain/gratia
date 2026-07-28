@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
@@ -77,10 +78,15 @@ fun QueueSheet(
         }
     }
 
-    val tintedBg by animateColorAsState(
-        targetValue = coverColors.dominant.copy(alpha = 0.15f),
+    val bgTop by animateColorAsState(
+        targetValue = coverColors.dominant,
         animationSpec = tween(500),
-        label = "queueBgTint"
+        label = "queueBgTop"
+    )
+    val bgBottom by animateColorAsState(
+        targetValue = coverColors.darkMuted,
+        animationSpec = tween(500),
+        label = "queueBgBottom"
     )
 
     Column(
@@ -88,8 +94,11 @@ fun QueueSheet(
             .fillMaxWidth()
             .fillMaxHeight(0.75f)
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(GratiaTheme.colors.surface)
-            .background(tintedBg) // Tinted overlay
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(bgTop, bgBottom)
+                )
+            )
             .padding(top = 12.dp)
     ) {
         // Drag indicator
@@ -98,7 +107,7 @@ fun QueueSheet(
                 .width(36.dp)
                 .height(4.dp)
                 .clip(RoundedCornerShape(2.dp))
-                .background(GratiaTheme.colors.textSecondary.copy(alpha = 0.3f))
+                .background(Color.White.copy(alpha = 0.3f))
                 .align(Alignment.CenterHorizontally)
         )
 
@@ -129,7 +138,7 @@ fun QueueSheet(
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
-                        color = GratiaTheme.colors.textPrimary,
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -137,7 +146,7 @@ fun QueueSheet(
                         current.artist,
                         fontFamily = Inter,
                         fontSize = 12.sp,
-                        color = GratiaTheme.colors.textSecondary,
+                        color = Color.White.copy(alpha = 0.7f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -148,7 +157,7 @@ fun QueueSheet(
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = "Now playing",
-                        tint = GratiaTheme.colors.accent,
+                        tint = Color.White.copy(alpha = 0.8f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -186,14 +195,14 @@ fun QueueSheet(
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = GratiaTheme.colors.textPrimary,
+                color = Color.White,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
             Text(
                 "From ${current.album ?: "your library"}",
                 fontFamily = Inter,
                 fontSize = 12.sp,
-                color = GratiaTheme.colors.textSecondary,
+                color = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
             )
         }
@@ -291,7 +300,7 @@ private fun ShufflePill(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val bgColor by animateColorAsState(
-        targetValue = if (isActive) GratiaTheme.colors.accent.copy(alpha = 0.3f) else GratiaTheme.colors.surfaceHover,
+        targetValue = if (isActive) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
         animationSpec = tween(200),
         label = "shuffleBg"
     )
@@ -310,17 +319,17 @@ private fun ShufflePill(
         Icon(
             Icons.Default.Shuffle,
             contentDescription = "Shuffle",
-            tint = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+            tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
             modifier = Modifier.size(20.dp)
         )
     }
 }
 
 /**
- * Repeat pill button with badge showing repeat count.
+ * Repeat pill button with badge.
  * OFF: dimmed icon, no badge
+ * ALL: highlighted icon
  * ONE: highlighted icon + "1" badge
- * TWO: highlighted icon + "2" badge
  */
 @Composable
 private fun RepeatPill(
@@ -331,7 +340,7 @@ private fun RepeatPill(
     val hapticFeedback = LocalHapticFeedback.current
     val isActive = repeatMode != RepeatMode.OFF
     val bgColor by animateColorAsState(
-        targetValue = if (isActive) GratiaTheme.colors.accent.copy(alpha = 0.3f) else GratiaTheme.colors.surfaceHover,
+        targetValue = if (isActive) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
         animationSpec = tween(200),
         label = "repeatBg"
     )
@@ -354,23 +363,19 @@ private fun RepeatPill(
             Icon(
                 Icons.Default.Repeat,
                 contentDescription = "Repeat",
-                tint = if (isActive) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )
 
-            // Show badge with count
-            if (isActive) {
+            // Show badge for repeat one
+            if (repeatMode == RepeatMode.ONE) {
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    text = when (repeatMode) {
-                        RepeatMode.ONE -> "1"
-                        RepeatMode.TWO -> "2"
-                        else -> ""
-                    },
+                    text = "1",
                     fontFamily = Inter,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
-                    color = GratiaTheme.colors.accent
+                    color = Color.White
                 )
             }
         }
@@ -418,7 +423,7 @@ private fun QueueRow(
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
-                color = GratiaTheme.colors.textPrimary,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -426,7 +431,7 @@ private fun QueueRow(
                 song.artist,
                 fontFamily = Inter,
                 fontSize = 12.sp,
-                color = GratiaTheme.colors.textSecondary,
+                color = Color.White.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -436,7 +441,7 @@ private fun QueueRow(
         Icon(
             Icons.Default.DragHandle,
             contentDescription = "Reorder",
-            tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.3f),
+            tint = Color.White.copy(alpha = 0.3f),
             modifier = Modifier.size(20.dp)
         )
     }
@@ -458,7 +463,7 @@ private fun QueueEmptyState() {
             Icon(
                 Icons.Default.MusicNote,
                 contentDescription = "Empty queue",
-                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.2f),
+                tint = Color.White.copy(alpha = 0.2f),
                 modifier = Modifier.size(64.dp)
             )
 
@@ -469,7 +474,7 @@ private fun QueueEmptyState() {
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
-                color = GratiaTheme.colors.textPrimary
+                color = Color.White
             )
 
             Spacer(Modifier.height(8.dp))
@@ -478,7 +483,7 @@ private fun QueueEmptyState() {
                 "Play a song and it will appear here\nwith the rest of your queue",
                 fontFamily = Inter,
                 fontSize = 13.sp,
-                color = GratiaTheme.colors.textSecondary.copy(alpha = 0.6f),
+                color = Color.White.copy(alpha = 0.5f),
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(horizontal = 32.dp),
                 textAlign = TextAlign.Center

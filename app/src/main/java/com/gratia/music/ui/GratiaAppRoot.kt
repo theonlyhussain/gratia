@@ -91,10 +91,20 @@ fun GratiaAppRoot() {
                 if (onboardingCompleted == null) {
                     Box(modifier = Modifier.fillMaxSize().background(GratiaTheme.colors.background))
                 } else if (onboardingCompleted == false) {
-                    com.gratia.music.ui.onboarding.PermissionIntroScreen(
-                        onFinished = { /* Automatically handled by flow update */ },
-                        settingsDataStore = settingsDataStore
-                    )
+                    var showPermissions by remember { mutableStateOf(false) }
+
+                    if (!showPermissions) {
+                        com.gratia.music.ui.onboarding.WelcomeScreen(
+                            selectedTheme = themeOption,
+                            settingsDataStore = settingsDataStore,
+                            onContinue = { showPermissions = true }
+                        )
+                    } else {
+                        com.gratia.music.ui.onboarding.PermissionIntroScreen(
+                            onFinished = { /* Automatically handled by flow update */ },
+                            settingsDataStore = settingsDataStore
+                        )
+                    }
                 } else {
                     Scaffold(
                     containerColor = GratiaTheme.colors.background,

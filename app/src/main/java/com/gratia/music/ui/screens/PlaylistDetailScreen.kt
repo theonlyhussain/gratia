@@ -44,7 +44,23 @@ import com.gratia.music.ui.selection.SelectableSongRow
 import com.gratia.music.ui.selection.SelectionManager
 import com.gratia.music.ui.selection.SelectionToolbar
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.data.CoverColorCache
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.material.icons.filled.CameraAlt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +76,8 @@ fun PlaylistDetailScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val hapticFeedback = LocalHapticFeedback.current
 
     val selectionManager = remember { SelectionManager() }
     val selectedIds by selectionManager.selectedIds.collectAsState()
@@ -71,10 +89,77 @@ fun PlaylistDetailScreen(
 
     val playlist = playlistFlow ?: return
 
+    val coverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                val file = File(context.filesDir, "playlist_cover_${playlist.id}.jpg")
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    playlistDao.insertPlaylist(playlist.copy(coverArtUri = file.absolutePath, updatedAt = System.currentTimeMillis()))
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+        }
+    }
+
+    // Colors for animated background
+    var color1 by remember { mutableStateOf(CoverColorCache.FALLBACK.darkMuted) }
+    var color2 by remember { mutableStateOf(CoverColorCache.FALLBACK.dominant) }
+
+    LaunchedEffect(playlistSongs) {
+        if (playlistSongs.isNotEmpty()) {
+            val colors1 = CoverColorCache.getColors(playlistSongs[0].id, playlistSongs[0].coverArtPath)
+            color1 = colors1.darkMuted
+            
+            if (playlistSongs.size > 1) {
+                val colors2 = CoverColorCache.getColors(playlistSongs[1].id, playlistSongs[1].coverArtPath)
+                color2 = colors2.darkMuted
+            } else {
+                color2 = colors1.dominant
+            }
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "PlaylistBg")
+    val animatedColor1 by infiniteTransition.animateColor(
+        initialValue = color1,
+        targetValue = color2,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BgColor1"
+    )
+    val animatedColor2 by infiniteTransition.animateColor(
+        initialValue = color2,
+        targetValue = color1,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "BgColor2"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.background)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        animatedColor1.copy(alpha = 0.5f),
+                        GratiaTheme.colors.background,
+                        GratiaTheme.colors.background
+                    )
+                )
+            )
     ) {
         LazyColumn(
             contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
@@ -90,12 +175,47 @@ fun PlaylistDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     val paths = playlistSongs.take(4).map { it.coverArtPath }
-                    Box(modifier = Modifier.shadow(32.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent)) {
-                        CollageArtwork(
-                            paths = paths,
-                            size = 240.dp,
-                            cornerRadius = 24.dp
-                        )
+                    Box(
+                        modifier = Modifier
+                            .shadow(32.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent)
+                            .clickable {
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                coverPicker.launch(arrayOf("image/*"))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (playlist.coverArtUri != null && File(playlist.coverArtUri).exists()) {
+                            AsyncImage(
+                                model = File(playlist.coverArtUri),
+                                contentDescription = "Playlist Cover",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(240.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                            )
+                        } else {
+                            CollageArtwork(
+                                paths = paths,
+                                size = 240.dp,
+                                cornerRadius = 24.dp
+                            )
+                        }
+                        
+                        // Edit overlay icon
+                        Box(
+                            modifier = Modifier
+                                .size(240.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Color.Black.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = "Change Cover",
+                                tint = Color.White.copy(alpha = 0.8f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
                     }
                     
                     Spacer(Modifier.height(GratiaTheme.spacing.large))

@@ -119,8 +119,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun addToQueue(song: SongEntity) = playerManager.addToQueue(song)
 
     fun toggleFavorite(song: SongEntity) {
+        val newFavorite = !song.isFavorite
         viewModelScope.launch {
-            songRepository.toggleFavorite(song.id, !song.isFavorite)
+            // 1. Persist to database
+            songRepository.toggleFavorite(song.id, newFavorite)
+
+            // 2. Update in-memory currentSong so the UI immediately reflects
+            val updatedSong = song.copy(isFavorite = newFavorite)
+            if (playerManager.currentSong.value?.id == song.id) {
+                playerManager.updateCurrentSongState(updatedSong)
+            }
+
+            // 3. Update the song in the queue list as well
+            playerManager.updateSongInQueue(song.id, updatedSong)
         }
     }
 

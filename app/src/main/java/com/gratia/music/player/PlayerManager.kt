@@ -421,9 +421,9 @@ class PlayerManager(private val context: Context) {
 
     fun cycleRepeatMode() {
         _repeatMode.value = when (_repeatMode.value) {
-            RepeatMode.OFF -> RepeatMode.ONE
-            RepeatMode.ONE -> RepeatMode.TWO
-            RepeatMode.TWO -> RepeatMode.OFF
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
         }
         Log.d(TAG, "cycleRepeatMode: ${_repeatMode.value}")
     }
@@ -483,22 +483,27 @@ class PlayerManager(private val context: Context) {
     private fun handleSongEnded() {
         when (_repeatMode.value) {
             RepeatMode.ONE -> {
-                // Repeat once, then go back to OFF and continue queue
-                Log.d(TAG, "handleSongEnded: REPEAT_ONE — restarting once, then OFF")
-                _repeatMode.value = RepeatMode.OFF
+                // Repeat current song indefinitely
+                Log.d(TAG, "handleSongEnded: REPEAT_ONE — restarting current song")
                 if (!ensureConnected()) return
                 val controller = mediaController ?: return
                 controller.seekTo(0)
                 controller.play()
             }
-            RepeatMode.TWO -> {
-                // Repeat twice: first replay decrements to ONE
-                Log.d(TAG, "handleSongEnded: REPEAT_TWO — restarting, decrement to ONE")
-                _repeatMode.value = RepeatMode.ONE
-                if (!ensureConnected()) return
-                val controller = mediaController ?: return
-                controller.seekTo(0)
-                controller.play()
+            RepeatMode.ALL -> {
+                // Loop the entire queue — when at end, go back to first song
+                val current = _currentSong.value ?: return
+                val q = _queue.value
+                val currentIndex = q.indexOfFirst { it.id == current.id }
+                if (currentIndex < q.size - 1) {
+                    Log.d(TAG, "handleSongEnded: REPEAT_ALL — next in queue")
+                    nextSong()
+                } else {
+                    Log.d(TAG, "handleSongEnded: REPEAT_ALL — looping back to start")
+                    if (q.isNotEmpty()) {
+                        playSong(q.first(), q)
+                    }
+                }
             }
             RepeatMode.OFF -> {
                 val current = _currentSong.value ?: return
@@ -557,6 +562,21 @@ class PlayerManager(private val context: Context) {
             listeningRepo.logEvent(current.id, reason, listenedSec, completed = completed, skipped = skipped)
             GratiaApp.instance.database.songDao().incrementListenTime(current.id, listenedSec * 1000)
         }
+    }
+
+    /**
+     * Update the in-memory currentSong state without changing playback.
+     * Used when metadata (like isFavorite) changes while the song is playing.
+     */
+    fun updateCurrentSongState(song: SongEntity) {
+        _currentSong.value = song
+    }
+
+    /**
+     * Update a song's metadata in the queue list without changing playback order.
+     */
+    fun updateSongInQueue(songId: String, updatedSong: SongEntity) {
+        _queue.value = _queue.value.map { if (it.id == songId) updatedSong else it }
     }
 
     /**
@@ -621,5 +641,5 @@ fun SongEntity.toMediaItem(): MediaItem {
 }
 
 enum class RepeatMode {
-    OFF, ONE, TWO
+    OFF, ALL, ONE
 }

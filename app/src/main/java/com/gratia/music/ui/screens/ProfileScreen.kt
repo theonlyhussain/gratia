@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.*
+import androidx.compose.animation.core.spring
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +24,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +52,7 @@ fun ProfileScreen(
     onNavigateToStorage: () -> Unit
 ) {
     val context = LocalContext.current
+    val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     val profileDao = remember { GratiaApp.instance.database.userProfileDao() }
@@ -295,8 +299,9 @@ fun ProfileScreen(
                             .putString("display_name", profile.displayName)
                             .apply()
                         
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                         saveSuccess = true
-                        delay(1500)
+                        delay(2000)
                         hasChanges = false
                         saveSuccess = false
                     }
@@ -314,7 +319,8 @@ fun ProfileScreen(
                 AnimatedContent(
                     targetState = saveSuccess,
                     transitionSpec = {
-                        (scaleIn(initialScale = 0.8f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.8f) + fadeOut())
+                        (scaleIn(initialScale = 0.5f, animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f)) + fadeIn()) togetherWith 
+                        (scaleOut(targetScale = 0.8f) + fadeOut())
                     },
                     label = "SaveButtonAnimation"
                 ) { isSuccess ->

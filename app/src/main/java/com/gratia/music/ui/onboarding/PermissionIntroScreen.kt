@@ -132,6 +132,20 @@ fun PermissionIntroScreen(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "On newer Android versions, you will see multiple permission requests. Please grant access to audio files and notifications for the best experience.",
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp,
+                        color = GratiaTheme.colors.accent,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(48.dp))
 
                 LazyColumn(
