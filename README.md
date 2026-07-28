@@ -4,7 +4,7 @@
 
 **The Local-First Android Music Player**
 
-A modern, meticulously crafted music player focused on fluid playback, stunning Apple-inspired UI, and a deeply personal, ad-free listening experience.
+A modern, meticulously crafted music player focused on fluid playback, stunning UI, ad-free listening experience.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg?logo=kotlin)](http://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Compose-Jetpack-4285F4.svg?logo=android)](https://developer.android.com/jetpack/compose)
