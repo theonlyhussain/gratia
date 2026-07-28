@@ -103,9 +103,10 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
         }
 
         if (showCreateDialog) {
-            CreatePlaylistDialog(
+            com.gratia.music.ui.components.PlaylistEditorSheet(
+                initialSong = null,
                 onDismiss = { showCreateDialog = false },
-                onCreate = { name ->
+                onSave = { name, description, uri ->
                     scope.launch {
                         playlistDao.insertPlaylist(
                             PlaylistEntity(id = UUID.randomUUID().toString(), name = name, createdAt = System.currentTimeMillis())
@@ -153,51 +154,4 @@ fun PlaylistRow(playlist: PlaylistEntity, onClick: () -> Unit) {
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
-    var text by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            GratiaText(
-                text = "New Playlist",
-                style = GratiaTheme.typography.title,
-                color = GratiaTheme.colors.textPrimary
-            )
-        },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("Playlist Name") },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GratiaTheme.colors.accent,
-                    unfocusedBorderColor = GratiaTheme.colors.glassBorder,
-                    cursorColor = GratiaTheme.colors.accent
-                )
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { if (text.isNotBlank()) onCreate(text) },
-                colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.accent)
-            ) {
-                Text("Create")
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                colors = ButtonDefaults.textButtonColors(contentColor = GratiaTheme.colors.textSecondary)
-            ) {
-                Text("Cancel")
-            }
-        },
-        containerColor = GratiaTheme.colors.surface,
-        textContentColor = GratiaTheme.colors.textSecondary
-    )
 }

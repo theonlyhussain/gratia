@@ -18,7 +18,6 @@ import com.gratia.music.data.model.PlaylistEntity
 import com.gratia.music.data.model.PlaylistSongCrossRef
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.ui.LocalSnackbarHostState
-import com.gratia.music.ui.screens.CreatePlaylistDialog
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
@@ -150,11 +149,12 @@ fun AddToPlaylistSheet(
     }
 
     if (showCreateDialog) {
-        CreatePlaylistDialog(
+        PlaylistEditorSheet(
+            initialSong = song,
             onDismiss = { showCreateDialog = false },
-            onCreate = { name ->
+            onSave = { name, description, uri ->
                 scope.launch {
-                    val newId = UUID.randomUUID().toString()
+                    val newId = java.util.UUID.randomUUID().toString()
                     val now = System.currentTimeMillis()
                     val newPlaylist = PlaylistEntity(id = newId, name = name, createdAt = now, updatedAt = now)
                     playlistDao.insertPlaylist(newPlaylist)

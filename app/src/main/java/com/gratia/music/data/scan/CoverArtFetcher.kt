@@ -82,6 +82,41 @@ object CoverArtFetcher {
     }
 
     /**
+     * Searches Deezer API for the given artist and returns their high-res picture_xl URL.
+     */
+    fun searchDeezerArtist(artistName: String): String? {
+        try {
+            val cleanArtist = cleanSearchTerm(artistName)
+            if (cleanArtist.isEmpty() || cleanArtist.lowercase() == "unknown artist") return null
+
+            val encodedQuery = URLEncoder.encode(cleanArtist, "UTF-8")
+            val urlString = "https://api.deezer.com/search/artist?q=$encodedQuery&limit=1"
+
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(responseText)
+                val dataArray = json.optJSONArray("data")
+                if (dataArray != null && dataArray.length() > 0) {
+                    val firstResult = dataArray.getJSONObject(0)
+                    val pictureXl = firstResult.optString("picture_xl", "")
+                    if (pictureXl.isNotEmpty()) {
+                        return pictureXl
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch artist from Deezer: ${e.message}")
+        }
+        return null
+    }
+
+    /**
      * Fetch genre from album object. Tries the album's genre_id mapping.
      * Falls back to fetching the album details endpoint for genre info.
      */

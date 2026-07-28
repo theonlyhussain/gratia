@@ -30,10 +30,14 @@ fun CoverArtImage(
     fontSize: TextUnit = 16.sp,
     modifier: Modifier = Modifier
 ) {
-    if (!coverArtPath.isNullOrBlank() && File(coverArtPath).exists()) {
+    val isHttpUrl = coverArtPath?.startsWith("http") == true
+    val isLocalFile = !coverArtPath.isNullOrBlank() && !isHttpUrl && File(coverArtPath).exists()
+
+    if (isHttpUrl || isLocalFile) {
+        val modelData = if (isHttpUrl) coverArtPath else File(coverArtPath!!)
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(File(coverArtPath))
+                .data(modelData)
                 .crossfade(300)
                 .build(),
             contentDescription = "$title cover art",

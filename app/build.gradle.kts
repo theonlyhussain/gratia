@@ -80,7 +80,7 @@ android {
             val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val flavor = variant.name
             val version = variant.versionName
-            outputImpl.outputFileName = "Gratia_v${version}.apk"
+            outputImpl.outputFileName = "Gratia v${version}.apk"
         }
     }
 }

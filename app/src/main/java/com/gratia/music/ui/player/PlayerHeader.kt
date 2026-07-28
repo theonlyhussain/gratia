@@ -146,14 +146,14 @@ private fun FavoriteStarButton(
     // Circle background color
     val circleColor by animateColorAsState(
         targetValue = if (isFavorite) Color.White else Color.Transparent,
-        animationSpec = tween(250),
+        animationSpec = if (isFavorite) tween(0) else tween(200),
         label = "circleColor"
     )
 
     // Star icon color
     val starColor by animateColorAsState(
         targetValue = if (isFavorite) Color(0xFF1C1C1E) else Color.White.copy(alpha = 0.8f),
-        animationSpec = tween(250),
+        animationSpec = if (isFavorite) tween(0) else tween(200),
         label = "starColor"
     )
 

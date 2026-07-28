@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.scale
 import androidx.compose.animation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.clickable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -146,12 +147,23 @@ fun GratiaAppRoot() {
                         ) {
                             bottomNavItems.forEachIndexed { index, screen ->
                                 val selected = index == navIndex
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val isPressed by interactionSource.collectIsPressedAsState()
+                                val scale by androidx.compose.animation.core.animateFloatAsState(
+                                    targetValue = if (isPressed) 0.85f else 1.0f,
+                                    animationSpec = androidx.compose.animation.core.spring(
+                                        dampingRatio = 0.5f,
+                                        stiffness = 600f
+                                    ),
+                                    label = "navScale"
+                                )
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
                                         .fillMaxHeight()
+                                        .scale(scale)
                                         .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
+                                            interactionSource = interactionSource,
                                             indication = null, // Apple has no ripple
                                             onClick = {
                                                 navController.navigate(screen.route) {
@@ -168,10 +180,12 @@ fun GratiaAppRoot() {
                                 ) {
                                     val iconTint by androidx.compose.animation.animateColorAsState(
                                         targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                                        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
                                         label = "iconTint"
                                     )
                                     val textTint by androidx.compose.animation.animateColorAsState(
                                         targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                                        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
                                         label = "textTint"
                                     )
                                     Icon(

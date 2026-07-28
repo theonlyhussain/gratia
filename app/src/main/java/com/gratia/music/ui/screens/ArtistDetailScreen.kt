@@ -44,6 +44,16 @@ fun ArtistDetailScreen(
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
     val coverArtPath = artistSongs.firstOrNull()?.coverArtPath
+    var artistImageUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(artistName) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val url = com.gratia.music.data.scan.CoverArtFetcher.searchDeezerArtist(artistName)
+            if (url != null) {
+                artistImageUrl = url
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -79,7 +89,7 @@ fun ArtistDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CoverArtImage(
-                        coverArtPath = coverArtPath,
+                        coverArtPath = artistImageUrl ?: coverArtPath,
                         title = artistName,
                         artist = artistName,
                         size = 240.dp,
