@@ -2,7 +2,7 @@
   
 # 🎵 Gratia
 
-**The Premium Local-First Android Music Player**
+**The Local-First Android Music Player**
 
 A modern, meticulously crafted music player focused on fluid playback, stunning Apple-inspired UI, and a deeply personal, ad-free listening experience.
 
