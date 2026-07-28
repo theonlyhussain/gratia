@@ -15,6 +15,8 @@ class SongRepository(private val songDao: SongDao) {
     suspend fun getSongByLocalUri(localUri: String): SongEntity? = songDao.getSongByLocalUri(localUri)
 
     fun getSongByIdFlow(id: String): Flow<SongEntity?> = songDao.getSongByIdFlow(id)
+    
+    suspend fun getSongsByArtistDirect(artist: String): List<SongEntity> = songDao.getSongsByArtistDirect(artist)
 
     fun getFavorites(): Flow<List<SongEntity>> = songDao.getFavorites()
 

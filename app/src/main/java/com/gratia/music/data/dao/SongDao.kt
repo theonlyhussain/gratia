@@ -18,6 +18,9 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE id = :id")
     fun getSongByIdFlow(id: String): Flow<SongEntity?>
+    
+    @Query("SELECT * FROM songs WHERE artist = :artist ORDER BY playCount DESC")
+    suspend fun getSongsByArtistDirect(artist: String): List<SongEntity>
 
     @Query("SELECT * FROM songs WHERE isFavorite = 1 ORDER BY updatedAt DESC")
     fun getFavorites(): Flow<List<SongEntity>>

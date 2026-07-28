@@ -495,12 +495,7 @@ fun LyricsScreen(
             }
 
             // Bottom Player Control Panel
-            CompactControlsPanel(
-                playerViewModel = playerViewModel,
-                isPlaying = isPlaying,
-                currentTimeMs = visualTimeMs,
-                durationMs = durationMs
-            )
+
         }
     }
     
@@ -584,99 +579,6 @@ fun LyricsScreen(
     }
 }
 
-@Composable
-private fun CompactControlsPanel(
-    playerViewModel: PlayerViewModel,
-    isPlaying: Boolean,
-    currentTimeMs: Long,
-    durationMs: Long
-) {
-    val progress = if (durationMs > 0) currentTimeMs.toFloat() / durationMs.toFloat() else 0f
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        Slider(
-            value = progress,
-            onValueChange = { playerViewModel.seekTo((it * durationMs).toLong()) },
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = GratiaTheme.colors.accent,
-                inactiveTrackColor = Color.White.copy(alpha = 0.15f)
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatTime(currentTimeMs),
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.4f),
-                fontFamily = Inter
-            )
-            Text(
-                text = formatTime(durationMs),
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.4f),
-                fontFamily = Inter
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = { playerViewModel.prevSong() },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipPrevious,
-                    contentDescription = "Previous",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            IconButton(
-                onClick = { playerViewModel.togglePlay() },
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Play/Pause",
-                    tint = Color.Black,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            IconButton(
-                onClick = { playerViewModel.nextSong() },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SkipNext,
-                    contentDescription = "Next",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun EmptyLyricsState(

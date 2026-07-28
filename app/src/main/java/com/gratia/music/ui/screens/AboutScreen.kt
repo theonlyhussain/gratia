@@ -108,6 +108,15 @@ fun AboutScreen(
                     .padding(vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                val appVersion = packageInfo.versionName ?: "Unknown"
+                val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    packageInfo.longVersionCode.toString()
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageInfo.versionCode.toString()
+                }
+                
                 Image(
                     painter = painterResource(id = R.drawable.gratia_logo),
                     contentDescription = "Gratia Logo",
@@ -124,7 +133,7 @@ fun AboutScreen(
                     color = GratiaTheme.colors.textPrimary
                 )
                 Text(
-                    text = "Version 2.2.2",
+                    text = "Version $appVersion",
                     fontFamily = Inter,
                     fontSize = 14.sp,
                     color = GratiaTheme.colors.accent,
@@ -134,7 +143,6 @@ fun AboutScreen(
 
             AboutCard(title = "System Information") {
                 val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                val appVersion = packageInfo.versionName ?: "Unknown"
                 val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     packageInfo.longVersionCode.toString()
                 } else {

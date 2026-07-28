@@ -13,7 +13,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -22,12 +21,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +45,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gratia.music.data.SettingsDataStore
@@ -108,56 +114,57 @@ fun PermissionIntroScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(120.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        GratiaTheme.colors.accent.copy(alpha = 0.15f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = "Permissions",
+                        modifier = Modifier.size(48.dp),
+                        tint = GratiaTheme.colors.accent
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Text(
-                    text = "Grant Permissions",
+                    text = "You're Almost There",
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
                     color = GratiaTheme.colors.textPrimary,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    lineHeight = 36.sp
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Gratia needs a few permissions to play your local music, show playback notifications, and connect to your audio devices.",
+                    text = "Gratia needs a few permissions to seamlessly play your local music and display playback controls on your lock screen.",
                     fontFamily = Inter,
                     fontWeight = FontWeight.Normal,
                     fontSize = 16.sp,
                     color = GratiaTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
                     lineHeight = 24.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp)
                 )
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "On newer Android versions, you will see multiple permission requests. Please grant access to audio files and notifications for the best experience.",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp,
-                        color = GratiaTheme.colors.accent,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 20.sp,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(48.dp))
-
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(permissions, key = { it.permission }) { item ->
-                        PermissionCard(item = item)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.weight(1f))
 
                 val hasPermanentlyDenied = permissions.any { it.status == PermissionStatus.PERMANENTLY_DENIED }
                 

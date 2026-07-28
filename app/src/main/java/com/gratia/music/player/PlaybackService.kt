@@ -7,6 +7,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -61,12 +62,14 @@ class PlaybackService : MediaSessionService() {
             }
         })
             
-        mediaSession = MediaSession.Builder(this, masterPlayer)
+        val wrappedMasterPlayer = wrapPlayer(masterPlayer)
+        mediaSession = MediaSession.Builder(this, wrappedMasterPlayer)
             .build()
             
         engine.addPlayerSwapListener { newPlayer ->
             Log.d(TAG, "Player swapped during transition. Updating MediaSession.")
-            mediaSession?.player = newPlayer
+            val wrappedNewPlayer = wrapPlayer(newPlayer)
+            mediaSession?.player = wrappedNewPlayer
             
             // Need to re-listen for session ID changes on the new player
             newPlayer.addListener(object : Player.Listener {
@@ -93,6 +96,17 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
         return mediaSession
+    }
+    
+    private fun wrapPlayer(player: Player): Player {
+        return object : ForwardingPlayer(player) {
+            override fun getAvailableCommands(): Player.Commands {
+                return super.getAvailableCommands().buildUpon()
+                    .add(Player.COMMAND_SEEK_TO_NEXT)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .build()
+            }
+        }
     }
 
     override fun onDestroy() {

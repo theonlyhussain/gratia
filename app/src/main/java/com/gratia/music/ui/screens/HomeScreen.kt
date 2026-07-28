@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -35,9 +36,11 @@ import com.gratia.music.ui.components.AppleSectionHeader
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.GratiaEmptyState
 import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.RecommendedForYouCard
 import com.gratia.music.ui.components.TopPickCard
 import com.gratia.music.ui.components.RecentCard
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.data.network.ArtistImageFetcher
 import java.util.Calendar
 
 @Composable
@@ -55,6 +58,27 @@ fun HomeScreen(
     val lastAdded by songRepo.getLastAdded(10).collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
+
+    // Determine Top Artist for Recommendation
+    val recommendedArtist = remember(mostPlayed, recentlyPlayed) {
+        val allSongs = mostPlayed + recentlyPlayed
+        val artistCounts = allSongs.groupingBy { it.artist }.eachCount()
+        artistCounts.maxByOrNull { it.value }?.key
+    }
+    
+    val recommendedArtistSongs by produceState<List<SongEntity>>(initialValue = emptyList(), key1 = recommendedArtist) {
+        if (recommendedArtist != null) {
+            value = songRepo.getSongsByArtistDirect(recommendedArtist)
+        }
+    }
+    
+    var artistImageUrl by remember { mutableStateOf<String?>(null) }
+    
+    LaunchedEffect(recommendedArtist) {
+        if (recommendedArtist != null) {
+            artistImageUrl = ArtistImageFetcher.getArtistPictureUrl(recommendedArtist)
+        }
+    }
 
     val context = LocalContext.current
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
@@ -147,6 +171,40 @@ fun HomeScreen(
                             onClick = { playerViewModel.playSong(song, mostPlayed) }
                         )
                     }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+
+        // Recommended For You Card
+        if (recommendedArtist != null && recommendedArtistSongs.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                    androidx.compose.material3.Text(
+                        text = "Recommended For You",
+                        fontFamily = com.gratia.music.ui.theme.SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 22.sp,
+                        color = GratiaTheme.colors.textPrimary
+                    )
+                    androidx.compose.material3.Text(
+                        text = "Based on your listening history",
+                        fontFamily = com.gratia.music.ui.theme.Inter,
+                        fontSize = 14.sp,
+                        color = GratiaTheme.colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    RecommendedForYouCard(
+                        artistName = recommendedArtist,
+                        artistImageUrl = artistImageUrl,
+                        songs = recommendedArtistSongs,
+                        onPlay = {
+                            if (recommendedArtistSongs.isNotEmpty()) {
+                                playerViewModel.playSong(recommendedArtistSongs.first(), recommendedArtistSongs)
+                            }
+                        }
+                    )
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }

@@ -40,6 +40,7 @@ import androidx.compose.foundation.clickable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.activity.compose.BackHandler
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.player.ExpandedPlayer
 import com.gratia.music.ui.player.MiniPlayer
@@ -407,6 +408,9 @@ fun GratiaAppRoot() {
         }
 
         // Expanded Player Overlay
+        BackHandler(enabled = expandedPlayerOpen && currentSong != null) {
+            playerViewModel.setExpandedPlayerOpen(false)
+        }
         AnimatedVisibility(
             visible = expandedPlayerOpen && currentSong != null,
             enter = slideInVertically(
@@ -474,6 +478,9 @@ fun GratiaAppRoot() {
         }
 
         // Lyrics overlay (from lyrics button in expanded player)
+        BackHandler(enabled = lyricsOverlayOpen && currentSong != null) {
+            playerViewModel.setLyricsOverlayOpen(false)
+        }
         AnimatedVisibility(
             visible = lyricsOverlayOpen && currentSong != null,
             enter = slideInVertically(
