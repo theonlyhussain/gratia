@@ -62,4 +62,14 @@ class SongRepository(private val songDao: SongDao) {
     fun getDistinctGenres(): Flow<List<String>> = songDao.getDistinctGenres()
 
     fun getSongsByGenre(genre: String): Flow<List<SongEntity>> = songDao.getSongsByGenre(genre)
+
+    suspend fun getRandomSongByGenreExcludingArtist(genre: String, excludedArtist: String): SongEntity? = songDao.getRandomSongByGenreExcludingArtist(genre, excludedArtist)
+
+    suspend fun getRandomSongByGenre(genre: String): SongEntity? = songDao.getRandomSongByGenre(genre)
+
+    suspend fun getRandomSongExcludingGenre(excludedGenre: String): SongEntity? = songDao.getRandomSongExcludingGenre(excludedGenre)
+
+    suspend fun getRandomSongExcludingArtist(excludedArtist: String): SongEntity? = songDao.getRandomSongExcludingArtist(excludedArtist)
+
+    suspend fun getRandomSong(): SongEntity? = songDao.getRandomSong()
 }

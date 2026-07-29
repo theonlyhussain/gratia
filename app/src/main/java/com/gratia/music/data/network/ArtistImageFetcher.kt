@@ -12,8 +12,19 @@ object ArtistImageFetcher {
      * Fetches a high-quality artist picture URL using the Deezer Search API.
      * Deezer requires no API key for basic search.
      */
+    private var prefs: android.content.SharedPreferences? = null
+
+    fun init(context: android.content.Context) {
+        prefs = context.getSharedPreferences("artist_images", android.content.Context.MODE_PRIVATE)
+    }
+
     suspend fun getArtistPictureUrl(artistName: String): String? = withContext(Dispatchers.IO) {
         if (artistName.isBlank() || artistName == "<unknown>") return@withContext null
+        
+        val cached = prefs?.getString(artistName, null)
+        if (cached != null) {
+            return@withContext cached
+        }
         
         try {
             val encodedName = URLEncoder.encode(artistName, "UTF-8")
@@ -31,8 +42,13 @@ object ArtistImageFetcher {
                 if (dataArray != null && dataArray.length() > 0) {
                     val firstResult = dataArray.getJSONObject(0)
                     // Try to get the highest quality picture, fallback to medium
-                    return@withContext firstResult.optString("picture_xl", null) 
+                    val fetchedUrl = firstResult.optString("picture_xl", null) 
                         ?: firstResult.optString("picture_medium", null)
+                    
+                    if (fetchedUrl != null) {
+                        prefs?.edit()?.putString(artistName, fetchedUrl)?.apply()
+                    }
+                    return@withContext fetchedUrl
                 }
             }
         } catch (e: Exception) {

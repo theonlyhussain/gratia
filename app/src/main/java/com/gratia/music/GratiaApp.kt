@@ -31,6 +31,7 @@ class GratiaApp : Application() {
         instance = this
         database = GratiaDatabase.getInstance(this)
         preloadManager = com.gratia.music.player.PreloadManager(this)
+        com.gratia.music.data.network.ArtistImageFetcher.init(this)
         
         playerManager = PlayerManager(this)
         

@@ -56,6 +56,7 @@ fun HomeScreen(
     val recentlyPlayed by songRepo.getRecentlyPlayed(10).collectAsState(initial = emptyList())
     val mostPlayed by songRepo.getMostPlayed(10).collectAsState(initial = emptyList())
     val lastAdded by songRepo.getLastAdded(10).collectAsState(initial = emptyList())
+    val favoriteSongs by songRepo.getFavorites().collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
@@ -205,6 +206,24 @@ fun HomeScreen(
                             }
                         }
                     )
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+
+        if (favoriteSongs.isNotEmpty()) {
+            item {
+                AppleSectionHeader(title = "Your Favorites")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(favoriteSongs) { song ->
+                        RecentCard(
+                            song = song,
+                            onClick = { playerViewModel.playSong(song, favoriteSongs) }
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }

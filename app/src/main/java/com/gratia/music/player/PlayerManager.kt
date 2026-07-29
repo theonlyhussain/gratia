@@ -50,6 +50,10 @@ class PlayerManager(private val context: Context) {
     private var isConnecting = false
 
     private val listeningRepo = ListeningEventRepository(GratiaApp.instance.database.listeningEventDao())
+    private val songRepo = com.gratia.music.data.repository.SongRepository(GratiaApp.instance.database.songDao())
+
+    private val retentionManager = RetentionManager()
+    private val autoPlayEngine = AutoPlayEngine(songRepo)
 
     private var currentSessionStartTimeMs: Long = 0L
 
@@ -278,7 +282,7 @@ class PlayerManager(private val context: Context) {
         }
 
         _currentSong.value = song
-        _queue.value = songQueue
+        _queue.value = songQueue.toList() // Copy to prevent ConcurrentModificationException
         _currentTimeMs.value = 0L
         _playbackError.value = null
         updatePreloadManager()
@@ -304,7 +308,16 @@ class PlayerManager(private val context: Context) {
                 .setAlbumTitle(song.album ?: "Gratia")
             
             if (!song.coverArtPath.isNullOrBlank()) {
-                metadataBuilder.setArtworkUri(Uri.parse("file://${song.coverArtPath}"))
+                try {
+                    val uriString = if (song.coverArtPath.startsWith("content://") || song.coverArtPath.startsWith("http")) {
+                        song.coverArtPath
+                    } else {
+                        "file://${song.coverArtPath}"
+                    }
+                    metadataBuilder.setArtworkUri(Uri.parse(uriString))
+                } catch (e: Exception) {
+                    Log.e(TAG, "playSong: invalid artwork uri", e)
+                }
             }
 
             val mediaItem = MediaItem.Builder()
@@ -550,17 +563,61 @@ class PlayerManager(private val context: Context) {
         progressJob = null
     }
 
-    /**
-     * Helper to log listening events with safety checks.
-     */
     private fun logListeningEvent(reason: String, completed: Boolean = false, skipped: Boolean = false) {
         val current = _currentSong.value ?: return
         if (currentSessionStartTimeMs <= 0) return
         val listenedSec = (System.currentTimeMillis() - currentSessionStartTimeMs) / 1000
         if (listenedSec <= (if (reason == "pause") 1 else 0)) return
+        
+        // Process through RetentionManager
+        val action = retentionManager.processTrackEnd(listenedSec * 1000, _durationMs.value)
+        
         scope.launch(Dispatchers.IO) {
             listeningRepo.logEvent(current.id, reason, listenedSec, completed = completed, skipped = skipped)
             GratiaApp.instance.database.songDao().incrementListenTime(current.id, listenedSec * 1000)
+        }
+        
+        // Handle Auto-Play logic
+        handleAutoPlay(action, current)
+    }
+
+    private fun handleAutoPlay(action: QueueAction, evaluatedSong: SongEntity) {
+        scope.launch(Dispatchers.IO) {
+            val q = _queue.value
+            val currentActive = _currentSong.value ?: return@launch
+            val currentIndex = q.indexOfFirst { it.id == currentActive.id }
+            
+            // If the user is far from the end of the queue, and not frustrated, don't intervene yet.
+            if (action != QueueAction.RADICAL_SHIFT && currentIndex != -1 && currentIndex < q.size - 2) {
+                return@launch
+            }
+
+            Log.d(TAG, "handleAutoPlay: action=$action, evaluatedSong='${evaluatedSong.title}'")
+            
+            val nextTrack = autoPlayEngine.generateNextTrack(action, evaluatedSong, q.map { it.id })
+            if (nextTrack != null) {
+                if (action == QueueAction.RADICAL_SHIFT) {
+                    // Inject immediately after the currently playing song to change the vibe fast
+                    if (currentIndex != -1 && currentIndex + 1 < q.size) {
+                        Log.d(TAG, "AutoPlayEngine: Injecting vibe shift at index ${currentIndex + 1}")
+                        val newQueue = q.toMutableList()
+                        newQueue.add(currentIndex + 1, nextTrack)
+                        _queue.value = newQueue
+                    } else {
+                        // Append if at end
+                        val newQueue = q.toMutableList()
+                        newQueue.add(nextTrack)
+                        _queue.value = newQueue
+                    }
+                } else {
+                    // Just append to the end of the queue to keep music flowing
+                    Log.d(TAG, "AutoPlayEngine: Appending to end of queue")
+                    val newQueue = q.toMutableList()
+                    newQueue.add(nextTrack)
+                    _queue.value = newQueue
+                }
+                updatePreloadManager()
+            }
         }
     }
 
@@ -630,7 +687,16 @@ fun SongEntity.toMediaItem(): MediaItem {
         .setAlbumTitle(album ?: "Gratia")
 
     if (!coverArtPath.isNullOrBlank()) {
-        metadataBuilder.setArtworkUri(android.net.Uri.parse("file://${coverArtPath}"))
+        try {
+            val uriString = if (coverArtPath.startsWith("content://") || coverArtPath.startsWith("http")) {
+                coverArtPath
+            } else {
+                "file://${coverArtPath}"
+            }
+            metadataBuilder.setArtworkUri(android.net.Uri.parse(uriString))
+        } catch (e: Exception) {
+            // Ignore invalid URIs
+        }
     }
 
     return MediaItem.Builder()

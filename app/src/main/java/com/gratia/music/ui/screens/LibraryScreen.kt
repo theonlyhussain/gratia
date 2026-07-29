@@ -73,6 +73,7 @@ fun LibraryScreen(
             LibraryRootView(
                 allSongs = allSongs,
                 onNavigateToPlaylists = { navController.navigate("playlists") },
+                onNavigateToFavorites = { activeSubView = "Favorites" },
                 onNavigateToArtists = { activeSubView = "Artists" },
                 onNavigateToAlbums = { activeSubView = "Albums" },
                 onNavigateToSongs = { activeSubView = "Songs" },
@@ -97,6 +98,7 @@ fun LibraryScreen(
 fun LibraryRootView(
     allSongs: List<SongEntity>,
     onNavigateToPlaylists: () -> Unit,
+    onNavigateToFavorites: () -> Unit,
     onNavigateToArtists: () -> Unit,
     onNavigateToAlbums: () -> Unit,
     onNavigateToSongs: () -> Unit,
@@ -125,6 +127,20 @@ fun LibraryRootView(
                     )
                 },
                 onClick = onNavigateToPlaylists
+            )
+        }
+        item {
+            AppleListRow(
+                title = "Favorites",
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = "Favorites",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToFavorites
             )
         }
         item {
@@ -298,6 +314,39 @@ fun LibrarySubView(
 
             // Content
             when (title) {
+                "Favorites" -> {
+                    val favoriteSongs = remember(allSongs) { allSongs.filter { it.isFavorite } }
+                    if (favoriteSongs.isEmpty()) {
+                        EmptyStateView(
+                            icon = Icons.Default.FavoriteBorder,
+                            headline = "No favorites yet",
+                            description = "Like some songs to see them here."
+                        )
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small),
+                            verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
+                        ) {
+                            itemsIndexed(
+                                items = favoriteSongs,
+                                key = { _, song -> song.id }
+                            ) { index, song ->
+                                SelectableSongRow(
+                                    song = song,
+                                    index = index,
+                                    isActive = currentSong?.id == song.id,
+                                    isPlaying = currentSong?.id == song.id && isPlaying,
+                                    isSelectionMode = isSelectionMode,
+                                    isSelected = selectedIds.contains(song.id),
+                                    onPlay = { playerViewModel.playSong(song, favoriteSongs) },
+                                    onLongPress = { selectionManager.startSelection(song.id) },
+                                    onToggleSelection = { selectionManager.toggle(song.id) },
+                                    modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
+                                )
+                            }
+                        }
+                    }
+                }
                 "Songs" -> {
                     if (sortedSongs.isEmpty()) {
                         EmptyStateView(
@@ -374,11 +423,7 @@ fun LibrarySubView(
                                 AppleListRow(
                                     title = artist,
                                     leadingContent = {
-                                        if (coverArtPath != null) {
-                                            CoverArtImage(coverArtPath = coverArtPath, title = artist, size = 56.dp, cornerRadius = 28.dp)
-                                        } else {
-                                            ArtistFallback(artistName = artist, size = 56.dp)
-                                        }
+                                        ArtistRowImage(artistName = artist, fallbackPath = coverArtPath, size = 56.dp)
                                     },
                                     onClick = { onNavigateToArtist(artist) }
                                 )
@@ -467,5 +512,26 @@ fun LibrarySubView(
                 onClose = { selectionManager.clearSelection() }
             )
         }
+    }
+}
+
+@Composable
+fun ArtistRowImage(artistName: String, fallbackPath: String?, size: androidx.compose.ui.unit.Dp) {
+    var fetchedUrl by remember(artistName) { mutableStateOf<String?>(null) }
+    LaunchedEffect(artistName) {
+        fetchedUrl = com.gratia.music.data.network.ArtistImageFetcher.getArtistPictureUrl(artistName)
+    }
+
+    if (fetchedUrl != null) {
+        coil.compose.AsyncImage(
+            model = fetchedUrl,
+            contentDescription = artistName,
+            modifier = Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape),
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        )
+    } else if (fallbackPath != null) {
+        CoverArtImage(coverArtPath = fallbackPath, title = artistName, size = size, cornerRadius = size / 2)
+    } else {
+        ArtistFallback(artistName = artistName, size = size)
     }
 }

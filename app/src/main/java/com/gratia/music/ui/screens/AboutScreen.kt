@@ -120,9 +120,8 @@ fun AboutScreen(
                 Image(
                     painter = painterResource(id = R.drawable.gratia_logo),
                     contentDescription = "Gratia Logo",
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(RoundedCornerShape(24.dp))
+                    modifier = Modifier.size(100.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(

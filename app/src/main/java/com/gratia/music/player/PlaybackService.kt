@@ -106,6 +106,26 @@ class PlaybackService : MediaSessionService() {
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS)
                     .build()
             }
+            
+            override fun seekToNextMediaItem() {
+                Log.d(TAG, "seekToNextMediaItem intercepted from MediaSession")
+                GratiaApp.instance.playerManager.nextSong()
+            }
+            
+            override fun seekToPreviousMediaItem() {
+                Log.d(TAG, "seekToPreviousMediaItem intercepted from MediaSession")
+                GratiaApp.instance.playerManager.prevSong()
+            }
+
+            override fun seekToNext() {
+                Log.d(TAG, "seekToNext intercepted from MediaSession")
+                GratiaApp.instance.playerManager.nextSong()
+            }
+
+            override fun seekToPrevious() {
+                Log.d(TAG, "seekToPrevious intercepted from MediaSession")
+                GratiaApp.instance.playerManager.prevSong()
+            }
         }
     }
 

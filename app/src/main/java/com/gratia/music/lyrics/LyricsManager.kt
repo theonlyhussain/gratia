@@ -39,6 +39,7 @@ class LyricsManager(
             playerManager.currentSong.collectLatest { song ->
                 if (song != null) {
                     fetchLyricsForSong(song, forceRefresh = false)
+                    prefetchNextSongLyrics(song)
                 } else {
                     _currentLyrics.value = null
                     _error.value = null
@@ -67,6 +68,25 @@ class LyricsManager(
             }
         } finally {
             _isLoading.value = false
+        }
+    }
+
+    private fun prefetchNextSongLyrics(currentSong: SongEntity) {
+        scope.launch(Dispatchers.IO) {
+            val queue = playerManager.queue.value
+            val currentIndex = queue.indexOfFirst { it.id == currentSong.id }
+            if (currentIndex != -1 && currentIndex + 1 < queue.size) {
+                val nextSong = queue[currentIndex + 1]
+                // Only fetch if we don't already have it in the DB
+                val local = lyricsRepository.getLyricsOnce(nextSong.id)
+                if (local == null) {
+                    try {
+                        lyricsRepository.getLyrics(nextSong, forceRefresh = false)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to prefetch lyrics for next song", e)
+                    }
+                }
+            }
         }
     }
 

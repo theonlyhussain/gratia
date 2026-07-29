@@ -47,12 +47,7 @@ fun ArtistDetailScreen(
     var artistImageUrl by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(artistName) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val url = com.gratia.music.data.scan.CoverArtFetcher.searchDeezerArtist(artistName)
-            if (url != null) {
-                artistImageUrl = url
-            }
-        }
+        artistImageUrl = com.gratia.music.data.network.ArtistImageFetcher.getArtistPictureUrl(artistName)
     }
 
     Column(
@@ -88,14 +83,25 @@ fun ArtistDetailScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = GratiaTheme.spacing.large),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    CoverArtImage(
-                        coverArtPath = artistImageUrl ?: coverArtPath,
-                        title = artistName,
-                        artist = artistName,
-                        size = 240.dp,
-                        cornerRadius = 120.dp, // Circle for Artist
-                        fontSize = 40.sp
-                    )
+                    if (artistImageUrl != null) {
+                        coil.compose.AsyncImage(
+                            model = artistImageUrl,
+                            contentDescription = artistName,
+                            modifier = Modifier.size(240.dp).clip(CircleShape),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    } else if (coverArtPath != null) {
+                        CoverArtImage(
+                            coverArtPath = coverArtPath,
+                            title = artistName,
+                            artist = artistName,
+                            size = 240.dp,
+                            cornerRadius = 120.dp, // Circle for Artist
+                            fontSize = 40.sp
+                        )
+                    } else {
+                        com.gratia.music.ui.components.ArtistFallback(artistName = artistName, size = 240.dp)
+                    }
                     Spacer(Modifier.height(GratiaTheme.spacing.large))
                     GratiaText(
                         text = artistName,
