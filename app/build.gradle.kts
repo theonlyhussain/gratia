@@ -16,8 +16,8 @@ android {
         applicationId = "com.gratia.music"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "2.3.1"
+        versionCode = 12
+        versionName = "2.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -80,7 +80,7 @@ android {
             val outputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val flavor = variant.name
             val version = variant.versionName
-            outputImpl.outputFileName = "Gratia v${version}.apk"
+            outputImpl.outputFileName = "Gratia.apk"
         }
     }
 }

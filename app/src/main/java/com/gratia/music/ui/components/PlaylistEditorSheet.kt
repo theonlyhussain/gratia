@@ -2,6 +2,7 @@ package com.gratia.music.ui.components
 
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
@@ -322,7 +323,9 @@ fun PlaylistEditorSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { /* TODO: Open search */ }
+                    .clickable { 
+                        Toast.makeText(context, "Please save the playlist first to add more music.", Toast.LENGTH_SHORT).show()
+                    }
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {

@@ -104,8 +104,13 @@ class PlaybackService : MediaSessionService() {
                 return super.getAvailableCommands().buildUpon()
                     .add(Player.COMMAND_SEEK_TO_NEXT)
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
                     .build()
             }
+            
+            override fun hasNextMediaItem(): Boolean = true
+            override fun hasPreviousMediaItem(): Boolean = true
             
             override fun seekToNextMediaItem() {
                 Log.d(TAG, "seekToNextMediaItem intercepted from MediaSession")

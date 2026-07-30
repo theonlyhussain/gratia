@@ -93,8 +93,12 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
-                        if (Math.abs(offsetX) > 300f) {
-                            playerViewModel.clearQueue()
+                        if (offsetX < -200f) {
+                            haptics.light(view)
+                            playerViewModel.nextSong()
+                        } else if (offsetX > 200f) {
+                            haptics.light(view)
+                            playerViewModel.prevSong()
                         }
                         offsetX = 0f
                     },
