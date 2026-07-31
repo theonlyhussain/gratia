@@ -42,6 +42,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import com.gratia.music.ui.components.bounceClick
+import androidx.compose.ui.draw.alpha
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 import org.burnoutcrew.reorderable.ReorderableItem
@@ -99,7 +100,7 @@ fun QueueSheet(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.75f)
+            .fillMaxSize()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(
                 Brush.verticalGradient(
@@ -108,16 +109,6 @@ fun QueueSheet(
             )
             .padding(top = 12.dp)
     ) {
-        // Drag indicator
-        Box(
-            modifier = Modifier
-                .width(36.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.3f))
-                .align(Alignment.CenterHorizontally)
-        )
-
         Spacer(Modifier.height(16.dp))
 
         // --- Current song info header ---
@@ -164,7 +155,7 @@ fun QueueSheet(
                     Icon(
                         if (current.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
                         contentDescription = "Favorite",
-                        tint = if (current.isFavorite) GratiaTheme.colors.primary else Color.White.copy(alpha = 0.8f),
+                        tint = if (current.isFavorite) GratiaTheme.colors.accent else Color.White.copy(alpha = 0.8f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -295,49 +286,16 @@ fun QueueSheet(
                     key = { index, song -> "queue_${song.id}_$index" }
                 ) { index, song ->
                     ReorderableItem(listState, key = "queue_${song.id}_$index") { isDragging ->
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { dismissValue ->
-                                if (dismissValue != SwipeToDismissBoxValue.Settled) {
-                                    playerViewModel.removeFromQueue(song.id)
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                        )
-
-                        SwipeToDismissBox(
-                            state = dismissState,
+                        QueueRow(
+                            song = song,
+                            index = upcomingStartIndex + index,
+                            isCurrentSong = false,
+                            onPlay = { playerViewModel.playFromQueue(upcomingStartIndex + index) },
+                            onRemove = { playerViewModel.removeFromQueue(song.id) },
                             modifier = Modifier
                                 .animateItem()
-                                .background(if (isDragging) GratiaTheme.colors.surfaceHover else Color.Transparent),
-                            enableDismissFromStartToEnd = true,
-                            enableDismissFromEndToStart = true,
-                            backgroundContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Color.Black.copy(alpha = 0.2f))
-                                        .padding(horizontal = 24.dp),
-                                    contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
-                                ) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Remove",
-                                        tint = Color.White.copy(alpha = 0.8f)
-                                    )
-                                }
-                            },
-                            content = {
-                                QueueRow(
-                                    song = song,
-                                    index = upcomingStartIndex + index,
-                                    isCurrentSong = false,
-                                    onPlay = { playerViewModel.playFromQueue(upcomingStartIndex + index) },
-                                    onRemove = { playerViewModel.removeFromQueue(song.id) },
-                                    modifier = Modifier.detectReorderAfterLongPress(listState)
-                                )
-                            }
+                                .background(if (isDragging) GratiaTheme.colors.surfaceHover else Color.Transparent)
+                                .detectReorderAfterLongPress(listState)
                         )
                     }
                 }

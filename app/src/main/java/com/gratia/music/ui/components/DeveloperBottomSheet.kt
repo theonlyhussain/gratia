@@ -269,14 +269,14 @@ private fun DeveloperActionIcon(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.1f))
+            .background(GratiaTheme.colors.surfaceHover)
             .bounceClick { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = Color.White,
+            tint = GratiaTheme.colors.textPrimary,
             modifier = Modifier.size(22.dp)
         )
     }

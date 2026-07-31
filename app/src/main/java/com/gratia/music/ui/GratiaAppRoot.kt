@@ -449,8 +449,10 @@ fun GratiaAppRoot() {
 
         // Queue Bottom Sheet
         if (queueSheetOpen) {
+            val queueSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
             androidx.compose.material3.ModalBottomSheet(
                 onDismissRequest = { queueSheetOpen = false },
+                sheetState = queueSheetState,
                 containerColor = GratiaTheme.colors.surface,
                 scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
                 shape = GratiaTheme.shapes.sheet
@@ -526,7 +528,7 @@ fun GratiaAppRoot() {
                     label = "splashScale"
                 )
                 androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(id = com.gratia.music.R.drawable.gratia_logo),
+                    painter = androidx.compose.ui.res.painterResource(id = com.gratia.music.R.drawable.high_resolution_color_logo),
                     contentDescription = "Gratia Logo",
                     modifier = Modifier
                         .size(120.dp)

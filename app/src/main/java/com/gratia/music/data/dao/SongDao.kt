@@ -107,18 +107,18 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE genre = :genre ORDER BY title ASC")
     fun getSongsByGenre(genre: String): Flow<List<SongEntity>>
 
-    @Query("SELECT * FROM songs WHERE genre = :genre AND artist != :excludedArtist ORDER BY RANDOM() LIMIT 1")
+    @Query("SELECT * FROM songs WHERE genre = :genre AND artist != :excludedArtist ORDER BY playCount ASC, RANDOM() LIMIT 1")
     suspend fun getRandomSongByGenreExcludingArtist(genre: String, excludedArtist: String): SongEntity?
 
-    @Query("SELECT * FROM songs WHERE genre = :genre ORDER BY RANDOM() LIMIT 1")
+    @Query("SELECT * FROM songs WHERE genre = :genre ORDER BY playCount ASC, RANDOM() LIMIT 1")
     suspend fun getRandomSongByGenre(genre: String): SongEntity?
 
-    @Query("SELECT * FROM songs WHERE genre != :excludedGenre ORDER BY RANDOM() LIMIT 1")
+    @Query("SELECT * FROM songs WHERE genre != :excludedGenre ORDER BY playCount ASC, RANDOM() LIMIT 1")
     suspend fun getRandomSongExcludingGenre(excludedGenre: String): SongEntity?
 
-    @Query("SELECT * FROM songs WHERE artist != :excludedArtist ORDER BY RANDOM() LIMIT 1")
+    @Query("SELECT * FROM songs WHERE artist != :excludedArtist ORDER BY playCount ASC, RANDOM() LIMIT 1")
     suspend fun getRandomSongExcludingArtist(excludedArtist: String): SongEntity?
 
-    @Query("SELECT * FROM songs ORDER BY RANDOM() LIMIT 1")
+    @Query("SELECT * FROM songs ORDER BY playCount ASC, RANDOM() LIMIT 1")
     suspend fun getRandomSong(): SongEntity?
 }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import android.graphics.BitmapFactory
 import android.graphics.Bitmap
@@ -107,9 +108,11 @@ class PlayerManager(private val context: Context) {
                 }
                 Player.STATE_ENDED -> {
                     Log.d(TAG, "STATE_ENDED: handling song end")
-                    logListeningEvent("complete", completed = true)
-                    currentSessionStartTimeMs = 0L
-                    handleSongEnded()
+                    scope.launch {
+                        logListeningEventSuspend("complete", completed = true)
+                        currentSessionStartTimeMs = 0L
+                        handleSongEnded()
+                    }
                 }
                 Player.STATE_IDLE -> {
                     Log.d(TAG, "STATE_IDLE")
@@ -130,7 +133,7 @@ class PlayerManager(private val context: Context) {
             } else {
                 stopProgressUpdates()
                 cancelBackgroundSync()
-                logListeningEvent("pause")
+                scope.launch { logListeningEventSuspend("pause") }
                 currentSessionStartTimeMs = 0L
             }
         }
@@ -283,7 +286,7 @@ class PlayerManager(private val context: Context) {
         // Log listening event for previously playing song
         val previousSong = _currentSong.value
         if (previousSong != null && previousSong.id != song.id) {
-            logListeningEvent("skip", skipped = true)
+            scope.launch { logListeningEventSuspend("skip", skipped = true) }
             currentSessionStartTimeMs = 0L
 
             // Add previous song to history
@@ -460,7 +463,7 @@ class PlayerManager(private val context: Context) {
         Log.d(TAG, "Autoplay enabled: ${_autoplayEnabled.value}")
         // If autoplay is turned on and we're near the end of the queue, we might want to generate right away
         if (_autoplayEnabled.value && _currentSong.value != null && _queue.value.isEmpty()) {
-            handleAutoPlay(QueueAction.APPEND, _currentSong.value!!)
+            scope.launch { handleAutoPlaySuspend(QueueAction.MAINTAIN_VIBE, _currentSong.value!!) }
         }
     }
 
@@ -590,7 +593,7 @@ class PlayerManager(private val context: Context) {
         progressJob = null
     }
 
-    private fun logListeningEvent(reason: String, completed: Boolean = false, skipped: Boolean = false) {
+    private suspend fun logListeningEventSuspend(reason: String, completed: Boolean = false, skipped: Boolean = false) {
         val current = _currentSong.value ?: return
         if (currentSessionStartTimeMs <= 0) return
         val listenedSec = (System.currentTimeMillis() - currentSessionStartTimeMs) / 1000
@@ -604,49 +607,38 @@ class PlayerManager(private val context: Context) {
             GratiaApp.instance.database.songDao().incrementListenTime(current.id, listenedSec * 1000)
         }
         
-        // Handle Auto-Play logic
-        handleAutoPlay(action, current)
+        // Handle Auto-Play logic synchronously in this coroutine
+        handleAutoPlaySuspend(action, current)
     }
 
-    private fun handleAutoPlay(action: QueueAction, evaluatedSong: SongEntity) {
+    private suspend fun handleAutoPlaySuspend(action: QueueAction, evaluatedSong: SongEntity) = withContext(Dispatchers.IO) {
         if (!_autoplayEnabled.value) {
             Log.d(TAG, "handleAutoPlay skipped because autoplay is disabled")
-            return
+            return@withContext
         }
-        scope.launch(Dispatchers.IO) {
-            val q = _queue.value
-            val currentActive = _currentSong.value ?: return@launch
-            val currentIndex = q.indexOfFirst { it.id == currentActive.id }
-            
-            // If the user is far from the end of the queue, and not frustrated, don't intervene yet.
-            if (action != QueueAction.RADICAL_SHIFT && currentIndex != -1 && currentIndex < q.size - 2) {
-                return@launch
-            }
+        val q = _queue.value
+        val currentActive = _currentSong.value ?: return@withContext
+        val currentIndex = q.indexOfFirst { it.id == currentActive.id }
+        
+        // If the user is far from the end of the queue, and not frustrated, don't intervene yet.
+        if (action != QueueAction.RADICAL_SHIFT && currentIndex != -1 && currentIndex < q.size - 2) {
+            return@withContext
+        }
 
-            Log.d(TAG, "handleAutoPlay: action=$action, evaluatedSong='${evaluatedSong.title}'")
-            
-            val nextTrack = autoPlayEngine.generateNextTrack(action, evaluatedSong, q.map { it.id })
-            if (nextTrack != null) {
-                if (action == QueueAction.RADICAL_SHIFT) {
-                    // Inject immediately after the currently playing song to change the vibe fast
-                    if (currentIndex != -1 && currentIndex + 1 < q.size) {
-                        Log.d(TAG, "AutoPlayEngine: Injecting vibe shift at index ${currentIndex + 1}")
-                        val newQueue = q.toMutableList()
-                        newQueue.add(currentIndex + 1, nextTrack)
-                        _queue.value = newQueue
-                    } else {
-                        // Append if at end
-                        val newQueue = q.toMutableList()
-                        newQueue.add(nextTrack)
-                        _queue.value = newQueue
-                    }
-                } else {
-                    // Just append to the end of the queue to keep music flowing
-                    Log.d(TAG, "AutoPlayEngine: Appending to end of queue")
-                    val newQueue = q.toMutableList()
-                    newQueue.add(nextTrack)
-                    _queue.value = newQueue
-                }
+        Log.d(TAG, "handleAutoPlay: action=$action, evaluatedSong='${evaluatedSong.title}'")
+        
+        val nextTrack = autoPlayEngine.generateNextTrack(action, evaluatedSong, q.map { it.id })
+        if (nextTrack != null) {
+            val newQueue = q.toMutableList()
+            if (action == QueueAction.RADICAL_SHIFT && currentIndex != -1 && currentIndex + 1 < q.size) {
+                Log.d(TAG, "AutoPlayEngine: Injecting vibe shift at index ${currentIndex + 1}")
+                newQueue.add(currentIndex + 1, nextTrack)
+            } else {
+                Log.d(TAG, "AutoPlayEngine: Appending to end of queue")
+                newQueue.add(nextTrack)
+            }
+            withContext(Dispatchers.Main) {
+                _queue.value = newQueue
                 updatePreloadManager()
             }
         }

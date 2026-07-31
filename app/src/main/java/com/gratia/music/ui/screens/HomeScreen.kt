@@ -86,21 +86,19 @@ fun HomeScreen(
     val initialScanCompleted by settingsDataStore.initialScanCompletedFlow.collectAsState(initial = false)
     var isScanning by remember { mutableStateOf(false) }
 
-    LaunchedEffect(initialScanCompleted) {
-        if (!initialScanCompleted) {
-            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Manifest.permission.READ_MEDIA_AUDIO
-            } else {
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            }
-            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
-                isScanning = true
-                try {
-                    MediaStoreScanner.scanLocalMusic(context, songRepo)
-                } finally {
-                    isScanning = false
-                    settingsDataStore.setInitialScanCompleted(true)
-                }
+    LaunchedEffect(Unit) {
+        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+            isScanning = true
+            try {
+                MediaStoreScanner.scanLocalMusic(context, songRepo)
+            } finally {
+                isScanning = false
+                settingsDataStore.setInitialScanCompleted(true)
             }
         }
     }
