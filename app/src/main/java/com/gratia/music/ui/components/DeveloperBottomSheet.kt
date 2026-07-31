@@ -270,7 +270,7 @@ private fun DeveloperActionIcon(
             .size(48.dp)
             .clip(CircleShape)
             .background(Color.White.copy(alpha = 0.1f))
-            .clickable { onClick() },
+            .bounceClick { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(

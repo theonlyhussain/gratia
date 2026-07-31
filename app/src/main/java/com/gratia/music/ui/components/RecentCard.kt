@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import kotlin.math.abs
 import androidx.compose.ui.graphics.Color
+import com.gratia.music.ui.components.bounceClick
 
 @Composable
 fun RecentCard(
@@ -35,11 +36,7 @@ fun RecentCard(
         modifier = Modifier
             .size(140.dp)
             .clip(RoundedCornerShape(8.dp))
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
+            .bounceClick(onClick = onClick)
     ) {
         if (hasCover) {
             AsyncImage(

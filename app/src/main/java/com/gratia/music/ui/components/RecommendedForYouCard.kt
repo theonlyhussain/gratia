@@ -26,6 +26,7 @@ import com.gratia.music.data.model.SongEntity
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import com.gratia.music.ui.components.bounceClick
 
 @Composable
 fun RecommendedForYouCard(
@@ -40,7 +41,7 @@ fun RecommendedForYouCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(32.dp))
             .background(GratiaTheme.colors.surface)
-            .clickable(onClick = onPlay)
+            .bounceClick(onClick = onPlay)
             .padding(24.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

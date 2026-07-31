@@ -41,6 +41,7 @@ import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import com.gratia.music.ui.components.bounceClick
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 import org.burnoutcrew.reorderable.ReorderableItem
@@ -167,22 +168,6 @@ fun QueueSheet(
                         modifier = Modifier.size(24.dp)
                     )
                 }
-
-                // Three-dots menu
-                IconButton(
-                    onClick = { /* Could open song menu */ },
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .size(32.dp)
-                ) {
-                    Icon(
-                        Icons.Default.MoreVert,
-                        contentDescription = "More",
-                        tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
 
             Spacer(Modifier.height(12.dp))
@@ -196,6 +181,7 @@ fun QueueSheet(
             ) {
                 ShufflePill(
                     isActive = shuffleEnabled,
+                    isAlbum = current.album != null,
                     onClick = { playerViewModel.toggleShuffle() },
                     modifier = Modifier.weight(1f)
                 )
@@ -237,7 +223,7 @@ fun QueueSheet(
                         fontFamily = Inter,
                         fontSize = 14.sp,
                         color = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.clickable { playerViewModel.clearHistory() }
+                        modifier = Modifier.bounceClick { playerViewModel.clearHistory() }
                     )
                 }
                 Spacer(Modifier.height(8.dp))
@@ -361,11 +347,13 @@ fun QueueSheet(
 }
 
 /**
- * Shuffle pill button — rounded, filled when active.
+ * Shuffle/Mix pill button.
+ * Acts as Mix when an album is playing, standard Shuffle otherwise.
  */
 @Composable
 private fun ShufflePill(
     isActive: Boolean,
+    isAlbum: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -381,18 +369,33 @@ private fun ShufflePill(
             .height(36.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(bgColor)
-            .clickable {
+            .bounceClick {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
             },
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            Icons.Default.Shuffle,
-            contentDescription = "Shuffle",
-            tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
-            modifier = Modifier.size(20.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Shuffle,
+                contentDescription = if (isAlbum) "Mix" else "Shuffle",
+                tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(18.dp)
+            )
+            if (isAlbum) {
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Mix",
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 13.sp,
+                    color = if (isActive) Color.White else Color.White.copy(alpha = 0.6f)
+                )
+            }
+        }
     }
 }
 
@@ -421,7 +424,7 @@ private fun RepeatPill(
             .height(36.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(bgColor)
-            .clickable {
+            .bounceClick {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
             },
@@ -474,7 +477,7 @@ private fun AutoplayPill(
             .height(36.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(bgColor)
-            .clickable {
+            .bounceClick {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
             },
@@ -507,7 +510,7 @@ private fun QueueRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable {
+            .bounceClick {
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onPlay()
             }

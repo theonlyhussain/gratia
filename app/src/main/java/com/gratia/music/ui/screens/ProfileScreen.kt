@@ -40,6 +40,7 @@ import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.components.AppleLargeTitleHeader
 import com.gratia.music.ui.components.DeveloperBottomSheet
+import com.gratia.music.ui.components.bounceClick
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
@@ -509,7 +510,7 @@ private fun ProfileItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.bounceClick(onClick = onClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

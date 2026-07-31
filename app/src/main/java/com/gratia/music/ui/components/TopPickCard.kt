@@ -22,6 +22,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.ui.components.bounceClick
 import java.io.File
 
 @Composable
@@ -37,11 +38,7 @@ fun TopPickCard(
             .width(200.dp)
             .height(280.dp)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            )
+            .bounceClick(onClick = onClick)
     ) {
         if (hasCover) {
             AsyncImage(
