@@ -7,7 +7,7 @@
     </style>
 
     <style name="Theme.Gratia.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/gr_base_dark</item>
+        <item name="windowSplashScreenBackground">@color/logo_red_bg</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.Gratia</item>
     </style>

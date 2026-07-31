@@ -39,6 +39,7 @@ import com.gratia.music.data.repository.ListeningEventRepository
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.components.AppleLargeTitleHeader
+import com.gratia.music.ui.components.DeveloperBottomSheet
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
@@ -79,6 +80,7 @@ fun ProfileScreen(
     var saveSuccess by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showDeveloperSheet by remember { mutableStateOf(false) }
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val currentTheme by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
     val versionName = remember {
@@ -370,6 +372,7 @@ fun ProfileScreen(
             ProfileItem(icon = Icons.Default.Palette, label = "Appearance", detail = currentTheme.name.lowercase().replaceFirstChar { it.uppercase() }, onClick = { showThemeDialog = true })
             ProfileItem(icon = Icons.Default.PrivacyTip, label = "Privacy", detail = "All data stays on your device")
             ProfileItem(icon = Icons.Default.CalendarMonth, label = "Clear Listening History", detail = "Remove local calendar data", onClick = { showClearHistoryDialog = true })
+            ProfileItem(icon = Icons.Default.Code, label = "Developer", detail = "Hussain Shaikh", onClick = { showDeveloperSheet = true })
             ProfileItem(icon = Icons.Default.Info, label = "About Gratia", detail = "Version $versionName")
         }
 
@@ -459,6 +462,12 @@ fun ProfileScreen(
                     Text("Cancel", color = GratiaTheme.colors.textPrimary)
                 }
             }
+        )
+    }
+
+    if (showDeveloperSheet) {
+        DeveloperBottomSheet(
+            onDismiss = { showDeveloperSheet = false }
         )
     }
 }

@@ -4,4 +4,5 @@
     <color name="gr_base_black">#FF000000</color>
     <color name="gr_accent_emerald">#FF22D36B</color>
     <color name="gr_surface_card">#FF181818</color>
+    <color name="logo_red_bg">#FFF60707</color>
 </resources>

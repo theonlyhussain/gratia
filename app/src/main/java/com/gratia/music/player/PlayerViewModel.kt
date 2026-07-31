@@ -36,6 +36,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val queue = playerManager.queue
     val shuffleEnabled = playerManager.shuffleEnabled
     val repeatMode = playerManager.repeatMode
+    val autoplayEnabled = playerManager.autoplayEnabled
+    val history = playerManager.history
     val playbackError = playerManager.playbackError
 
     val songCount = songRepository.getSongCount()
@@ -91,7 +93,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun nextSong() = playerManager.nextSong()
     fun prevSong() = playerManager.prevSong()
     fun toggleShuffle() = playerManager.toggleShuffle()
-    fun cycleRepeatMode() = playerManager.cycleRepeatMode()
+    fun cycleRepeatMode() {
+        playerManager.cycleRepeatMode()
+    }
+
+    fun toggleAutoplay() {
+        playerManager.toggleAutoplay()
+    }
+
+    fun clearHistory() {
+        playerManager.clearHistory()
+    }
+
     fun clearError() = playerManager.clearError()
 
     fun setExpandedPlayerOpen(open: Boolean) {

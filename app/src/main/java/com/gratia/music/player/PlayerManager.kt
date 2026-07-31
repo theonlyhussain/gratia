@@ -78,6 +78,12 @@ class PlayerManager(private val context: Context) {
     private val _repeatMode = MutableStateFlow(RepeatMode.OFF)
     val repeatMode: StateFlow<RepeatMode> = _repeatMode.asStateFlow()
 
+    private val _autoplayEnabled = MutableStateFlow(false)
+    val autoplayEnabled: StateFlow<Boolean> = _autoplayEnabled.asStateFlow()
+
+    private val _history = MutableStateFlow<List<SongEntity>>(emptyList())
+    val history: StateFlow<List<SongEntity>> = _history.asStateFlow()
+
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
@@ -279,6 +285,13 @@ class PlayerManager(private val context: Context) {
         if (previousSong != null && previousSong.id != song.id) {
             logListeningEvent("skip", skipped = true)
             currentSessionStartTimeMs = 0L
+
+            // Add previous song to history
+            val currentHistory = _history.value.toMutableList()
+            currentHistory.removeAll { it.id == previousSong.id } // Remove duplicates
+            currentHistory.add(0, previousSong)
+            // Keep history limited to 20 items for UI
+            _history.value = currentHistory.take(20)
         }
 
         _currentSong.value = song
@@ -433,12 +446,26 @@ class PlayerManager(private val context: Context) {
     }
 
     fun cycleRepeatMode() {
-        _repeatMode.value = when (_repeatMode.value) {
+        val next = when (_repeatMode.value) {
             RepeatMode.OFF -> RepeatMode.ALL
             RepeatMode.ALL -> RepeatMode.ONE
             RepeatMode.ONE -> RepeatMode.OFF
         }
-        Log.d(TAG, "cycleRepeatMode: ${_repeatMode.value}")
+        _repeatMode.value = next
+        Log.d(TAG, "Repeat mode set to $next")
+    }
+
+    fun toggleAutoplay() {
+        _autoplayEnabled.value = !_autoplayEnabled.value
+        Log.d(TAG, "Autoplay enabled: ${_autoplayEnabled.value}")
+        // If autoplay is turned on and we're near the end of the queue, we might want to generate right away
+        if (_autoplayEnabled.value && _currentSong.value != null && _queue.value.isEmpty()) {
+            handleAutoPlay(QueueAction.APPEND, _currentSong.value!!)
+        }
+    }
+
+    fun clearHistory() {
+        _history.value = emptyList()
     }
 
     fun clearError() {
@@ -582,6 +609,10 @@ class PlayerManager(private val context: Context) {
     }
 
     private fun handleAutoPlay(action: QueueAction, evaluatedSong: SongEntity) {
+        if (!_autoplayEnabled.value) {
+            Log.d(TAG, "handleAutoPlay skipped because autoplay is disabled")
+            return
+        }
         scope.launch(Dispatchers.IO) {
             val q = _queue.value
             val currentActive = _currentSong.value ?: return@launch

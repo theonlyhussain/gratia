@@ -10,12 +10,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -61,8 +65,10 @@ fun QueueSheet(
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
+    val history by playerViewModel.history.collectAsState()
     val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
     val repeatMode by playerViewModel.repeatMode.collectAsState()
+    val autoplayEnabled by playerViewModel.autoplayEnabled.collectAsState()
 
     val current = currentSong
     val upcomingStartIndex = if (current != null) {
@@ -152,42 +158,107 @@ fun QueueSheet(
                     )
                 }
 
-                // Three-dots menu
-                IconButton(onClick = { /* Could open song menu */ }) {
+                // Favorite button
+                IconButton(onClick = { playerViewModel.toggleFavorite(current) }) {
                     Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = "Now playing",
+                        if (current.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "Favorite",
+                        tint = if (current.isFavorite) GratiaTheme.colors.primary else Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // Three-dots menu
+                IconButton(
+                    onClick = { /* Could open song menu */ },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(alpha = 0.1f))
+                        .size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "More",
                         tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // --- Shuffle / Repeat pill buttons ---
+            // --- Shuffle / Repeat / Autoplay pill buttons ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Shuffle pill
                 ShufflePill(
                     isActive = shuffleEnabled,
                     onClick = { playerViewModel.toggleShuffle() },
                     modifier = Modifier.weight(1f)
                 )
 
-                // Repeat pill
                 RepeatPill(
                     repeatMode = repeatMode,
                     onClick = { playerViewModel.cycleRepeatMode() },
                     modifier = Modifier.weight(1f)
                 )
+
+                AutoplayPill(
+                    isActive = autoplayEnabled,
+                    onClick = { playerViewModel.toggleAutoplay() },
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             Spacer(Modifier.height(16.dp))
+
+            // --- History Section ---
+            if (history.isNotEmpty()) {
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "History",
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = Color.White
+                    )
+                    Text(
+                        "Clear",
+                        fontFamily = Inter,
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.clickable { playerViewModel.clearHistory() }
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                
+                // Show last 3 history items just as a preview, to save space
+                Column {
+                    history.take(3).forEach { song ->
+                        QueueRow(
+                            song = song,
+                            index = -1,
+                            isCurrentSong = false,
+                            onPlay = { /* History play not fully implemented */ },
+                            onRemove = {}, // History items aren't removed individually here
+                            modifier = Modifier.alpha(0.6f),
+                            showDragHandle = false
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
 
             // --- "Continue Playing" header ---
             Text(
@@ -201,13 +272,13 @@ fun QueueSheet(
             Text(
                 "From ${current.album ?: "your library"}",
                 fontFamily = Inter,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.6f),
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
             )
         }
 
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
 
         if (queue.isEmpty()) {
             QueueEmptyState()
@@ -260,14 +331,14 @@ fun QueueSheet(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(GratiaTheme.colors.error)
+                                        .background(Color.Black.copy(alpha = 0.2f))
                                         .padding(horizontal = 24.dp),
                                     contentAlignment = if (dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd) Alignment.CenterStart else Alignment.CenterEnd
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Remove",
-                                        tint = GratiaTheme.colors.background
+                                        tint = Color.White.copy(alpha = 0.8f)
                                     )
                                 }
                             },
@@ -383,6 +454,42 @@ private fun RepeatPill(
 }
 
 /**
+ * Autoplay (Infinite Mix) pill button.
+ */
+@Composable
+private fun AutoplayPill(
+    isActive: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val hapticFeedback = LocalHapticFeedback.current
+    val bgColor by animateColorAsState(
+        targetValue = if (isActive) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
+        animationSpec = tween(200),
+        label = "autoplayBg"
+    )
+
+    Box(
+        modifier = modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(bgColor)
+            .clickable {
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            Icons.Default.AllInclusive,
+            contentDescription = "Autoplay",
+            tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+/**
  * Queue row for upcoming songs.
  */
 @Composable
@@ -392,7 +499,8 @@ private fun QueueRow(
     isCurrentSong: Boolean,
     onPlay: () -> Unit,
     onRemove: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDragHandle: Boolean = true
 ) {
     val hapticFeedback = LocalHapticFeedback.current
 
@@ -437,13 +545,17 @@ private fun QueueRow(
             )
         }
 
-        // Drag handle
-        Icon(
-            Icons.Default.DragHandle,
-            contentDescription = "Reorder",
-            tint = Color.White.copy(alpha = 0.3f),
-            modifier = Modifier.size(20.dp)
-        )
+        // Drag handle or placeholder
+        if (showDragHandle) {
+            Icon(
+                Icons.Default.DragHandle,
+                contentDescription = "Reorder",
+                tint = Color.White.copy(alpha = 0.3f),
+                modifier = Modifier.size(20.dp)
+            )
+        } else {
+            Spacer(Modifier.width(20.dp))
+        }
     }
 }
 
