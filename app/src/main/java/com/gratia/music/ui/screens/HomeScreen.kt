@@ -60,19 +60,11 @@ fun HomeScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
+    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     val mostPlayed = remember(mostPlayedRaw) { mostPlayedRaw }
-    val favoriteSongs = remember(mostPlayedRaw, favoriteSongsRaw) {
-        val excludeIds = mostPlayedRaw.map { it.id }.toSet()
-        favoriteSongsRaw.filter { it.id !in excludeIds }
-    }
-    val recentlyPlayed = remember(mostPlayedRaw, favoriteSongsRaw, recentlyPlayedRaw) {
-        val excludeIds = (mostPlayedRaw + favoriteSongsRaw).map { it.id }.toSet()
-        recentlyPlayedRaw.filter { it.id !in excludeIds }
-    }
-    val lastAdded = remember(mostPlayedRaw, favoriteSongsRaw, recentlyPlayedRaw, lastAddedRaw) {
-        val excludeIds = (mostPlayedRaw + favoriteSongsRaw + recentlyPlayedRaw).map { it.id }.toSet()
-        lastAddedRaw.filter { it.id !in excludeIds }
-    }
+    val favoriteSongs = remember(favoriteSongsRaw) { favoriteSongsRaw }
+    val recentlyPlayed = remember(recentlyPlayedRaw) { recentlyPlayedRaw }
+    val lastAdded = remember(lastAddedRaw) { lastAddedRaw }
 
     // Determine Top Artist for Recommendation
     val recommendedArtist = remember(mostPlayedRaw, recentlyPlayedRaw) {
@@ -270,6 +262,26 @@ fun HomeScreen(
                         RecentCard(
                             song = song,
                             onClick = { playerViewModel.playSong(song, lastAdded) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+        
+        if (allSongs.isNotEmpty()) {
+            item {
+                AppleSectionHeader(title = "All Songs")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Show a reasonable chunk of songs on the home screen to avoid huge horizontal scrolls
+                    val displaySongs = allSongs.take(30)
+                    items(displaySongs) { song ->
+                        RecentCard(
+                            song = song,
+                            onClick = { playerViewModel.playSong(song, displaySongs) }
                         )
                     }
                 }

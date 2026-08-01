@@ -14,8 +14,7 @@ import kotlinx.coroutines.flow.map
 enum class ThemeOption(val value: String) {
     SYSTEM("system"),
     LIGHT("light"),
-    DARK("dark"),
-    AMOLED("amoled");
+    DARK("dark");
 
     companion object {
         fun fromValue(value: String): ThemeOption {
@@ -39,6 +38,19 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setThemeOption(themeOption: ThemeOption) {
         context.dataStore.edit { preferences ->
             preferences[THEME_KEY] = themeOption.value
+        }
+    }
+
+    private val OLED_THEME_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("oled_theme_enabled")
+
+    val oledThemeEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[OLED_THEME_KEY] ?: false
+        }
+
+    suspend fun setOledThemeEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[OLED_THEME_KEY] = enabled
         }
     }
 

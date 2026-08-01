@@ -76,13 +76,14 @@ fun GratiaAppRoot() {
     val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
     val isDark = when (themeOption) {
         com.gratia.music.data.ThemeOption.LIGHT -> false
-        com.gratia.music.data.ThemeOption.DARK, com.gratia.music.data.ThemeOption.AMOLED -> true
+        com.gratia.music.data.ThemeOption.DARK -> true
         com.gratia.music.data.ThemeOption.SYSTEM -> isSystemDark
     }
+    val oledThemeEnabled by settingsDataStore.oledThemeEnabledFlow.collectAsState(initial = false)
     val onboardingCompleted by settingsDataStore.onboardingCompletedFlow.collectAsState(initial = null)
     val snackbarHostState = remember { SnackbarHostState() }
 
-    GratiaTheme(themeOption = themeOption) {
+    GratiaTheme(themeOption = themeOption, isOledThemeEnabled = oledThemeEnabled) {
         CompositionLocalProvider(
             LocalSnackbarHostState provides snackbarHostState,
             LocalNavController provides navController,

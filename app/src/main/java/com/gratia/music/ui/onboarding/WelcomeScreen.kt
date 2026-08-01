@@ -69,12 +69,9 @@ fun WelcomeScreen(
     settingsDataStore: SettingsDataStore,
     onContinue: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-
     // Staggered entrance animation
     var showTitle by remember { mutableStateOf(false) }
     var showSubtitle by remember { mutableStateOf(false) }
-    var showThemePicker by remember { mutableStateOf(false) }
     var showButton by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -82,8 +79,6 @@ fun WelcomeScreen(
         showTitle = true
         delay(300)
         showSubtitle = true
-        delay(200)
-        showThemePicker = true
         delay(200)
         showButton = true
     }
@@ -103,7 +98,7 @@ fun WelcomeScreen(
         ) {
             Spacer(Modifier.weight(1f))
 
-            // --- Title ---
+            // --- Logo & Title ---
             AnimatedVisibility(
                 visible = showTitle,
                 enter = fadeIn(tween(600)) + slideInVertically(
@@ -115,23 +110,22 @@ fun WelcomeScreen(
                 )
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Welcome to",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.Normal,
-                        fontSize = 18.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        textAlign = TextAlign.Center
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.gratia.music.R.drawable.high_resolution_color_logo),
+                        contentDescription = "Gratia Logo",
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(GratiaTheme.shapes.hero)
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(24.dp))
                     Text(
-                        text = "Gratia",
+                        text = "Welcome to Gratia",
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 48.sp,
+                        fontSize = 32.sp,
                         color = GratiaTheme.colors.textPrimary,
                         textAlign = TextAlign.Center,
-                        letterSpacing = (-1.5).sp
+                        letterSpacing = (-1).sp
                     )
                 }
             }
@@ -150,99 +144,20 @@ fun WelcomeScreen(
                 )
             ) {
                 Text(
-                    text = "Your premium local music player.\nBeautiful, fast, and completely offline.",
+                    text = "Experience your music\\nlike never before.",
                     fontFamily = Inter,
                     fontWeight = FontWeight.Normal,
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     color = GratiaTheme.colors.textSecondary,
                     textAlign = TextAlign.Center,
-                    lineHeight = 22.sp,
+                    lineHeight = 24.sp,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
 
-            Spacer(Modifier.height(48.dp))
-
-            // --- Theme Picker ---
-            AnimatedVisibility(
-                visible = showThemePicker,
-                enter = fadeIn(tween(400)) + slideInVertically(
-                    initialOffsetY = { 30 },
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessLow
-                    )
-                )
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "Choose your look",
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = GratiaTheme.colors.textPrimary,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(Modifier.height(16.dp))
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            ThemeCard(
-                                label = "System",
-                                icon = Icons.Default.Settings,
-                                isSelected = selectedTheme == ThemeOption.SYSTEM,
-                                onClick = {
-                                    scope.launch { settingsDataStore.setThemeOption(ThemeOption.SYSTEM) }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            ThemeCard(
-                                label = "Light",
-                                icon = Icons.Default.LightMode,
-                                isSelected = selectedTheme == ThemeOption.LIGHT,
-                                onClick = {
-                                    scope.launch { settingsDataStore.setThemeOption(ThemeOption.LIGHT) }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            ThemeCard(
-                                label = "Dark",
-                                icon = Icons.Default.DarkMode,
-                                isSelected = selectedTheme == ThemeOption.DARK,
-                                onClick = {
-                                    scope.launch { settingsDataStore.setThemeOption(ThemeOption.DARK) }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                            ThemeCard(
-                                label = "AMOLED",
-                                icon = Icons.Default.DarkMode, // Both use DarkMode icon for now
-                                isSelected = selectedTheme == ThemeOption.AMOLED,
-                                onClick = {
-                                    scope.launch { settingsDataStore.setThemeOption(ThemeOption.AMOLED) }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-            }
-
             Spacer(Modifier.weight(1f))
 
-            // --- Get Started Button ---
+            // --- Continue Button ---
             AnimatedVisibility(
                 visible = showButton,
                 enter = fadeIn(tween(400)) + slideInVertically(
@@ -266,7 +181,7 @@ fun WelcomeScreen(
                         )
                     ) {
                         Text(
-                            text = "Get Started",
+                            text = "Continue",
                             fontFamily = Inter,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 16.sp
@@ -280,54 +195,3 @@ fun WelcomeScreen(
     }
 }
 
-/**
- * Selectable theme card for the welcome screen.
- */
-@Composable
-private fun ThemeCard(
-    label: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val scale by animateFloatAsState(
-        targetValue = if (isSelected) 1.0f else 0.95f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
-        label = "themeCardScale"
-    )
-
-    Column(
-        modifier = modifier
-            .scale(scale)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (isSelected) GratiaTheme.colors.accent.copy(alpha = 0.15f)
-                else GratiaTheme.colors.surface
-            )
-            .border(
-                width = if (isSelected) 2.dp else 0.5.dp,
-                color = if (isSelected) GratiaTheme.colors.accent
-                else GratiaTheme.colors.textSecondary.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = if (isSelected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
-            modifier = Modifier.size(28.dp)
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = label,
-            fontFamily = Inter,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            fontSize = 13.sp,
-            color = if (isSelected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary
-        )
-    }
-}

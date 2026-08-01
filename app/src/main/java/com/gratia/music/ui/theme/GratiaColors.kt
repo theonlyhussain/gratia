@@ -89,26 +89,6 @@ val darkGratiaColors = GratiaColors(
     playerSurface = Color(0xB3000000)
 )
 
-val amoledGratiaColors = GratiaColors(
-    isDark = true,
-    background = Color(0xFF000000), // Pure pitch black
-    surface = Color(0xFF000000),    // Pure pitch black surface
-    surfaceHover = Color(0xFF111111), // Slightly off-black
-    accent = Color(0xFFFA243C),     
-    accentGlow = Color(0x4DFA243C), 
-    textPrimary = Color(0xFFFFFFFF),
-    textSecondary = Color(0xFF8E8E93), 
-    glassBg = Color(0xCC000000),    // Darker glass for AMOLED
-    glassBorder = Color(0x26FFFFFF),
-    error = Color(0xFFFF453A),      
-    success = Color(0xFF30D158),    
-    warning = Color(0xFFFF9F0A),    
-    accentWarm = Color(0xFFFF9F0A),
-    playerGlow = Color(0x40FA243C),
-    progressTrack = Color(0x26FFFFFF),
-    progressActive = Color(0xFFFFFFFF),
-    controlMuted = Color(0x4DFFFFFF),
-    playerSurface = Color(0xCC000000)
-)
+
 
 val LocalGratiaColors = staticCompositionLocalOf { lightGratiaColors }

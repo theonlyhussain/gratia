@@ -69,6 +69,7 @@ fun SettingsScreen(
 
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val themeOption by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
+    val oledThemeEnabled by settingsDataStore.oledThemeEnabledFlow.collectAsState(initial = false)
 
     LazyColumn(
         modifier = Modifier
@@ -130,13 +131,37 @@ fun SettingsScreen(
             AppleListRow(
                 title = "Dark",
                 onClick = { scope.launch { settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.DARK) } },
-                showDivider = false,
+                showDivider = themeOption == com.gratia.music.data.ThemeOption.DARK, // Show divider if OLED option will be below it
                 trailingContent = {
                     if (themeOption == com.gratia.music.data.ThemeOption.DARK) {
                         GratiaText(text = "Selected", style = GratiaTheme.typography.caption, color = GratiaTheme.colors.accent)
                     }
                 }
             )
+            
+            androidx.compose.animation.AnimatedVisibility(
+                visible = themeOption == com.gratia.music.data.ThemeOption.DARK
+            ) {
+                AppleListRow(
+                    title = "OLED Theme",
+                    subtitle = "Pure black theme for OLED displays",
+                    onClick = { scope.launch { settingsDataStore.setOledThemeEnabled(!oledThemeEnabled) } },
+                    showDivider = false,
+                    trailingContent = {
+                        Switch(
+                            checked = oledThemeEnabled,
+                            onCheckedChange = { scope.launch { settingsDataStore.setOledThemeEnabled(it) } },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = GratiaTheme.colors.surface,
+                                checkedTrackColor = GratiaTheme.colors.accent,
+                                uncheckedThumbColor = GratiaTheme.colors.textSecondary,
+                                uncheckedTrackColor = GratiaTheme.colors.surfaceHover,
+                                uncheckedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                            )
+                        )
+                    }
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
 

@@ -114,35 +114,8 @@ fun PermissionIntroScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(120.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(androidx.compose.foundation.shape.CircleShape)
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        GratiaTheme.colors.accent.copy(alpha = 0.15f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = "Permissions",
-                        modifier = Modifier.size(48.dp),
-                        tint = GratiaTheme.colors.accent
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-
                 Text(
-                    text = "You're Almost There",
+                    text = "Grant Permissions",
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
@@ -163,6 +136,15 @@ fun PermissionIntroScreen(
                     lineHeight = 24.sp,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                permissions.forEach { item ->
+                    PermissionCard(
+                        item = item,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.weight(1f))
 

@@ -55,24 +55,25 @@ class PreloadManager(private val context: Context) {
     fun updateQueue(queue: List<SongEntity>, currentPlayingId: String?) {
         val manager = preloadManager ?: return
         
+        val currentIndex = queue.indexOfFirst { it.id == currentPlayingId }.takeIf { it >= 0 } ?: 0
+        
+        // Only process a small window to prevent ANRs with massive queues (e.g. 5000+ songs)
+        val startIndex = currentIndex
+        val endIndex = minOf(queue.size, currentIndex + 15)
+        val window = queue.subList(startIndex, endIndex)
+
         // Convert to MediaItems matching what PlayerManager uses
-        val mediaItems = queue.map { song ->
+        val mediaItems = window.map { song ->
             song.toMediaItem()
         }
 
-        var currentIndex = C.INDEX_UNSET
-        
         mediaItems.forEachIndexed { index, mediaItem ->
-            if (mediaItem.mediaId == currentPlayingId) {
-                currentIndex = index
-            }
-            manager.add(mediaItem, index)
+            val actualIndex = startIndex + index
+            manager.add(mediaItem, actualIndex)
         }
 
-        if (currentIndex != C.INDEX_UNSET) {
-            targetPreloadStatusControl.currentPlayingIndex = currentIndex
-            manager.setCurrentPlayingIndex(currentIndex)
-        }
+        targetPreloadStatusControl.currentPlayingIndex = currentIndex
+        manager.setCurrentPlayingIndex(currentIndex)
         
         manager.invalidate()
     }

@@ -88,20 +88,28 @@ object GratiaTheme {
 @Composable
 fun GratiaTheme(
     themeOption: com.gratia.music.data.ThemeOption = com.gratia.music.data.ThemeOption.SYSTEM,
+    isOledThemeEnabled: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val isSystemDark = isSystemInDarkTheme()
     val isDark = when (themeOption) {
         com.gratia.music.data.ThemeOption.LIGHT -> false
-        com.gratia.music.data.ThemeOption.DARK, com.gratia.music.data.ThemeOption.AMOLED -> true
+        com.gratia.music.data.ThemeOption.DARK -> true
         com.gratia.music.data.ThemeOption.SYSTEM -> isSystemDark
     }
 
-    val targetColors = when (themeOption) {
-        com.gratia.music.data.ThemeOption.AMOLED -> amoledGratiaColors
+    var targetColors = when (themeOption) {
         com.gratia.music.data.ThemeOption.LIGHT -> lightGratiaColors
         com.gratia.music.data.ThemeOption.DARK -> darkGratiaColors
         com.gratia.music.data.ThemeOption.SYSTEM -> if (isSystemDark) darkGratiaColors else lightGratiaColors
+    }
+
+    if (isDark && isOledThemeEnabled) {
+        targetColors = targetColors.copy(
+            background = androidx.compose.ui.graphics.Color.Black,
+            surface = androidx.compose.ui.graphics.Color.Black,
+            surfaceHover = androidx.compose.ui.graphics.Color(0xFF0A0A0A)
+        )
     }
 
     val background by androidx.compose.animation.animateColorAsState(targetColors.background, label = "background")
