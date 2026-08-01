@@ -10,8 +10,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.platform.LocalContext
 import java.io.File
 
@@ -35,13 +38,16 @@ fun CoverArtImage(
 
     if (isHttpUrl || isLocalFile) {
         val modelData = if (isHttpUrl) coverArtPath else File(coverArtPath!!)
-        AsyncImage(
+        SubcomposeAsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(modelData)
                 .crossfade(300)
                 .build(),
             contentDescription = "$title cover art",
             contentScale = ContentScale.Crop,
+            loading = {
+                Box(modifier = Modifier.fillMaxSize().background(shimmerBrush()))
+            },
             modifier = modifier
                 .size(size)
                 .clip(RoundedCornerShape(cornerRadius))

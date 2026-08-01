@@ -57,8 +57,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val sleepTimerDurationMs = sleepTimerManager.durationMs
     val sleepTimerAction = sleepTimerManager.action
 
+    private val _favoriteSongIds = MutableStateFlow<Set<String>>(emptySet())
+    val favoriteSongIds: StateFlow<Set<String>> = _favoriteSongIds.asStateFlow()
+
     init {
-        // PlayerViewModel doesn't need to observe currentSong for lyrics anymore, LyricsManager handles it.
+        viewModelScope.launch {
+            songRepository.getFavorites().collectLatest { favs ->
+                _favoriteSongIds.value = favs.map { it.id }.toSet()
+            }
+        }
     }
 
     fun refreshLyrics(force: Boolean = true) {
@@ -134,6 +141,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleFavorite(song: SongEntity) {
         val newFavorite = !song.isFavorite
         viewModelScope.launch {
+            // Optimistically update the global set
+            val currentFavs = _favoriteSongIds.value.toMutableSet()
+            if (newFavorite) currentFavs.add(song.id) else currentFavs.remove(song.id)
+            _favoriteSongIds.value = currentFavs
+
             // 1. Persist to database
             songRepository.toggleFavorite(song.id, newFavorite)
 

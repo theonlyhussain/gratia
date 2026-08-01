@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -86,6 +87,7 @@ fun PlaylistDetailScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showAddMusic by remember { mutableStateOf(false) }
 
     val playlist = playlistFlow ?: return
 
@@ -148,18 +150,22 @@ fun PlaylistDetailScreen(
         label = "BgColor2"
     )
 
+    val bgColor = GratiaTheme.colors.background
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        animatedColor1.copy(alpha = 0.5f),
-                        GratiaTheme.colors.background,
-                        GratiaTheme.colors.background
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            animatedColor1.copy(alpha = 0.5f),
+                            bgColor,
+                            bgColor
+                        )
                     )
                 )
-            )
+            }
     ) {
         LazyColumn(
             contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
@@ -194,11 +200,27 @@ fun PlaylistDetailScreen(
                                     .clip(RoundedCornerShape(24.dp))
                             )
                         } else {
-                            CollageArtwork(
-                                paths = paths,
-                                size = 240.dp,
-                                cornerRadius = 24.dp
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(240.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(
+                                        Brush.linearGradient(
+                                            colors = listOf(
+                                                animatedColor1,
+                                                animatedColor2
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QueueMusic,
+                                    contentDescription = "Playlist",
+                                    tint = Color.White.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(80.dp)
+                                )
+                            }
                         }
                         
                         // Edit overlay icon
@@ -275,7 +297,9 @@ fun PlaylistDetailScreen(
                     EmptyStateView(
                         icon = Icons.Default.QueueMusic,
                         headline = "Empty Playlist",
-                        description = "Add some songs to this playlist to start listening."
+                        description = "Add some songs to this playlist to start listening.",
+                        actionLabel = "Add Music",
+                        onActionClick = { showAddMusic = true }
                     )
                 }
             } else {
@@ -334,6 +358,10 @@ fun PlaylistDetailScreen(
                     modifier = Modifier.background(GratiaTheme.colors.surface)
                 ) {
                     DropdownMenuItem(
+                        text = { GratiaText("Add Music", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
+                        onClick = { showMenu = false; showAddMusic = true }
+                    )
+                    DropdownMenuItem(
                         text = { GratiaText("Rename Playlist", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
                         onClick = { showMenu = false; showRenameDialog = true }
                     )
@@ -389,5 +417,12 @@ fun PlaylistDetailScreen(
                 onClose = { selectionManager.clearSelection() }
             )
         }
+    }
+
+    if (showAddMusic) {
+        com.gratia.music.ui.components.AddMusicSheet(
+            playlistId = playlist.id,
+            onDismiss = { showAddMusic = false }
+        )
     }
 }

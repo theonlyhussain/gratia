@@ -47,6 +47,9 @@ fun SongRow(
     modifier: Modifier = Modifier
 ) {
     val playerViewModel = LocalPlayerViewModel.current
+    val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
+    val isFavorite = favoriteSongIds.contains(song.id)
+    
     val firstMood = song.mood?.split(",")?.firstOrNull()?.trim()
     var showMenu by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
@@ -214,6 +217,7 @@ fun SongRow(
     if (showMenu) {
         SongMenuSheet(
             song = song,
+            isFavorite = isFavorite,
             onDismiss = { showMenu = false },
             onPlayNext = { playerViewModel.playNext(song) },
             onAddToQueue = { playerViewModel.addToQueue(song) },

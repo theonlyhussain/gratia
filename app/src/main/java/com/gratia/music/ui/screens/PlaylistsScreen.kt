@@ -29,6 +29,7 @@ import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.io.File
 
 @Composable
 fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
@@ -108,10 +109,21 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                 onDismiss = { showCreateDialog = false },
                 onSave = { name, description, uri ->
                     scope.launch {
+                        val newId = UUID.randomUUID().toString()
                         playlistDao.insertPlaylist(
-                            PlaylistEntity(id = UUID.randomUUID().toString(), name = name, createdAt = System.currentTimeMillis())
+                            PlaylistEntity(id = newId, name = name, createdAt = System.currentTimeMillis())
                         )
                         showCreateDialog = false
+                    }
+                },
+                onAddMusic = { name, description, uri ->
+                    scope.launch {
+                        val newId = UUID.randomUUID().toString()
+                        playlistDao.insertPlaylist(
+                            PlaylistEntity(id = newId, name = name, createdAt = System.currentTimeMillis())
+                        )
+                        showCreateDialog = false
+                        onNavigateToPlaylist(newId)
                     }
                 }
             )
@@ -134,11 +146,30 @@ fun PlaylistRow(playlist: PlaylistEntity, onClick: () -> Unit) {
                 .padding(GratiaTheme.spacing.mediumSmall),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            CollageArtwork(
-                paths = paths,
-                size = 56.dp,
-                cornerRadius = 12.dp
-            )
+            val firstCover = songs.firstOrNull()?.coverArtPath
+            if (firstCover != null && File(firstCover).exists()) {
+                com.gratia.music.ui.components.CoverArtImage(
+                    coverArtPath = firstCover,
+                    title = playlist.name,
+                    size = 56.dp,
+                    cornerRadius = 12.dp
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(GratiaTheme.colors.surfaceHover),
+                    contentAlignment = Alignment.Center
+                ) {
+                    GratiaIcon(
+                        imageVector = Icons.AutoMirrored.Filled.QueueMusic,
+                        contentDescription = "Playlist",
+                        tint = GratiaTheme.colors.textSecondary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
             Spacer(Modifier.width(GratiaTheme.spacing.mediumLarge))
             Column {
                 GratiaText(

@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,6 +69,9 @@ fun QueueSheet(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
     val history by playerViewModel.history.collectAsState()
+    val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
+
+    val context = LocalContext.current
     val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
     val repeatMode by playerViewModel.repeatMode.collectAsState()
     val autoplayEnabled by playerViewModel.autoplayEnabled.collectAsState()
@@ -152,11 +156,12 @@ fun QueueSheet(
 
                 // Favorite button
                 IconButton(onClick = { playerViewModel.toggleFavorite(current) }) {
+                    val isFav = favoriteSongIds.contains(current.id)
                     Icon(
-                        if (current.isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                        if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
                         contentDescription = "Favorite",
-                        tint = if (current.isFavorite) GratiaTheme.colors.accent else Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(24.dp)
+                        tint = if (isFav) GratiaTheme.colors.accent else Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -226,7 +231,7 @@ fun QueueSheet(
                             song = song,
                             index = -1,
                             isCurrentSong = false,
-                            onPlay = { /* History play not fully implemented */ },
+                            onPlay = { playerViewModel.playSong(song, history) },
                             onRemove = {}, // History items aren't removed individually here
                             modifier = Modifier.alpha(0.6f),
                             showDragHandle = false

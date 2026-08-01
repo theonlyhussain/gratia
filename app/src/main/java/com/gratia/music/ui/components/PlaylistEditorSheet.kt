@@ -52,7 +52,8 @@ import java.io.File
 fun PlaylistEditorSheet(
     initialSong: SongEntity? = null,
     onDismiss: () -> Unit,
-    onSave: (name: String, description: String, customImageUri: Uri?) -> Unit
+    onSave: (name: String, description: String, customImageUri: Uri?) -> Unit,
+    onAddMusic: ((name: String, description: String, customImageUri: Uri?) -> Unit)? = null
 ) {
     var name by remember { mutableStateOf("New Playlist") }
     var description by remember { mutableStateOf("") }
@@ -324,7 +325,11 @@ fun PlaylistEditorSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { 
-                        Toast.makeText(context, "Please save the playlist first to add more music.", Toast.LENGTH_SHORT).show()
+                        if (onAddMusic != null) {
+                            onAddMusic(name, description, customImageUri)
+                        } else {
+                            Toast.makeText(context, "Please save the playlist first to add more music.", Toast.LENGTH_SHORT).show()
+                        }
                     }
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically

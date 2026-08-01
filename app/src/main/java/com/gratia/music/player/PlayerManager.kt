@@ -27,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,6 +53,7 @@ class PlayerManager(private val context: Context) {
 
     private val listeningRepo = ListeningEventRepository(GratiaApp.instance.database.listeningEventDao())
     private val songRepo = com.gratia.music.data.repository.SongRepository(GratiaApp.instance.database.songDao())
+    private val settingsDataStore = com.gratia.music.data.SettingsDataStore(context)
 
     private val retentionManager = RetentionManager()
     private val autoPlayEngine = AutoPlayEngine(songRepo)
@@ -111,7 +113,7 @@ class PlayerManager(private val context: Context) {
                     scope.launch {
                         logListeningEventSuspend("complete", completed = true)
                         currentSessionStartTimeMs = 0L
-                        handleSongEnded()
+                        handleSongEndedSuspend()
                     }
                 }
                 Player.STATE_IDLE -> {
@@ -148,6 +150,41 @@ class PlayerManager(private val context: Context) {
     init {
         Log.d(TAG, "PlayerManager init — connecting to PlaybackService")
         connect()
+        
+        // Restore playback state on startup
+        scope.launch(Dispatchers.IO) {
+            try {
+                val queueIds = settingsDataStore.savedQueueIdsFlow.first()
+                val currentId = settingsDataStore.savedCurrentSongIdFlow.first()
+                val currentTime = settingsDataStore.savedCurrentTimeMsFlow.first()
+
+                if (queueIds.isNotEmpty() && currentId != null) {
+                    val restoredQueue = mutableListOf<SongEntity>()
+                    for (id in queueIds) {
+                        val song = songRepo.getSongById(id)
+                        if (song != null) restoredQueue.add(song)
+                    }
+                    val currentSong = songRepo.getSongById(currentId)
+                    
+                    if (currentSong != null && restoredQueue.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            Log.d(TAG, "Restored playback state: song='${currentSong.title}', queueSize=${restoredQueue.size}, time=${currentTime}ms")
+                            _queue.value = restoredQueue
+                            _currentSong.value = currentSong
+                            _currentTimeMs.value = currentTime
+                            
+                            // Let the controller know about this state when it connects
+                            pendingPlay = Pair(currentSong, restoredQueue)
+                            // We don't want it to immediately start playing on app start, 
+                            // but our playSong() method automatically calls controller.play().
+                            // We need a way to prepare without playing.
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore playback state", e)
+            }
+        }
         
         scope.launch {
             kotlinx.coroutines.flow.combine(currentSong, isPlaying) { song, playing ->
@@ -225,7 +262,13 @@ class PlayerManager(private val context: Context) {
                         if (pending != null) {
                             pendingPlay = null
                             Log.d(TAG, "connect(): executing pending play for '${pending.first.title}'")
-                            playSong(pending.first, pending.second)
+                            
+                            // If this was a restored state, prepare but don't play automatically
+                            if (_currentSong.value?.id == pending.first.id && _isPlaying.value == false && _currentTimeMs.value > 0) {
+                                playSongInternal(pending.first, pending.second, playImmediately = false, seekPosition = _currentTimeMs.value)
+                            } else {
+                                playSong(pending.first, pending.second)
+                            }
                         }
                     } else {
                         Log.e(TAG, "connect(): controller is null after Future.get()")
@@ -280,8 +323,21 @@ class PlayerManager(private val context: Context) {
         }
     }
 
+    private fun saveStateToDataStore() {
+        scope.launch(Dispatchers.IO) {
+            val qIds = _queue.value.map { it.id }
+            val cId = _currentSong.value?.id
+            val cTime = _currentTimeMs.value
+            settingsDataStore.savePlaybackState(qIds, cId, cTime)
+        }
+    }
+
     fun playSong(song: SongEntity, songQueue: List<SongEntity>) {
-        Log.d(TAG, "playSong: '${song.title}' by ${song.artist}")
+        playSongInternal(song, songQueue, playImmediately = true, seekPosition = 0L)
+    }
+
+    private fun playSongInternal(song: SongEntity, songQueue: List<SongEntity>, playImmediately: Boolean = true, seekPosition: Long = 0L) {
+        Log.d(TAG, "playSongInternal: '${song.title}' by ${song.artist}")
         
         // Log listening event for previously playing song
         val previousSong = _currentSong.value
@@ -344,11 +400,17 @@ class PlayerManager(private val context: Context) {
 
             controller.setMediaItem(mediaItem)
             controller.prepare()
-            controller.play()
-            Log.d(TAG, "playSong: commands sent to controller")
+            if (seekPosition > 0) {
+                controller.seekTo(seekPosition)
+            }
+            if (playImmediately) {
+                controller.play()
+            }
+            Log.d(TAG, "playSongInternal: commands sent to controller")
+            saveStateToDataStore()
             
         } catch (e: Exception) {
-            Log.e(TAG, "playSong: exception — ${e.message}")
+            Log.e(TAG, "playSongInternal: exception — ${e.message}")
             _playbackError.value = "Couldn't play this song. Try another file or check permission."
         }
     }
@@ -390,6 +452,7 @@ class PlayerManager(private val context: Context) {
         Log.d(TAG, "seekTo: ${clampedPosition}ms")
         controller.seekTo(clampedPosition)
         _currentTimeMs.value = clampedPosition
+        saveStateToDataStore()
     }
 
     fun clearQueue() {
@@ -397,6 +460,7 @@ class PlayerManager(private val context: Context) {
         _currentSong.value = null
         _queue.value = emptyList()
         updatePreloadManager()
+        saveStateToDataStore()
     }
 
     fun nextSong() {
@@ -405,6 +469,25 @@ class PlayerManager(private val context: Context) {
         if (q.isEmpty()) return
 
         val currentIndex = q.indexOfFirst { it.id == current.id }
+        
+        // Autoplay logic if at the end of queue
+        if (currentIndex == q.size - 1 && _autoplayEnabled.value) {
+            scope.launch {
+                val nextTrack = withContext(Dispatchers.IO) { autoPlayEngine.generateNextTrack(QueueAction.MAINTAIN_VIBE, current, q.map { it.id }) }
+                if (nextTrack != null) {
+                    val newQueue = q.toMutableList()
+                    newQueue.add(nextTrack)
+                    withContext(Dispatchers.Main) {
+                        _queue.value = newQueue
+                        updatePreloadManager()
+                        // Queue grew, we can now confidently play the next index
+                        playSong(newQueue[currentIndex + 1], newQueue)
+                    }
+                }
+            }
+            return
+        }
+
         val nextIndex = if (currentIndex == -1) {
             0
         } else if (_shuffleEnabled.value) {
@@ -523,42 +606,55 @@ class PlayerManager(private val context: Context) {
         playSong(q[index], q)
     }
 
-    private fun handleSongEnded() {
-        when (_repeatMode.value) {
-            RepeatMode.ONE -> {
-                // Repeat current song indefinitely
-                Log.d(TAG, "handleSongEnded: REPEAT_ONE — restarting current song")
-                if (!ensureConnected()) return
-                val controller = mediaController ?: return
+    private suspend fun handleSongEndedSuspend() {
+        if (_repeatMode.value == RepeatMode.ONE) {
+            Log.d(TAG, "handleSongEnded: REPEAT_ONE — restarting current song")
+            withContext(Dispatchers.Main) {
+                if (!ensureConnected()) return@withContext
+                val controller = mediaController ?: return@withContext
                 controller.seekTo(0)
                 controller.play()
             }
-            RepeatMode.ALL -> {
-                // Loop the entire queue — when at end, go back to first song
-                val current = _currentSong.value ?: return
-                val q = _queue.value
-                val currentIndex = q.indexOfFirst { it.id == current.id }
-                if (currentIndex < q.size - 1) {
-                    Log.d(TAG, "handleSongEnded: REPEAT_ALL — next in queue")
-                    nextSong()
-                } else {
-                    Log.d(TAG, "handleSongEnded: REPEAT_ALL — looping back to start")
+            return
+        }
+
+        val current = _currentSong.value ?: return
+        var q = _queue.value
+        var currentIndex = q.indexOfFirst { it.id == current.id }
+
+        // If at the end of the queue and autoplay is enabled, generate a track
+        if (currentIndex == q.size - 1 && _autoplayEnabled.value) {
+            Log.d(TAG, "handleSongEnded: End of queue, Autoplay is enabled. Generating next track.")
+            val nextTrack = withContext(Dispatchers.IO) { autoPlayEngine.generateNextTrack(QueueAction.MAINTAIN_VIBE, current, q.map { it.id }) }
+            if (nextTrack != null) {
+                val newQueue = q.toMutableList()
+                newQueue.add(nextTrack)
+                withContext(Dispatchers.Main) {
+                    _queue.value = newQueue
+                    updatePreloadManager()
+                }
+                q = newQueue
+            }
+        }
+
+        if (_repeatMode.value == RepeatMode.ALL) {
+            if (currentIndex < q.size - 1) {
+                Log.d(TAG, "handleSongEnded: REPEAT_ALL — next in queue")
+                withContext(Dispatchers.Main) { nextSong() }
+            } else {
+                Log.d(TAG, "handleSongEnded: REPEAT_ALL — looping back to start")
+                withContext(Dispatchers.Main) {
                     if (q.isNotEmpty()) {
                         playSong(q.first(), q)
                     }
                 }
             }
-            RepeatMode.OFF -> {
-                val current = _currentSong.value ?: return
-                val q = _queue.value
-                val currentIndex = q.indexOfFirst { it.id == current.id }
-                if (currentIndex < q.size - 1) {
-                    Log.d(TAG, "handleSongEnded: REPEAT_OFF — next in queue")
-                    nextSong()
-                } else {
-                    Log.d(TAG, "handleSongEnded: REPEAT_OFF — end of queue, stopping")
-                    // Don't manually set _isPlaying — ExoPlayer will emit onIsPlayingChanged(false)
-                }
+        } else if (_repeatMode.value == RepeatMode.OFF) {
+            if (currentIndex < q.size - 1) {
+                Log.d(TAG, "handleSongEnded: REPEAT_OFF — next in queue")
+                withContext(Dispatchers.Main) { nextSong() }
+            } else {
+                Log.d(TAG, "handleSongEnded: REPEAT_OFF — end of queue, stopping")
             }
         }
     }
@@ -584,6 +680,11 @@ class PlayerManager(private val context: Context) {
                     return@launch
                 }
                 delay(100) // 100ms for smooth UI updates
+                
+                // Save state periodically if playing
+                if (controller?.isPlaying == true && (System.currentTimeMillis() % 5000 < 100)) {
+                    saveStateToDataStore()
+                }
             }
         }
     }

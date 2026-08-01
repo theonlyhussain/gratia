@@ -96,4 +96,34 @@ class SettingsDataStore(private val context: Context) {
             preferences[SEARCH_HISTORY_KEY] = emptySet()
         }
     }
+
+    // Playback State Persistence
+    private val SAVED_QUEUE_IDS_KEY = stringPreferencesKey("saved_queue_ids") // comma separated
+    private val SAVED_CURRENT_SONG_ID_KEY = stringPreferencesKey("saved_current_song_id")
+    private val SAVED_CURRENT_TIME_MS_KEY = androidx.datastore.preferences.core.longPreferencesKey("saved_current_time_ms")
+
+    val savedQueueIdsFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        val str = preferences[SAVED_QUEUE_IDS_KEY] ?: ""
+        if (str.isEmpty()) emptyList() else str.split(",")
+    }
+
+    val savedCurrentSongIdFlow: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[SAVED_CURRENT_SONG_ID_KEY]
+    }
+
+    val savedCurrentTimeMsFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[SAVED_CURRENT_TIME_MS_KEY] ?: 0L
+    }
+
+    suspend fun savePlaybackState(queueIds: List<String>, currentSongId: String?, currentTimeMs: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[SAVED_QUEUE_IDS_KEY] = queueIds.joinToString(",")
+            if (currentSongId != null) {
+                preferences[SAVED_CURRENT_SONG_ID_KEY] = currentSongId
+            } else {
+                preferences.remove(SAVED_CURRENT_SONG_ID_KEY)
+            }
+            preferences[SAVED_CURRENT_TIME_MS_KEY] = currentTimeMs
+        }
+    }
 }

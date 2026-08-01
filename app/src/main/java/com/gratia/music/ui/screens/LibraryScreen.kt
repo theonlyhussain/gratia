@@ -45,7 +45,7 @@ fun LibraryScreen(
     val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     
     // activeSubView: null means root library menu
-    var activeSubView by remember { mutableStateOf<String?>(null) }
+    var activeSubView by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
     
     val navController = LocalNavController.current
 
@@ -523,11 +523,14 @@ fun ArtistRowImage(artistName: String, fallbackPath: String?, size: androidx.com
     }
 
     if (fetchedUrl != null) {
-        coil.compose.AsyncImage(
+        coil.compose.SubcomposeAsyncImage(
             model = fetchedUrl,
             contentDescription = artistName,
             modifier = Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            loading = {
+                Box(modifier = Modifier.fillMaxSize().background(com.gratia.music.ui.components.shimmerBrush()))
+            }
         )
     } else if (fallbackPath != null) {
         CoverArtImage(coverArtPath = fallbackPath, title = artistName, size = size, cornerRadius = size / 2)

@@ -84,11 +84,14 @@ fun ArtistDetailScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (artistImageUrl != null) {
-                        coil.compose.AsyncImage(
+                        coil.compose.SubcomposeAsyncImage(
                             model = artistImageUrl,
                             contentDescription = artistName,
                             modifier = Modifier.size(240.dp).clip(CircleShape),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                            loading = {
+                                Box(modifier = Modifier.fillMaxSize().background(com.gratia.music.ui.components.shimmerBrush()))
+                            }
                         )
                     } else if (coverArtPath != null) {
                         CoverArtImage(

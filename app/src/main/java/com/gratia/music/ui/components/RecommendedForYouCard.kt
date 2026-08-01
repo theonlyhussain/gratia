@@ -21,7 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -67,22 +67,36 @@ fun RecommendedForYouCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (artistImageUrl != null) {
-                    AsyncImage(
+                    SubcomposeAsyncImage(
                         model = artistImageUrl,
                         contentDescription = "Artist Image",
                         contentScale = ContentScale.Crop,
+                        loading = {
+                            Box(modifier = Modifier.fillMaxSize().background(com.gratia.music.ui.components.shimmerBrush()))
+                        },
                         modifier = Modifier
                             .size(180.dp)
                             .clip(PixelatedCircleShape(gridSize = 20))
                     )
                 } else {
-                    // Fallback to a plain grey pixelated circle if no image
-                    Box(
-                        modifier = Modifier
-                            .size(180.dp)
-                            .clip(PixelatedCircleShape(gridSize = 20))
-                            .background(GratiaTheme.colors.surfaceHover)
-                    )
+                    val fallbackPath = songs.firstOrNull { it.coverArtPath != null }?.coverArtPath
+                    if (fallbackPath != null) {
+                        CoverArtImage(
+                            coverArtPath = fallbackPath,
+                            title = artistName,
+                            size = 180.dp,
+                            cornerRadius = 90.dp,
+                            modifier = Modifier.clip(PixelatedCircleShape(gridSize = 20))
+                        )
+                    } else {
+                        // Fallback to a plain grey pixelated circle if no image and no cover
+                        Box(
+                            modifier = Modifier
+                                .size(180.dp)
+                                .clip(PixelatedCircleShape(gridSize = 20))
+                                .background(GratiaTheme.colors.surfaceHover)
+                        )
+                    }
                 }
             }
             

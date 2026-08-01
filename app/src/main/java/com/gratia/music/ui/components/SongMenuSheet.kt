@@ -25,6 +25,7 @@ import com.gratia.music.ui.theme.SpaceGrotesk
 @Composable
 fun SongMenuSheet(
     song: SongEntity,
+    isFavorite: Boolean = song.isFavorite,
     onDismiss: () -> Unit,
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
@@ -81,10 +82,10 @@ fun SongMenuSheet(
             MenuActionRow(icon = Icons.Outlined.QueueMusic, text = "Add to Queue", onClick = { onAddToQueue(); onDismiss() })
             MenuActionRow(icon = Icons.Outlined.PlaylistAdd, text = "Add to Playlist", onClick = { onAddToPlaylist(); onDismiss() })
             MenuActionRow(
-                icon = if (song.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, 
-                text = if (song.isFavorite) "Unlike" else "Like", 
+                icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, 
+                text = if (isFavorite) "Unlike" else "Like", 
                 onClick = { onToggleLike(); onDismiss() },
-                tint = if (song.isFavorite) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary
+                tint = if (isFavorite) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary
             )
             MenuActionRow(icon = Icons.Outlined.Album, text = "Go to Album", onClick = { onGoToAlbum(); onDismiss() })
             MenuActionRow(icon = Icons.Outlined.Person, text = "Go to Artist", onClick = { onGoToArtist(); onDismiss() })

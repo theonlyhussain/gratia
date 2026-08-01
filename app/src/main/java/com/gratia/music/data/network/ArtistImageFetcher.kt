@@ -23,7 +23,7 @@ object ArtistImageFetcher {
         
         val cached = prefs?.getString(artistName, null)
         if (cached != null) {
-            return@withContext cached
+            return@withContext if (cached == "NO_IMAGE") null else cached
         }
         
         try {
@@ -47,12 +47,19 @@ object ArtistImageFetcher {
                     
                     if (fetchedUrl != null) {
                         prefs?.edit()?.putString(artistName, fetchedUrl)?.apply()
+                    } else {
+                        prefs?.edit()?.putString(artistName, "NO_IMAGE")?.apply()
                     }
                     return@withContext fetchedUrl
+                } else {
+                    prefs?.edit()?.putString(artistName, "NO_IMAGE")?.apply()
                 }
+            } else {
+                prefs?.edit()?.putString(artistName, "NO_IMAGE")?.apply()
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            // Don't cache network errors as permanent failures
         }
         return@withContext null
     }

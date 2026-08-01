@@ -53,16 +53,30 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit = {}
 ) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
-    val recentlyPlayed by songRepo.getRecentlyPlayed(10).collectAsState(initial = emptyList())
-    val mostPlayed by songRepo.getMostPlayed(10).collectAsState(initial = emptyList())
-    val lastAdded by songRepo.getLastAdded(10).collectAsState(initial = emptyList())
-    val favoriteSongs by songRepo.getFavorites().collectAsState(initial = emptyList())
+    val mostPlayedRaw by songRepo.getMostPlayed(10).collectAsState(initial = emptyList())
+    val favoriteSongsRaw by songRepo.getFavorites().collectAsState(initial = emptyList())
+    val recentlyPlayedRaw by songRepo.getRecentlyPlayed(10).collectAsState(initial = emptyList())
+    val lastAddedRaw by songRepo.getLastAdded(10).collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
+    val mostPlayed = remember(mostPlayedRaw) { mostPlayedRaw }
+    val favoriteSongs = remember(mostPlayedRaw, favoriteSongsRaw) {
+        val excludeIds = mostPlayedRaw.map { it.id }.toSet()
+        favoriteSongsRaw.filter { it.id !in excludeIds }
+    }
+    val recentlyPlayed = remember(mostPlayedRaw, favoriteSongsRaw, recentlyPlayedRaw) {
+        val excludeIds = (mostPlayedRaw + favoriteSongsRaw).map { it.id }.toSet()
+        recentlyPlayedRaw.filter { it.id !in excludeIds }
+    }
+    val lastAdded = remember(mostPlayedRaw, favoriteSongsRaw, recentlyPlayedRaw, lastAddedRaw) {
+        val excludeIds = (mostPlayedRaw + favoriteSongsRaw + recentlyPlayedRaw).map { it.id }.toSet()
+        lastAddedRaw.filter { it.id !in excludeIds }
+    }
+
     // Determine Top Artist for Recommendation
-    val recommendedArtist = remember(mostPlayed, recentlyPlayed) {
-        val allSongs = mostPlayed + recentlyPlayed
+    val recommendedArtist = remember(mostPlayedRaw, recentlyPlayedRaw) {
+        val allSongs = mostPlayedRaw + recentlyPlayedRaw
         val artistCounts = allSongs.groupingBy { it.artist }.eachCount()
         artistCounts.maxByOrNull { it.value }?.key
     }

@@ -69,6 +69,9 @@ fun ExpandedPlayer(
     val currentTimeMs by playerViewModel.currentTimeMs.collectAsState()
     val durationMs by playerViewModel.durationMs.collectAsState()
 
+    val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
+    val isFavorite = currentSong?.id?.let { favoriteSongIds.contains(it) } ?: false
+
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
 
@@ -225,7 +228,7 @@ fun ExpandedPlayer(
                 title = song.title,
                 artist = song.artist,
                 album = song.album,
-                isFavorite = song.isFavorite,
+                isFavorite = isFavorite,
                 playingFrom = (song.album ?: "GRATIA").uppercase(),
                 onClickTitle = { showSongInfo = true },
                 onClickArtist = {
@@ -240,7 +243,7 @@ fun ExpandedPlayer(
                 },
                 onToggleFavorite = {
                     playerViewModel.toggleFavorite(song)
-                    val msg = if (song.isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
+                    val msg = if (isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
                     scope.launch { snackbarHostState.showSnackbar(msg) }
                 },
                 onMoreClick = { showSongMenu = true }
@@ -306,7 +309,7 @@ fun ExpandedPlayer(
                 },
                 onToggleLike = {
                     playerViewModel.toggleFavorite(song)
-                    val msg = if (song.isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
+                    val msg = if (isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
                     scope.launch { snackbarHostState.showSnackbar(msg) }
                 },
                 onGoToAlbum = {

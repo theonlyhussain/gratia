@@ -8,7 +8,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -82,18 +82,24 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
 
     var offsetX by remember { mutableFloatStateOf(0f) }
 
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
     GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
             .graphicsLayer {
                 translationX = offsetX
-                alpha = (1f - (Math.abs(offsetX) / 1000f)).coerceIn(0f, 1f)
+                translationY = offsetY
+                alpha = (1f - (Math.abs(offsetX) / 1000f) - (Math.abs(offsetY) / 500f)).coerceIn(0f, 1f)
             }
             .pointerInput(Unit) {
-                detectHorizontalDragGestures(
+                detectDragGestures(
                     onDragEnd = {
-                        if (offsetX < -200f) {
+                        if (offsetY > 150f) {
+                            haptics.heavy(view)
+                            playerViewModel.clearQueue()
+                        } else if (offsetX < -200f) {
                             haptics.light(view)
                             playerViewModel.nextSong()
                         } else if (offsetX > 200f) {
@@ -101,10 +107,20 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                             playerViewModel.prevSong()
                         }
                         offsetX = 0f
+                        offsetY = 0f
                     },
-                    onDragCancel = { offsetX = 0f },
-                    onHorizontalDrag = { _, dragAmount ->
-                        offsetX += dragAmount
+                    onDragCancel = { 
+                        offsetX = 0f
+                        offsetY = 0f 
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        // Prioritize horizontal unless dragging strongly downwards
+                        if (Math.abs(offsetX) > 20f || Math.abs(dragAmount.x) > Math.abs(dragAmount.y)) {
+                            offsetX += dragAmount.x
+                        } else if (dragAmount.y > 0) {
+                            offsetY += dragAmount.y
+                        }
                     }
                 )
             },
