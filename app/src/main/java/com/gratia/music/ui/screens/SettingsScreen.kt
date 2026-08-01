@@ -84,6 +84,28 @@ fun SettingsScreen(
             )
         }
 
+        // Update Banner
+        item {
+            val updateState by GratiaApp.instance.updateManager.state.collectAsState()
+            
+            // Check for update on Settings open if idle
+            LaunchedEffect(Unit) {
+                if (updateState is com.gratia.music.updater.UpdateState.Idle) {
+                    GratiaApp.instance.updateManager.checkForUpdate(manualCheck = true)
+                }
+            }
+            
+            com.gratia.music.ui.components.UpdateBanner(
+                state = updateState,
+                onDownload = { url ->
+                    scope.launch { GratiaApp.instance.updateManager.downloadUpdate(url) }
+                },
+                onInstall = { file ->
+                    GratiaApp.instance.updateManager.installUpdate(file)
+                }
+            )
+        }
+
         // Appearance
         item {
             AppleSectionHeader(title = "Appearance")

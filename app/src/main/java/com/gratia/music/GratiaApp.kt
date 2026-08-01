@@ -26,12 +26,17 @@ class GratiaApp : Application() {
     lateinit var preloadManager: com.gratia.music.player.PreloadManager
         private set
 
+    lateinit var updateManager: com.gratia.music.updater.UpdateManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
         database = GratiaDatabase.getInstance(this)
         preloadManager = com.gratia.music.player.PreloadManager(this)
         com.gratia.music.data.network.ArtistImageFetcher.init(this)
+        
+        updateManager = com.gratia.music.updater.UpdateManager(this)
         
         playerManager = PlayerManager(this)
         
@@ -42,6 +47,24 @@ class GratiaApp : Application() {
         equalizerManager = EqualizerManager(eqRepo)
         
         sleepTimerManager = com.gratia.music.player.SleepTimerManager(playerManager)
+        
+        scheduleUpdateCheck()
+    }
+
+    private fun scheduleUpdateCheck() {
+        val workRequest = androidx.work.PeriodicWorkRequestBuilder<com.gratia.music.updater.UpdateCheckWorker>(
+            24, java.util.concurrent.TimeUnit.HOURS
+        ).setConstraints(
+            androidx.work.Constraints.Builder()
+                .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+                .build()
+        ).build()
+        
+        androidx.work.WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            com.gratia.music.updater.UpdateCheckWorker.WORK_NAME,
+            androidx.work.ExistingPeriodicWorkPolicy.KEEP,
+            workRequest
+        )
     }
 
     companion object {

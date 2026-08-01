@@ -17,6 +17,9 @@
 
     <!-- Keep CPU awake during playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- For custom OTA updates -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".GratiaApp"
