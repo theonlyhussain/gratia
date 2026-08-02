@@ -173,7 +173,7 @@ fun HomeScreen(
                     items(mostPlayed) { song ->
                         TopPickCard(
                             song = song,
-                            onClick = { playerViewModel.playSong(song, mostPlayed) }
+                            onClick = { playerViewModel.playSong(song, allSongs) }
                         )
                     }
                 }
@@ -206,7 +206,7 @@ fun HomeScreen(
                         songs = recommendedArtistSongs,
                         onPlay = {
                             if (recommendedArtistSongs.isNotEmpty()) {
-                                playerViewModel.playSong(recommendedArtistSongs.first(), recommendedArtistSongs)
+                                playerViewModel.playSong(recommendedArtistSongs.first(), allSongs)
                             }
                         }
                     )
@@ -225,7 +225,7 @@ fun HomeScreen(
                     items(favoriteSongs) { song ->
                         RecentCard(
                             song = song,
-                            onClick = { playerViewModel.playSong(song, favoriteSongs) }
+                            onClick = { playerViewModel.playSong(song, allSongs) }
                         )
                     }
                 }
@@ -243,7 +243,7 @@ fun HomeScreen(
                     items(recentlyPlayed) { song ->
                         RecentCard(
                             song = song,
-                            onClick = { playerViewModel.playSong(song, recentlyPlayed) }
+                            onClick = { playerViewModel.playSong(song, allSongs) }
                         )
                     }
                 }
@@ -261,33 +261,14 @@ fun HomeScreen(
                     items(lastAdded) { song ->
                         RecentCard(
                             song = song,
-                            onClick = { playerViewModel.playSong(song, lastAdded) }
+                            onClick = { playerViewModel.playSong(song, allSongs) }
                         )
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
-        
-        if (allSongs.isNotEmpty()) {
-            item {
-                AppleSectionHeader(title = "All Songs")
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // Show a reasonable chunk of songs on the home screen to avoid huge horizontal scrolls
-                    val displaySongs = allSongs.take(30)
-                    items(displaySongs) { song ->
-                        RecentCard(
-                            song = song,
-                            onClick = { playerViewModel.playSong(song, displaySongs) }
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-        }
+
 
         if (mostPlayed.isEmpty() && recentlyPlayed.isEmpty() && lastAdded.isEmpty()) {
             item {

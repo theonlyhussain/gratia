@@ -144,7 +144,7 @@ fun WelcomeScreen(
                 )
             ) {
                 Text(
-                    text = "Experience your music\\nlike never before.",
+                    text = "Experience your music\nlike never before.",
                     fontFamily = Inter,
                     fontWeight = FontWeight.Normal,
                     fontSize = 16.sp,

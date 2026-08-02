@@ -75,6 +75,8 @@ class PlayerManager(private val context: Context) {
     private val _queue = MutableStateFlow<List<SongEntity>>(emptyList())
     val queue: StateFlow<List<SongEntity>> = _queue.asStateFlow()
 
+    private var baseQueue: List<SongEntity> = emptyList()
+
     private val _shuffleEnabled = MutableStateFlow(false)
     val shuffleEnabled: StateFlow<Boolean> = _shuffleEnabled.asStateFlow()
 
@@ -332,26 +334,39 @@ class PlayerManager(private val context: Context) {
         }
     }
 
-    fun playSong(song: SongEntity, songQueue: List<SongEntity>) {
-        playSongInternal(song, songQueue, playImmediately = true, seekPosition = 0L)
+    fun playSong(song: SongEntity, list: List<SongEntity>, playImmediately: Boolean = true) {
+        val oldCurrent = _currentSong.value
+        Log.d(TAG, "playSong: '${song.title}' from list of size ${list.size}")
+        
+        baseQueue = list
+        if (_shuffleEnabled.value) {
+            val idx = list.indexOfFirst { it.id == song.id }
+            val remainder = if (idx >= 0 && idx < list.size - 1) list.subList(idx + 1, list.size) else emptyList()
+            val before = if (idx > 0) list.subList(0, idx) else emptyList()
+            _queue.value = before + listOf(song) + remainder.shuffled()
+        } else {
+            _queue.value = list
+        }
+        
+        _currentSong.value = song
+        if (oldCurrent?.id != song.id) {
+            _history.value = listOf(song) + _history.value
+            
+            // Log listening event for previously playing song
+            if (oldCurrent != null) {
+                scope.launch { logListeningEventSuspend("skip", skipped = true) }
+                currentSessionStartTimeMs = 0L
+                
+                // Keep history limited to 20 items for UI
+                _history.value = _history.value.take(20)
+            }
+        }
+        
+        playSongInternal(song, _queue.value, playImmediately = playImmediately, seekPosition = 0L)
     }
 
     private fun playSongInternal(song: SongEntity, songQueue: List<SongEntity>, playImmediately: Boolean = true, seekPosition: Long = 0L) {
         Log.d(TAG, "playSongInternal: '${song.title}' by ${song.artist}")
-        
-        // Log listening event for previously playing song
-        val previousSong = _currentSong.value
-        if (previousSong != null && previousSong.id != song.id) {
-            scope.launch { logListeningEventSuspend("skip", skipped = true) }
-            currentSessionStartTimeMs = 0L
-
-            // Add previous song to history
-            val currentHistory = _history.value.toMutableList()
-            currentHistory.removeAll { it.id == previousSong.id } // Remove duplicates
-            currentHistory.add(0, previousSong)
-            // Keep history limited to 20 items for UI
-            _history.value = currentHistory.take(20)
-        }
 
         _currentSong.value = song
         _queue.value = songQueue.toList() // Copy to prevent ConcurrentModificationException
@@ -490,8 +505,6 @@ class PlayerManager(private val context: Context) {
 
         val nextIndex = if (currentIndex == -1) {
             0
-        } else if (_shuffleEnabled.value) {
-            (q.indices).random()
         } else {
             (currentIndex + 1) % q.size
         }
@@ -527,8 +540,33 @@ class PlayerManager(private val context: Context) {
     }
 
     fun toggleShuffle() {
-        _shuffleEnabled.value = !_shuffleEnabled.value
+        val currentShuffle = _shuffleEnabled.value
+        _shuffleEnabled.value = !currentShuffle
         Log.d(TAG, "toggleShuffle: ${_shuffleEnabled.value}")
+        
+        val current = _currentSong.value ?: return
+        val currentId = current.id
+        
+        if (!currentShuffle) {
+            // Turning ON shuffle: shuffle the remaining songs in the queue
+            val currentIndexInQueue = _queue.value.indexOfFirst { it.id == currentId }
+            if (currentIndexInQueue >= 0 && currentIndexInQueue < _queue.value.size - 1) {
+                val before = _queue.value.subList(0, currentIndexInQueue + 1)
+                val after = _queue.value.subList(currentIndexInQueue + 1, _queue.value.size).shuffled()
+                _queue.value = before + after
+                updatePreloadManager()
+            }
+        } else {
+            // Turning OFF shuffle: restore order from baseQueue 
+            // We find current song in baseQueue and reconstruct to prevent UI jumping
+            if (baseQueue.isNotEmpty()) {
+                val currentIndexInBase = baseQueue.indexOfFirst { it.id == currentId }
+                if (currentIndexInBase >= 0) {
+                    _queue.value = baseQueue
+                    updatePreloadManager()
+                }
+            }
+        }
     }
 
     fun cycleRepeatMode() {
