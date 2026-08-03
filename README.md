@@ -6,7 +6,7 @@
 
 A modern, meticulously crafted music player focused on fluid playback, stunning UI, ad-free listening experience.
 
-[![Version](https://img.shields.io/badge/Version-2.3.3-orange.svg)]()
+[![Version](https://img.shields.io/badge/Version-2.3.5-orange.svg)]()
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg?logo=kotlin)](http://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Compose-Jetpack-4285F4.svg?logo=android)](https://developer.android.com/jetpack/compose)
 [![Media3](https://img.shields.io/badge/Media3-ExoPlayer-brightgreen.svg)]()

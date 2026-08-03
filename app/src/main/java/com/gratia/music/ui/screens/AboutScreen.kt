@@ -46,6 +46,8 @@ fun AboutScreen(
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
+    val packageInfo = remember(context) { context.packageManager.getPackageInfo(context.packageName, 0) }
+    val appVersion = remember(packageInfo) { packageInfo.versionName ?: "Unknown" }
 
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
 
@@ -108,14 +110,6 @@ fun AboutScreen(
                     .padding(vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                val appVersion = packageInfo.versionName ?: "Unknown"
-                val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    packageInfo.longVersionCode.toString()
-                } else {
-                    @Suppress("DEPRECATION")
-                    packageInfo.versionCode.toString()
-                }
                 
                 Image(
                     painter = painterResource(id = R.drawable.gratia_logo),
@@ -141,7 +135,6 @@ fun AboutScreen(
             }
 
             AboutCard(title = "System Information") {
-                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
                 val buildNumber = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     packageInfo.longVersionCode.toString()
                 } else {
@@ -193,7 +186,7 @@ fun AboutScreen(
                 HorizontalDivider(color = GratiaTheme.colors.glassBorder)
                 AboutActionRow(
                     title = "Changelog",
-                    subtitle = "What's new in v2.2.2",
+                    subtitle = "What's new in v$appVersion",
                     onClick = {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/releases")))
                     }
