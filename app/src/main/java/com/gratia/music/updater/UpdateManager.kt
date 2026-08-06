@@ -122,7 +122,12 @@ class UpdateManager(private val context: Context) {
                     }
                 }
                 
-                _state.value = UpdateState.ReadyToInstall(apkFile)
+                if (verifyApk(apkFile)) {
+                    _state.value = UpdateState.ReadyToInstall(apkFile)
+                } else {
+                    _state.value = UpdateState.Error("Downloaded update is corrupted")
+                    apkFile.delete()
+                }
 
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -163,5 +168,19 @@ class UpdateManager(private val context: Context) {
             if (l < c) return false
         }
         return false
+    }
+
+    private fun verifyApk(apkFile: File): Boolean {
+        return try {
+            val packageInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+            if (packageInfo != null) {
+                packageInfo.packageName == context.packageName
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 }

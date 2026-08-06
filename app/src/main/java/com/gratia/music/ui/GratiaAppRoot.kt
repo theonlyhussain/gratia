@@ -1,6 +1,7 @@
 package com.gratia.music.ui
 
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -82,6 +83,13 @@ fun GratiaAppRoot() {
     val oledThemeEnabled by settingsDataStore.oledThemeEnabledFlow.collectAsState(initial = false)
     val onboardingCompleted by settingsDataStore.onboardingCompletedFlow.collectAsState(initial = null)
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        val isSmartUpdateEnabled = settingsDataStore.smartUpdateEnabledFlow.first()
+        if (isSmartUpdateEnabled) {
+            com.gratia.music.GratiaApp.instance.updateManager.checkForUpdate(manualCheck = false)
+        }
+    }
 
     GratiaTheme(themeOption = themeOption, isOledThemeEnabled = oledThemeEnabled) {
         CompositionLocalProvider(
@@ -330,7 +338,8 @@ fun GratiaAppRoot() {
                 composable("profile") {
                     ProfileScreen(
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateToStorage = { navController.navigate("storage") }
+                        onNavigateToStorage = { navController.navigate("storage") },
+                        onNavigateToAbout = { navController.navigate("about") }
                     )
                 }
                 composable("storage") {

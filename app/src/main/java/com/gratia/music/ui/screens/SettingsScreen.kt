@@ -85,7 +85,118 @@ fun SettingsScreen(
             )
         }
 
-        // Update Banner Removed
+        // Smart Update Section
+        item {
+            AppleSectionHeader(title = "Updates")
+            
+            val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
+            val smartUpdateOnboardingShown by settingsDataStore.smartUpdateOnboardingShownFlow.collectAsState(initial = false)
+            var showOnboarding by remember { mutableStateOf(false) }
+            
+            AppleListRow(
+                title = "Smart Update",
+                subtitle = "Automatically check for updates in the background",
+                onClick = { 
+                    if (!smartUpdateEnabled && !smartUpdateOnboardingShown) {
+                        showOnboarding = true
+                    } else {
+                        val newValue = !smartUpdateEnabled
+                        scope.launch { 
+                            settingsDataStore.setSmartUpdateEnabled(newValue) 
+                            if (newValue) {
+                                com.gratia.music.updater.UpdateCheckWorker.schedule(context)
+                            } else {
+                                com.gratia.music.updater.UpdateCheckWorker.cancel(context)
+                            }
+                        }
+                    }
+                },
+                trailingContent = {
+                    Switch(
+                        checked = smartUpdateEnabled,
+                        onCheckedChange = { checked ->
+                            if (checked && !smartUpdateOnboardingShown) {
+                                showOnboarding = true
+                            } else {
+                                scope.launch { 
+                                    settingsDataStore.setSmartUpdateEnabled(checked) 
+                                    if (checked) {
+                                        com.gratia.music.updater.UpdateCheckWorker.schedule(context)
+                                    } else {
+                                        com.gratia.music.updater.UpdateCheckWorker.cancel(context)
+                                    }
+                                }
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = GratiaTheme.colors.surface,
+                            checkedTrackColor = GratiaTheme.colors.accent,
+                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
+                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover,
+                            uncheckedBorderColor = androidx.compose.ui.graphics.Color.Transparent
+                        )
+                    )
+                }
+            )
+            AppleListRow(
+                title = "Check for Updates",
+                onClick = { 
+                    scope.launch { GratiaApp.instance.updateManager.checkForUpdate(manualCheck = true) }
+                },
+                showDivider = false,
+                trailingContent = {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Check",
+                        tint = GratiaTheme.colors.textSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
+            
+            if (showOnboarding) {
+                com.gratia.music.ui.components.SmartUpdateOnboardingSheet(
+                    onEnable = {
+                        showOnboarding = false
+                        scope.launch {
+                            settingsDataStore.setSmartUpdateOnboardingShown(true)
+                            settingsDataStore.setSmartUpdateEnabled(true)
+                            com.gratia.music.updater.UpdateCheckWorker.schedule(context)
+                        }
+                    },
+                    onCancel = {
+                        showOnboarding = false
+                    },
+                    onDismiss = {
+                        showOnboarding = false
+                    }
+                )
+            }
+            
+            val updateState by GratiaApp.instance.updateManager.state.collectAsState()
+            
+            if (updateState !is com.gratia.music.updater.UpdateState.Idle) {
+                com.gratia.music.ui.components.UpdatePromptSheet(
+                    state = updateState,
+                    onUpdateNow = { url ->
+                        scope.launch { GratiaApp.instance.updateManager.downloadUpdate(url) }
+                    },
+                    onLater = {
+                        GratiaApp.instance.updateManager.resetState()
+                    },
+                    onInstall = { file ->
+                        GratiaApp.instance.updateManager.installUpdate(file)
+                    },
+                    onDismiss = {
+                        if (updateState !is com.gratia.music.updater.UpdateState.Downloading) {
+                            GratiaApp.instance.updateManager.resetState()
+                        }
+                    }
+                )
+            }
+            
+            Spacer(Modifier.height(24.dp))
+        }
 
         // Appearance
         item {

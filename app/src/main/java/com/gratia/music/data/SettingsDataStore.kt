@@ -80,6 +80,32 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    private val SMART_UPDATE_ENABLED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("smart_update_enabled")
+    
+    val smartUpdateEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[SMART_UPDATE_ENABLED_KEY] ?: false
+        }
+
+    suspend fun setSmartUpdateEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SMART_UPDATE_ENABLED_KEY] = enabled
+        }
+    }
+
+    private val SMART_UPDATE_ONBOARDING_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("smart_update_onboarding_shown")
+    
+    val smartUpdateOnboardingShownFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[SMART_UPDATE_ONBOARDING_KEY] ?: false
+        }
+
+    suspend fun setSmartUpdateOnboardingShown(shown: Boolean = true) {
+        context.dataStore.edit { preferences ->
+            preferences[SMART_UPDATE_ONBOARDING_KEY] = shown
+        }
+    }
+
     private val SEARCH_HISTORY_KEY = stringSetPreferencesKey("search_history")
 
     val searchHistoryFlow: Flow<Set<String>> = context.dataStore.data
