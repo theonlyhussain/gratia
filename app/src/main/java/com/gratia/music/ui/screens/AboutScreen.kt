@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -274,35 +275,33 @@ fun AboutScreen(
                         DeveloperActionIcon(
                             icon = Icons.Default.Language,
                             contentDescription = "Portfolio",
-                            onClick = {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://theonlyhussain.vercel.app")))
-                            }
+                            onClick = { openUrlSafely(context, "https://theonlyhussain.vercel.app") }
                         )
                         
                         DeveloperActionIcon(
                             icon = InstagramIcon,
                             contentDescription = "Instagram",
-                            onClick = {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://instagram.com/theonly.hussain")))
-                            }
+                            onClick = { openUrlSafely(context, "https://instagram.com/theonly.hussain") }
                         )
                         
                         DeveloperActionIcon(
                             icon = GithubIcon,
                             contentDescription = "GitHub",
-                            onClick = {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain")))
-                            }
+                            onClick = { openUrlSafely(context, "https://github.com/theonlyhussain") }
                         )
 
                         DeveloperActionIcon(
                             icon = Icons.Default.Email,
                             contentDescription = "Email",
                             onClick = {
-                                val intent = Intent(Intent.ACTION_SENDTO).apply {
-                                    data = Uri.parse("mailto:hussainshaikh2509@gmail.com")
+                                try {
+                                    val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                        data = Uri.parse("mailto:hussainshaikh2509@gmail.com")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "No email app found.", Toast.LENGTH_SHORT).show()
                                 }
-                                context.startActivity(intent)
                             }
                         )
                     }
@@ -340,25 +339,25 @@ fun AboutScreen(
                     AboutActionRow(
                         title = "GitHub Repository",
                         subtitle = "Source code and releases",
-                        onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia")))
-                        }
+                        onClick = { openUrlSafely(context, "https://github.com/theonlyhussain/gratia") }
                     )
                     HorizontalDivider(color = GratiaTheme.colors.glassBorder, modifier = Modifier.padding(vertical = 4.dp))
                     AboutActionRow(
-                        title = "Report an Issue",
+                        title = "Report a Bug",
                         subtitle = "Found a bug? Let us know.",
-                        onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/issues")))
-                        }
+                        onClick = { openUrlSafely(context, "https://github.com/theonlyhussain/gratia/issues/new?template=bug_report.md") }
                     )
                     HorizontalDivider(color = GratiaTheme.colors.glassBorder, modifier = Modifier.padding(vertical = 4.dp))
                     AboutActionRow(
-                        title = "Feature Requests",
+                        title = "Request a Feature",
                         subtitle = "Suggest new ideas for Gratia.",
-                        onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/issues/new")))
-                        }
+                        onClick = { openUrlSafely(context, "https://github.com/theonlyhussain/gratia/issues/new?template=feature_request.md") }
+                    )
+                    HorizontalDivider(color = GratiaTheme.colors.glassBorder, modifier = Modifier.padding(vertical = 4.dp))
+                    AboutActionRow(
+                        title = "View Issues",
+                        subtitle = "Browse ongoing work and discussions.",
+                        onClick = { openUrlSafely(context, "https://github.com/theonlyhussain/gratia/issues") }
                     )
                 }
             }
@@ -379,9 +378,7 @@ fun AboutScreen(
                     AboutActionRow(
                         title = "Privacy Policy",
                         subtitle = "Local-first data policy",
-                        onClick = {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/theonlyhussain/gratia/blob/main/PRIVACY.md")))
-                        }
+                        onClick = { openUrlSafely(context, "https://github.com/theonlyhussain/gratia/blob/main/PRIVACY.md") }
                     )
                 }
             }
@@ -493,9 +490,7 @@ private fun SpecialThanksItem(name: String, description: String, url: String) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .bounceClick {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            }
+            .bounceClick { openUrlSafely(context, url) }
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -561,5 +556,13 @@ private fun AboutActionRow(title: String, subtitle: String, onClick: () -> Unit)
             tint = GratiaTheme.colors.textSecondary,
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+private fun openUrlSafely(context: Context, url: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    } catch (e: Exception) {
+        Toast.makeText(context, "Cannot open link. No browser found.", Toast.LENGTH_SHORT).show()
     }
 }
