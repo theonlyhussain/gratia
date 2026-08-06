@@ -265,15 +265,15 @@ fun GratiaAppRoot() {
                 composable(Screen.Search.route) {
                     SearchScreen(
                         playerViewModel = playerViewModel,
-                        onNavigateToGenre = { navController.navigate("genre/$it") }
+                        onNavigateToGenre = { navController.navigate("genre/${android.net.Uri.encode(it)}") }
                     )
                 }
                 composable(Screen.Library.route) {
                     LibraryScreen(
                         playerViewModel = playerViewModel,
-                        onNavigateToAlbum = { navController.navigate("album/$it") },
-                        onNavigateToArtist = { navController.navigate("artist/$it") },
-                        onNavigateToFolder = { navController.navigate("folder/$it") }
+                        onNavigateToAlbum = { navController.navigate("album/${android.net.Uri.encode(it)}") },
+                        onNavigateToArtist = { navController.navigate("artist/${android.net.Uri.encode(it)}") },
+                        onNavigateToFolder = { navController.navigate("folder/${android.net.Uri.encode(it)}") }
                     )
                 }
                 composable(
@@ -437,10 +437,10 @@ fun GratiaAppRoot() {
                     sleepTimerSheetOpen = true
                 },
                 onNavigateToAlbum = { albumName ->
-                    navController.navigate("album/$albumName")
+                    navController.navigate("album/${android.net.Uri.encode(albumName)}")
                 },
                 onNavigateToArtist = { artistName ->
-                    navController.navigate("artist/$artistName")
+                    navController.navigate("artist/${android.net.Uri.encode(artistName)}")
                 },
                 onDismiss = {
                     playerViewModel.setExpandedPlayerOpen(false)

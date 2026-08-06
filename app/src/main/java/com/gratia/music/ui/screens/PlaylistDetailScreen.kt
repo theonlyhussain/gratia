@@ -425,4 +425,78 @@ fun PlaylistDetailScreen(
             onDismiss = { showAddMusic = false }
         )
     }
+
+    if (showRenameDialog) {
+        var newName by remember { mutableStateOf(playlist.name) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = {
+                GratiaText(
+                    text = "Rename Playlist",
+                    style = GratiaTheme.typography.title,
+                    color = GratiaTheme.colors.textPrimary
+                )
+            },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    singleLine = true,
+                    textStyle = GratiaTheme.typography.body.copy(color = GratiaTheme.colors.textPrimary),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GratiaTheme.colors.accent,
+                        unfocusedBorderColor = GratiaTheme.colors.glassBorder,
+                        focusedTextColor = GratiaTheme.colors.textPrimary,
+                        unfocusedTextColor = GratiaTheme.colors.textPrimary
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newName.isNotBlank()) {
+                            scope.launch {
+                                playlistDao.insertPlaylist(playlist.copy(name = newName.trim(), updatedAt = System.currentTimeMillis()))
+                                showRenameDialog = false
+                            }
+                        }
+                    }
+                ) {
+                    Text("Save", color = GratiaTheme.colors.accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("Cancel", color = GratiaTheme.colors.textSecondary)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { GratiaText("Delete Playlist", style = GratiaTheme.typography.title, color = GratiaTheme.colors.textPrimary) },
+            text = { GratiaText("Are you sure you want to delete '${playlist.name}'? This action cannot be undone.", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textSecondary) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            playlistDao.deletePlaylist(playlist)
+                            withContext(Dispatchers.Main) { onBack() }
+                        }
+                    }
+                ) {
+                    Text("Delete", color = GratiaTheme.colors.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = GratiaTheme.colors.textSecondary)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
+    }
 }

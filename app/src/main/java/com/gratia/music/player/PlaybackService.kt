@@ -14,6 +14,7 @@ import androidx.media3.session.MediaSessionService
 import com.gratia.music.GratiaApp
 import com.gratia.music.player.transition.GratiaPlayerEngine
 import com.gratia.music.player.transition.TransitionController
+import androidx.core.app.ServiceCompat
 
 /**
  * Foreground service for background audio playback.
@@ -153,6 +154,7 @@ class PlaybackService : MediaSessionService() {
         if (player == null || !player.playWhenReady || player.mediaItemCount == 0 ||
             player.playbackState == Player.STATE_ENDED) {
             Log.d(TAG, "PlaybackService.onTaskRemoved(): stopping (player idle/ended)")
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         } else {
             Log.d(TAG, "PlaybackService.onTaskRemoved(): keeping alive (still playing)")

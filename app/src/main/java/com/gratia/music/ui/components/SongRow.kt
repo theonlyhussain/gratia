@@ -146,8 +146,7 @@ fun SongRow(
                     style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable { navController.navigate("artist/${song.artist}") }
+                    modifier = Modifier.clickable { navController.navigate("artist/${android.net.Uri.encode(song.artist)}") }
                 )
                 if (song.album != null) {
                     Text(" · ", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
@@ -155,9 +154,8 @@ fun SongRow(
                         " • ${song.album}",
                         style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary,
-                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { navController.navigate("album/${song.album}") }
+                        modifier = Modifier.clickable { navController.navigate("album/${android.net.Uri.encode(song.album)}") }
                     )
                 }
             }
@@ -227,9 +225,9 @@ fun SongRow(
             },
             onToggleLike = { playerViewModel.toggleFavorite(song) },
             onGoToAlbum = { 
-                if (!song.album.isNullOrBlank()) navController.navigate("album/${song.album}")
+                if (!song.album.isNullOrBlank()) navController.navigate("album/${android.net.Uri.encode(song.album)}")
             },
-            onGoToArtist = { navController.navigate("artist/${song.artist}") },
+            onGoToArtist = { navController.navigate("artist/${android.net.Uri.encode(song.artist)}") },
             onEditLyrics = {
                 navController.navigate("fullLyrics/${song.id}")
             },

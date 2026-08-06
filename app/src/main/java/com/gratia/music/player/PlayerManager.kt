@@ -96,8 +96,9 @@ class PlayerManager(private val context: Context) {
     private var backgroundSyncJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
 
+    private data class PendingPlayRequest(val song: SongEntity, val queue: List<SongEntity>, val playImmediately: Boolean, val seekPosition: Long)
     // Pending playback request — used when we need to reconnect before playing
-    private var pendingPlay: Pair<SongEntity, List<SongEntity>>? = null
+    private var pendingPlay: PendingPlayRequest? = null
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -176,7 +177,7 @@ class PlayerManager(private val context: Context) {
                             _currentTimeMs.value = currentTime
                             
                             // Let the controller know about this state when it connects
-                            pendingPlay = Pair(currentSong, restoredQueue)
+                            pendingPlay = PendingPlayRequest(currentSong, restoredQueue, false, currentTime)
                             // We don't want it to immediately start playing on app start, 
                             // but our playSong() method automatically calls controller.play().
                             // We need a way to prepare without playing.
@@ -263,14 +264,8 @@ class PlayerManager(private val context: Context) {
                         val pending = pendingPlay
                         if (pending != null) {
                             pendingPlay = null
-                            Log.d(TAG, "connect(): executing pending play for '${pending.first.title}'")
-                            
-                            // If this was a restored state, prepare but don't play automatically
-                            if (_currentSong.value?.id == pending.first.id && _isPlaying.value == false && _currentTimeMs.value > 0) {
-                                playSongInternal(pending.first, pending.second, playImmediately = false, seekPosition = _currentTimeMs.value)
-                            } else {
-                                playSong(pending.first, pending.second)
-                            }
+                            Log.d(TAG, "connect(): executing pending play for '${pending.song.title}'")
+                            playSongInternal(pending.song, pending.queue, playImmediately = pending.playImmediately, seekPosition = pending.seekPosition)
                         }
                     } else {
                         Log.e(TAG, "connect(): controller is null after Future.get()")
@@ -382,7 +377,7 @@ class PlayerManager(private val context: Context) {
 
         if (!ensureConnected()) {
             Log.w(TAG, "playSong: not connected, queuing for after reconnect")
-            pendingPlay = Pair(song, songQueue)
+            pendingPlay = PendingPlayRequest(song, songQueue, playImmediately, seekPosition)
             return
         }
         
