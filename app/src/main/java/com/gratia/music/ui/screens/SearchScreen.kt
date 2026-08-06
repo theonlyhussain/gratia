@@ -30,6 +30,7 @@ import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.*
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.ui.components.bounceClick
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
@@ -48,7 +49,7 @@ fun SearchScreen(
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     var query by remember { mutableStateOf("") }
     val results by songRepo.search(query.ifBlank { "§§NOMATCH§§" }).collectAsState(initial = emptyList())
-    val genres by songRepo.getDistinctGenres().collectAsState(initial = emptyList())
+    val genres by songRepo.getDistinctGenres().collectAsState(initial = null)
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val scope = rememberCoroutineScope()
@@ -170,75 +171,99 @@ fun SearchScreen(
         }
 
         if (query.isBlank()) {
-            if (searchHistory.isEmpty()) {
-                // Show genre cards grid
-                if (genres.isNotEmpty()) {
-                    AppleSectionHeader(title = "Browse Categories")
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 120.dp)
-                    ) {
-                        items(genres) { genre ->
-                            GenreCard(
-                                genre = genre,
-                                onClick = { onNavigateToGenre(genre) }
+            if (searchHistory.isEmpty() && genres?.isEmpty() == true) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    EmptyStateView(
+                        icon = Icons.Default.Search,
+                        headline = "Search your library",
+                        description = "Find any song, artist, album, or matching lyric."
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(bottom = 120.dp)
+                ) {
+                    if (searchHistory.isNotEmpty()) {
+                        item {
+                            AppleSectionHeader(
+                                title = "Recent Searches",
+                                action = {
+                                    GratiaText(
+                                        text = "Clear",
+                                        style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Medium),
+                                        color = GratiaTheme.colors.accent,
+                                        modifier = Modifier.clickable { 
+                                            scope.launch { 
+                                                settingsDataStore.clearSearchHistory()
+                                                android.widget.Toast.makeText(context, "Search history cleared", android.widget.Toast.LENGTH_SHORT).show()
+                                            } 
+                                        }.padding(4.dp)
+                                    )
+                                }
+                            )
+                        }
+                        
+                        items(searchHistory.toList().reversed()) { historyQuery ->
+                            AppleListRow(
+                                title = historyQuery,
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null,
+                                        tint = GratiaTheme.colors.textSecondary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                },
+                                trailingContent = {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Remove",
+                                        tint = GratiaTheme.colors.textSecondary,
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clickable { 
+                                                scope.launch { 
+                                                    settingsDataStore.removeSearchHistory(historyQuery)
+                                                } 
+                                            }
+                                            .padding(2.dp)
+                                    )
+                                },
+                                onClick = { query = historyQuery }
                             )
                         }
                     }
-                } else {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        EmptyStateView(
-                            icon = Icons.Default.Search,
-                            headline = "Search your library",
-                            description = "Find any song, artist, album, or matching lyric."
-                        )
-                    }
-                }
-            } else {
-                // Search History Apple Style
-                AppleSectionHeader(
-                    title = "Recent Searches",
-                    action = {
-                        GratiaText(
-                            text = "Clear",
-                            style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Medium),
-                            color = GratiaTheme.colors.accent,
-                            modifier = Modifier.clickable { scope.launch { settingsDataStore.clearSearchHistory() } }.padding(4.dp)
-                        )
-                    }
-                )
-                
-                LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    items(searchHistory.toList().reversed()) { historyQuery ->
-                        AppleListRow(
-                            title = historyQuery,
-                            leadingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            },
-                            trailingContent = {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove",
-                                    tint = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clickable { scope.launch { settingsDataStore.removeSearchHistory(historyQuery) } }
-                                        .padding(2.dp)
-                                )
-                            },
-                            onClick = { query = historyQuery }
-                        )
+
+                    if (!genres.isNullOrEmpty()) {
+                        item {
+                            Spacer(Modifier.height(8.dp))
+                            AppleSectionHeader(title = "Browse Categories")
+                            Spacer(Modifier.height(8.dp))
+                        }
+                        
+                        // We use a chunked list to simulate a 2-column grid in LazyColumn
+                        items(genres!!.chunked(2)) { rowGenres ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                for (genre in rowGenres) {
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        GenreCard(
+                                            genre = genre,
+                                            onClick = { onNavigateToGenre(genre) }
+                                        )
+                                    }
+                                }
+                                // If the last row has only 1 item, add an empty spacer so it doesn't stretch to fill the whole width
+                                if (rowGenres.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -304,7 +329,7 @@ private fun GenreCard(
             .background(
                 Brush.linearGradient(gradientColors)
             )
-            .clickable { onClick() }
+            .bounceClick { onClick() }
             .padding(16.dp),
         contentAlignment = Alignment.BottomStart
     ) {

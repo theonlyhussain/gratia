@@ -36,6 +36,7 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     val playlists by playlistDao.getAllPlaylists().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(
@@ -114,6 +115,7 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                             PlaylistEntity(id = newId, name = name, createdAt = System.currentTimeMillis())
                         )
                         showCreateDialog = false
+                        android.widget.Toast.makeText(context, "Playlist '$name' created", android.widget.Toast.LENGTH_SHORT).show()
                     }
                 },
                 onAddMusic = { name, description, uri ->
@@ -123,6 +125,7 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                             PlaylistEntity(id = newId, name = name, createdAt = System.currentTimeMillis())
                         )
                         showCreateDialog = false
+                        android.widget.Toast.makeText(context, "Playlist '$name' created", android.widget.Toast.LENGTH_SHORT).show()
                         onNavigateToPlaylist(newId)
                     }
                 }

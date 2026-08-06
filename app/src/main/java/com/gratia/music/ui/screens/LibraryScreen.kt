@@ -273,6 +273,7 @@ fun LibrarySubView(
     onNavigateToArtist: (String) -> Unit,
     onNavigateToFolder: (String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val selectionManager = remember { SelectionManager() }
     val selectedIds by selectionManager.selectedIds.collectAsState()
     val isSelectionMode by selectionManager.isSelectionMode.collectAsState()
@@ -484,6 +485,7 @@ fun LibrarySubView(
                 onAddToQueue = {
                     val selectedSongs = sortedSongs.filter { selectedIds.contains(it.id) }
                     selectedSongs.forEach { playerViewModel.addToQueue(it) }
+                    android.widget.Toast.makeText(context, "${selectedSongs.size} songs added to queue", android.widget.Toast.LENGTH_SHORT).show()
                     selectionManager.clearSelection()
                 },
                 onAddToPlaylist = {
@@ -500,6 +502,7 @@ fun LibrarySubView(
                             } catch (e: Exception) { e.printStackTrace() }
                         }
                     }
+                    android.widget.Toast.makeText(context, "${selectedSongs.size} songs deleted", android.widget.Toast.LENGTH_SHORT).show()
                     selectionManager.clearSelection()
                 },
                 onSelectAll = {

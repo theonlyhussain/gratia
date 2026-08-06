@@ -38,6 +38,7 @@ import com.gratia.music.ui.components.GratiaEmptyState
 import com.gratia.music.ui.components.GratiaText
 import com.gratia.music.ui.components.RecommendedForYouCard
 import com.gratia.music.ui.components.TopPickCard
+import com.gratia.music.ui.components.bounceClick
 import com.gratia.music.ui.components.RecentCard
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.data.network.ArtistImageFetcher
@@ -138,7 +139,7 @@ fun HomeScreen(
                             .size(36.dp)
                             .clip(CircleShape)
                             .background(GratiaTheme.colors.surface)
-                            .clickable(onClick = onNavigateToProfile),
+                            .bounceClick { onNavigateToProfile() },
                         contentAlignment = Alignment.Center
                     ) {
                         if (avatarPath != null) {

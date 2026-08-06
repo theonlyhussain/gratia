@@ -162,6 +162,7 @@ fun SettingsScreen(
                             settingsDataStore.setSmartUpdateOnboardingShown(true)
                             settingsDataStore.setSmartUpdateEnabled(true)
                             com.gratia.music.updater.UpdateCheckWorker.schedule(context)
+                            android.widget.Toast.makeText(context, "Smart Update enabled", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     },
                     onCancel = {
@@ -203,7 +204,12 @@ fun SettingsScreen(
             AppleSectionHeader(title = "Appearance")
             AppleListRow(
                 title = "System",
-                onClick = { scope.launch { settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.SYSTEM) } },
+                onClick = { 
+                    scope.launch { 
+                        settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.SYSTEM) 
+                        android.widget.Toast.makeText(context, "System theme selected", android.widget.Toast.LENGTH_SHORT).show()
+                    } 
+                },
                 trailingContent = {
                     if (themeOption == com.gratia.music.data.ThemeOption.SYSTEM) {
                         GratiaText(text = "Selected", style = GratiaTheme.typography.caption, color = GratiaTheme.colors.accent)
@@ -212,7 +218,12 @@ fun SettingsScreen(
             )
             AppleListRow(
                 title = "Light",
-                onClick = { scope.launch { settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.LIGHT) } },
+                onClick = { 
+                    scope.launch { 
+                        settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.LIGHT) 
+                        android.widget.Toast.makeText(context, "Light theme selected", android.widget.Toast.LENGTH_SHORT).show()
+                    } 
+                },
                 trailingContent = {
                     if (themeOption == com.gratia.music.data.ThemeOption.LIGHT) {
                         GratiaText(text = "Selected", style = GratiaTheme.typography.caption, color = GratiaTheme.colors.accent)
@@ -221,7 +232,12 @@ fun SettingsScreen(
             )
             AppleListRow(
                 title = "Dark",
-                onClick = { scope.launch { settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.DARK) } },
+                onClick = { 
+                    scope.launch { 
+                        settingsDataStore.setThemeOption(com.gratia.music.data.ThemeOption.DARK) 
+                        android.widget.Toast.makeText(context, "Dark theme selected", android.widget.Toast.LENGTH_SHORT).show()
+                    } 
+                },
                 showDivider = themeOption == com.gratia.music.data.ThemeOption.DARK, // Show divider if OLED option will be below it
                 trailingContent = {
                     if (themeOption == com.gratia.music.data.ThemeOption.DARK) {
@@ -236,7 +252,13 @@ fun SettingsScreen(
                 AppleListRow(
                     title = "OLED Theme",
                     subtitle = "Pure black theme for OLED displays",
-                    onClick = { scope.launch { settingsDataStore.setOledThemeEnabled(!oledThemeEnabled) } },
+                    onClick = { 
+                        scope.launch { 
+                            val newState = !oledThemeEnabled
+                            settingsDataStore.setOledThemeEnabled(newState) 
+                            android.widget.Toast.makeText(context, if (newState) "OLED Theme enabled" else "OLED Theme disabled", android.widget.Toast.LENGTH_SHORT).show()
+                        } 
+                    },
                     showDivider = false,
                     trailingContent = {
                         Switch(

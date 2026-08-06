@@ -148,16 +148,6 @@ fun SongRow(
                     maxLines = 1,
                     modifier = Modifier.clickable { navController.navigate("artist/${android.net.Uri.encode(song.artist)}") }
                 )
-                if (song.album != null) {
-                    Text(" · ", fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
-                    Text(
-                        " • ${song.album}",
-                        style = GratiaTheme.typography.caption,
-                        color = GratiaTheme.colors.textSecondary,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable { navController.navigate("album/${android.net.Uri.encode(song.album)}") }
-                    )
-                }
             }
             // Badge (e.g., "Lyrics match")
             if (badge != null) {

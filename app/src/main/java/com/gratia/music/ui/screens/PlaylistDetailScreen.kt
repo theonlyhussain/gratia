@@ -105,8 +105,13 @@ fun PlaylistDetailScreen(
                         }
                     }
                     playlistDao.insertPlaylist(playlist.copy(coverArtUri = file.absolutePath, updatedAt = System.currentTimeMillis()))
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Cover updated", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 } catch (e: Exception) {
-                    // Ignore
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(context, "Failed to update cover", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -116,8 +121,12 @@ fun PlaylistDetailScreen(
     var color1 by remember { mutableStateOf(CoverColorCache.FALLBACK.darkMuted) }
     var color2 by remember { mutableStateOf(CoverColorCache.FALLBACK.dominant) }
 
-    LaunchedEffect(playlistSongs) {
-        if (playlistSongs.isNotEmpty()) {
+    LaunchedEffect(playlist.coverArtUri, playlistSongs) {
+        if (playlist.coverArtUri != null && File(playlist.coverArtUri).exists()) {
+            val colors = CoverColorCache.getColors(playlist.id, playlist.coverArtUri)
+            color1 = colors.darkMuted
+            color2 = colors.dominant
+        } else if (playlistSongs.isNotEmpty()) {
             val colors1 = CoverColorCache.getColors(playlistSongs[0].id, playlistSongs[0].coverArtPath)
             color1 = colors1.darkMuted
             
@@ -183,11 +192,7 @@ fun PlaylistDetailScreen(
                     val paths = playlistSongs.take(4).map { it.coverArtPath }
                     Box(
                         modifier = Modifier
-                            .shadow(32.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent)
-                            .clickable {
-                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                coverPicker.launch(arrayOf("image/*"))
-                            },
+                            .shadow(32.dp, GratiaTheme.shapes.extraLarge, spotColor = GratiaTheme.colors.accent),
                         contentAlignment = Alignment.Center
                     ) {
                         if (playlist.coverArtUri != null && File(playlist.coverArtUri).exists()) {
@@ -223,21 +228,6 @@ fun PlaylistDetailScreen(
                             }
                         }
                         
-                        // Edit overlay icon
-                        Box(
-                            modifier = Modifier
-                                .size(240.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color.Black.copy(alpha = 0.3f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Default.CameraAlt,
-                                contentDescription = "Change Cover",
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(48.dp)
-                            )
-                        }
                     }
                     
                     Spacer(Modifier.height(GratiaTheme.spacing.large))
@@ -362,6 +352,10 @@ fun PlaylistDetailScreen(
                         onClick = { showMenu = false; showAddMusic = true }
                     )
                     DropdownMenuItem(
+                        text = { GratiaText("Edit Picture", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
+                        onClick = { showMenu = false; coverPicker.launch(arrayOf("image/*")) }
+                    )
+                    DropdownMenuItem(
                         text = { GratiaText("Rename Playlist", style = GratiaTheme.typography.body, color = GratiaTheme.colors.textPrimary) },
                         onClick = { showMenu = false; showRenameDialog = true }
                     )
@@ -393,6 +387,7 @@ fun PlaylistDetailScreen(
                 onAddToQueue = {
                     val selectedSongs = playlistSongs.filter { selectedIds.contains(it.id) }
                     selectedSongs.forEach { playerViewModel.addToQueue(it) }
+                    android.widget.Toast.makeText(context, "${selectedSongs.size} songs added to queue", android.widget.Toast.LENGTH_SHORT).show()
                     selectionManager.clearSelection()
                 },
                 onAddToPlaylist = {
@@ -403,6 +398,9 @@ fun PlaylistDetailScreen(
                     scope.launch {
                         selectedSongs.forEach { song ->
                             playlistDao.removeSongFromPlaylist(com.gratia.music.data.model.PlaylistSongCrossRef(playlistId, song.id))
+                        }
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(context, "${selectedSongs.size} songs removed from playlist", android.widget.Toast.LENGTH_SHORT).show()
                         }
                     }
                     selectionManager.clearSelection()
@@ -457,6 +455,9 @@ fun PlaylistDetailScreen(
                         if (newName.isNotBlank()) {
                             scope.launch {
                                 playlistDao.insertPlaylist(playlist.copy(name = newName.trim(), updatedAt = System.currentTimeMillis()))
+                                withContext(Dispatchers.Main) {
+                                    android.widget.Toast.makeText(context, "Playlist renamed to ${newName.trim()}", android.widget.Toast.LENGTH_SHORT).show()
+                                }
                                 showRenameDialog = false
                             }
                         }
@@ -484,7 +485,10 @@ fun PlaylistDetailScreen(
                     onClick = {
                         scope.launch {
                             playlistDao.deletePlaylist(playlist)
-                            withContext(Dispatchers.Main) { onBack() }
+                            withContext(Dispatchers.Main) { 
+                                android.widget.Toast.makeText(context, "Playlist deleted", android.widget.Toast.LENGTH_SHORT).show()
+                                onBack() 
+                            }
                         }
                     }
                 ) {

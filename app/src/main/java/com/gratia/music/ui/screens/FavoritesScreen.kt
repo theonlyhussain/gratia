@@ -34,6 +34,8 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
     val favorites by songRepo.getFavorites().collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
+    val view = androidx.compose.ui.platform.LocalView.current
+    val haptics = GratiaTheme.haptics
 
     Column(
         modifier = Modifier
@@ -107,7 +109,10 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Button(
-                                onClick = { playerViewModel.playSong(favorites.first(), favorites) },
+                                onClick = { 
+                                    haptics.light(view)
+                                    playerViewModel.playSong(favorites.first(), favorites) 
+                                },
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = GratiaTheme.colors.surface,
@@ -122,6 +127,7 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
                             
                             Button(
                                 onClick = { 
+                                    haptics.light(view)
                                     if (favorites.isNotEmpty()) {
                                         playerViewModel.toggleShuffle()
                                         playerViewModel.playSong(favorites.random(), favorites)

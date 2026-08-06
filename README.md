@@ -71,9 +71,14 @@ app/src/main/java/com/gratia/music/
       └── theme/      # Gratia Typography, Motion tokens, and Colors
 ```
 
-## 🤝 Contributing
+## 🤝 Contributing & Feedback
 
 We welcome community contributions! Gratia strives for high-quality, polished UI interactions. If you are planning a major feature or significant architectural change, please open an issue first to discuss your ideas and ensure they align with the project's design philosophy.
+
+### Bug Reports & Feature Requests
+Found a bug or have an idea to make Gratia even better? We'd love to hear it! 
+- [**Report a Bug**](https://github.com/theonlyhussain/gratia/issues) 🐛
+- [**Request a Feature**](https://github.com/theonlyhussain/gratia/issues) 💡
 
 ## 📄 License
 

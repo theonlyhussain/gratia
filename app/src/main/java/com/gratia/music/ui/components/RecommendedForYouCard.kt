@@ -132,8 +132,8 @@ fun RecommendedForYouCard(
                     onClick = onPlay,
                     shape = RoundedCornerShape(24.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = GratiaTheme.colors.success,
-                        contentColor = GratiaTheme.colors.background
+                        containerColor = GratiaTheme.colors.accent,
+                        contentColor = androidx.compose.ui.graphics.Color.White
                     ),
                     modifier = Modifier.height(44.dp).padding(start = 16.dp)
                 ) {
