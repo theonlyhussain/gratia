@@ -1,0 +1,1 @@
+A modern, local-first Android music player focused on fluid UI and privacy.
