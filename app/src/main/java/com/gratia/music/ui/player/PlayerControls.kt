@@ -42,7 +42,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 
 /**
  * Primary playback controls: Previous — Play/Pause — Next.
- * Mimics Apple Music's large, icon-only style.
+ * Mimics the industry standard's large, icon-only style.
  */
 @Composable
 fun PlayerControls(
@@ -145,7 +145,7 @@ private fun PlayPauseButton(
             GratiaIcon(
                 imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (playing) "Pause" else "Play",
-                tint = Color.White, // White icon for Apple Music style over dark blurred background
+                tint = Color.White, // White icon for the industry standard style over dark blurred background
                 size = 52.dp // Very large icon
             )
         }

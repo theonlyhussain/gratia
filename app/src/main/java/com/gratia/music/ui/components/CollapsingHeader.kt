@@ -21,7 +21,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Apple Music-style collapsible header that smoothly transitions from
+ * the industry standard-style collapsible header that smoothly transitions from
  * a large prominent heading into a compact toolbar as the user scrolls.
  *
  * Usage:

@@ -3,9 +3,9 @@ package com.gratia.music.lyrics
 
 
 /**
- * Rhythm lyrics song search result
+ * Gratia lyrics song search result
  */
-data class RhythmLyricsSearchResult(
+data class GratiaLyricsSearchResult(
     val id: String,
     val songName: String?,
     val artistName: String?,
@@ -20,22 +20,22 @@ data class RhythmLyricsSearchResult(
 )
 
 /**
- * Rhythm lyrics response containing word-by-word synchronized lyrics
+ * Gratia lyrics response containing word-by-word synchronized lyrics
  */
-data class RhythmLyricsResponse(
+data class GratiaLyricsResponse(
     val info: String?,
     val type: String?, // "Syllable" for word-by-word
-    val content: List<RhythmLyricsLine>?,
+    val content: List<GratiaLyricsLine>?,
     val ttmlContent: String?,
     val source: String?,
-    val track: RhythmLyricsTrackInfo?
+    val track: GratiaLyricsTrackInfo?
 )
 
 /**
  * Represents a line of lyrics with word-level synchronization
  */
-data class RhythmLyricsLine(
-    val text: List<RhythmLyricsWord>?,
+data class GratiaLyricsLine(
+    val text: List<GratiaLyricsWord>?,
     val background: Boolean?,
     val backgroundText: List<String>?,
     val oppositeTurn: Boolean?,
@@ -47,7 +47,7 @@ data class RhythmLyricsLine(
 /**
  * Represents a single word or syllable with precise timing
  */
-data class RhythmLyricsWord(
+data class GratiaLyricsWord(
     val text: String,
     val part: Boolean?, // true if this is part of a split word (syllable)
     val timestamp: Long, // Word start timestamp in milliseconds
@@ -55,9 +55,9 @@ data class RhythmLyricsWord(
 )
 
 /**
- * Track information from Rhythm lyrics source
+ * Track information from Gratia lyrics source
  */
-data class RhythmLyricsTrackInfo(
+data class GratiaLyricsTrackInfo(
     val albumName: String?,
     val artistName: String?,
     val name: String?,
@@ -69,7 +69,7 @@ data class RhythmLyricsTrackInfo(
 /**
  * Represents a generic track search result from various Lyrically API search endpoints (Spotify, NetEase, QQ, Kugou, YouTube).
  */
-data class RhythmLyricsGenericSearchResult(
+data class GratiaLyricsGenericSearchResult(
     val trackId: String?,
     val id: String?,
     val videoId: String?,
@@ -93,3 +93,4 @@ data class RhythmLyricsGenericSearchResult(
         return artistName ?: author ?: artist
     }
 }
+

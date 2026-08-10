@@ -3,11 +3,11 @@ package com.gratia.music.lyrics
 import java.util.regex.Pattern
 
 /**
- * Robust LRC parser inspired by Rhythm's parsing architecture.
+ * Robust LRC parser inspired by Gratia's parsing architecture.
  * Handles standard LRC, multi-timestamp lines, metadata tags,
  * translations, romanizations, and voice tags.
  *
- * Attribution: Parsing logic adapted from Rhythm (ChromaHub), GPL-3.0.
+ * Attribution: Parsing logic adapted from ChromaHub, GPL-3.0.
  */
 object LrcParser {
 
@@ -175,7 +175,7 @@ object LrcParser {
 
     /**
      * Separate main text from translation and romanization lines.
-     * Inspired by Rhythm's separateTranslation logic.
+     * Inspired by Gratia's separateTranslation logic.
      */
     private fun separateTranslation(textLines: List<String>): Triple<String, String?, String?> {
         val normalized = textLines.map { it.trim() }.filter { it.isNotEmpty() }

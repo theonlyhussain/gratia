@@ -43,7 +43,7 @@ import java.io.File
 import android.content.Intent
 
 /**
- * Premium Apple Music-style lyrics screen.
+ * Premium the industry standard-style lyrics screen.
  * Orchestrates models parsing, custom kinetic scroll layout, top/bottom fade shader masks,
  * animated background, and player control bindings.
  */
@@ -66,6 +66,7 @@ fun LyricsScreen(
     var showExportConfirm by remember { mutableStateOf(false) }
     var showOffsetUI by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showRefreshFeedback by remember { mutableStateOf(false) }
     var currentOffsetMs by remember { mutableLongStateOf(currentLyrics?.offsetMs ?: 0L) }
     
 
@@ -279,6 +280,11 @@ fun LyricsScreen(
                             onClick = {
                                 showMenu = false
                                 playerViewModel.refreshLyrics(force = true)
+                                scope.launch {
+                                    showRefreshFeedback = true
+                                    kotlinx.coroutines.delay(2000)
+                                    showRefreshFeedback = false
+                                }
                             }
                         )
                         DropdownMenuItem(

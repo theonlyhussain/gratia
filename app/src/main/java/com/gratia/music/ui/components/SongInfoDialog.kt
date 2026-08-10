@@ -50,6 +50,11 @@ fun SongInfoDialog(
                 InfoItem("File Path", song.storagePath ?: "Unknown")
                 InfoItem("Date Added", dateAdded)
                 InfoItem("Play Count", "${song.playCount} plays")
+                if (song.totalListenTime > 0) {
+                    val listenMins = song.totalListenTime / 60000
+                    val listenSecs = (song.totalListenTime % 60000) / 1000
+                    InfoItem("Total Time Played", "${listenMins}m ${listenSecs}s")
+                }
             }
         },
         confirmButton = {

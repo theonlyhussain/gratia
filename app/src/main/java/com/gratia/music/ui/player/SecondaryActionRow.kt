@@ -16,7 +16,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 
 /**
  * Bottom action row with only two buttons: Lyrics and Queue.
- * Matches Apple Music's minimalist bottom bar.
+ * Matches the industry standard's minimalist bottom bar.
  */
 @Composable
 fun SecondaryActionRow(

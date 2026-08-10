@@ -66,6 +66,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 _favoriteSongIds.value = favs.map { it.id }.toSet()
             }
         }
+        
+        viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10000L)
+                if (isPlaying.value) {
+                    currentSong.value?.let { song ->
+                        songRepository.addListenTime(song.id, 10000L)
+                    }
+                }
+            }
+        }
     }
 
     fun refreshLyrics(force: Boolean = true) {

@@ -28,7 +28,7 @@ import java.io.File
 
 /**
  * Hero album artwork — full-width, edge-to-edge with a gradient fade at the bottom.
- * Mimics Apple Music's immersive artwork experience.
+ * Mimics the industry standard's immersive artwork experience.
  *
  * Design details:
  * - Scale 0.85 → 1.0 on play (distinct pop effect)

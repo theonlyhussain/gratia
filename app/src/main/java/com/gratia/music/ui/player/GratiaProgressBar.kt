@@ -25,7 +25,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.JetBrainsMono
 
 /**
- * Custom premium progress bar — mimics Apple Music style.
+ * Custom premium progress bar — mimics the industry standard style.
  *
  * Design details:
  * - Very thin track
@@ -175,7 +175,7 @@ fun GratiaProgressBar(
                 color = Color.White.copy(alpha = 0.5f)
             )
             
-            // In Apple Music, remaining time is often shown with a negative sign (e.g. -2:30). 
+            // In the industry standard, remaining time is often shown with a negative sign (e.g. -2:30). 
             // We can just show duration or remaining time. Let's show remaining time for a more authentic feel if we want,
             // but the original app shows duration. Let's stick to duration or remaining. Let's do remaining.
             val remainingTime = durationMs - displayTime

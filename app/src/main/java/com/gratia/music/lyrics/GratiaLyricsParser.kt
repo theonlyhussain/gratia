@@ -1,16 +1,16 @@
 package com.gratia.music.lyrics
 
 import android.util.Log
-import com.gratia.music.lyrics.RhythmLyricsLine
-import com.gratia.music.lyrics.RhythmLyricsWord
+import com.gratia.music.lyrics.GratiaLyricsLine
+import com.gratia.music.lyrics.GratiaLyricsWord
 
 
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
 import kotlin.math.abs
 
-object RhythmLyricsParser {
-    private const val TAG = "RhythmLyricsParser"
+object GratiaLyricsParser {
+    private const val TAG = "GratiaLyricsParser"
     
     // Pattern to detect voice tags in lyrics text (e.g., "v1: text" or "v2: text")
     private val voiceTagPattern = java.util.regex.Pattern.compile("^(v\\d+):\\s*(.*)$", java.util.regex.Pattern.CASE_INSENSITIVE)
@@ -21,7 +21,7 @@ object RhythmLyricsParser {
     }
 
     /**
-    * Parses Rhythm word-by-word lyrics JSON into structured format
+    * Parses Word-by-word lyrics JSON into structured format
     * @param jsonContent JSON string containing word-by-word lyrics data
      * @return List of parsed word-level lyrics, or empty if parsing fails
      */
@@ -33,12 +33,12 @@ object RhythmLyricsParser {
      * Parse TTML (Timed Text Markup Language) formatted synchronized lyrics.
      * Extracts lines (<p>) and word-by-word timestamps (<span>).
      */
-    fun parseTtmlLyrics(ttmlContent: String): List<RhythmLyricsLine> {
+    fun parseTtmlLyrics(ttmlContent: String): List<GratiaLyricsLine> {
         val parsed = parseTtml(audioMimeType = null, lyricText = ttmlContent)
         if (parsed is SemanticLyrics.SyncedLyrics) {
             return parsed.text.map { semanticLine ->
                 val slWords = semanticLine.words
-                val rhythmLyricsWords = slWords?.mapIndexed { idx, word ->
+                val GratiaLyricsWords = slWords?.mapIndexed { idx, word ->
                     val rawText = semanticLine.text.substring(word.charRange)
                     val trimmedText = rawText.trim()
                     
@@ -63,14 +63,14 @@ object RhythmLyricsParser {
                     } else {
                         false
                     }
-                    RhythmLyricsWord(
+                    GratiaLyricsWord(
                         text = trimmedText,
                         part = isPart,
                         timestamp = word.begin.toLong(),
                         endtime = (word.endInclusive ?: word.begin).toLong()
                     )
                 } ?: listOf(
-                    RhythmLyricsWord(
+                    GratiaLyricsWord(
                         text = semanticLine.text,
                         part = false,
                         timestamp = semanticLine.start.toLong(),
@@ -78,8 +78,8 @@ object RhythmLyricsParser {
                     )
                 )
                 
-                RhythmLyricsLine(
-                    text = rhythmLyricsWords,
+                GratiaLyricsLine(
+                    text = GratiaLyricsWords,
                     background = semanticLine.speaker?.isBackground ?: false,
                     backgroundText = if (semanticLine.isTranslated) listOf(semanticLine.text) else null,
                     oppositeTurn = semanticLine.speaker?.isVoice2,
@@ -116,4 +116,5 @@ data class WordByWordWord(
     val timestamp: Long, // start time in milliseconds
     val endtime: Long // end time in milliseconds
 )
+
 

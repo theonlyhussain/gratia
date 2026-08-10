@@ -21,29 +21,41 @@ object JsonWordLyricsParser {
             when {
                 root.has("lyrics") -> root.getJSONArray("lyrics")
                 root.has("lines") -> root.getJSONArray("lines")
-                else -> throw IllegalArgumentException("No lyrics or lines array found in JSON")
+                root.has("content") -> root.getJSONArray("content")
+                else -> throw IllegalArgumentException("No lyrics, lines, or content array found in JSON")
             }
         }
 
         for (i in 0 until jsonArray.length()) {
             val lineObj = jsonArray.getJSONObject(i)
-            val lineText = lineObj.optString("line", lineObj.optString("text", ""))
+            
+            // Lyrically API uses 'timestamp' and 'endtime' on lines and words
+            val lineStartMs = getMsValue(lineObj, "timestamp", "start_time", "start", "startMs", "start_ms") ?: 0L
+            val lineEndMs = getMsValue(lineObj, "endtime", "end_time", "end", "endMs", "end_ms")
 
-            val lineStartMs = getMsValue(lineObj, "start_time", "start", "startMs", "start_ms") ?: 0L
-            val lineEndMs = getMsValue(lineObj, "end_time", "end", "endMs", "end_ms")
-
-            val wordsArray = lineObj.optJSONArray("words")
+            // Lyrically uses 'text' array for words, others use 'words'
+            val wordsArray = lineObj.optJSONArray("words") ?: lineObj.optJSONArray("text")
             val words = mutableListOf<LyricWord>()
+            val builtLineText = StringBuilder()
+            
             if (wordsArray != null) {
                 for (j in 0 until wordsArray.length()) {
                     val wordObj = wordsArray.getJSONObject(j)
                     val wordText = wordObj.optString("word", wordObj.optString("text", ""))
-                    val wordStartMs = getMsValue(wordObj, "start_time", "start", "startMs", "start_ms") ?: lineStartMs
-                    val wordEndMs = getMsValue(wordObj, "end_time", "end", "endMs", "end_ms") ?: (wordStartMs + 200L)
+                    val wordStartMs = getMsValue(wordObj, "timestamp", "start_time", "start", "startMs", "start_ms") ?: lineStartMs
+                    val wordEndMs = getMsValue(wordObj, "endtime", "end_time", "end", "endMs", "end_ms") ?: (wordStartMs + 200L)
                     if (wordText.isNotEmpty()) {
                         words.add(LyricWord(text = wordText, startMs = wordStartMs, endMs = wordEndMs))
+                        builtLineText.append(wordText)
                     }
                 }
+            }
+
+            var lineText = lineObj.optString("line")
+            if (lineText.isEmpty() && !lineObj.has("line") && !lineObj.has("text")) {
+                lineText = builtLineText.toString().trim()
+            } else if (lineText.isEmpty()) {
+                lineText = lineObj.optString("text", builtLineText.toString().trim())
             }
 
             list.add(LyricLine(text = lineText, startMs = lineStartMs, endMs = lineEndMs, words = words))

@@ -20,7 +20,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 
 /**
  * Cinematic blurred background for the player.
- * Mimics Apple Music by heavily blurring the album artwork.
+ * Mimics the industry standard by heavily blurring the album artwork.
  */
 @Composable
 fun PlayerBackground(

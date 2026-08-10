@@ -301,6 +301,13 @@ private fun SyncedVocalGapItem(
 ) {
     val isCurrentGap = currentPlaybackTime >= item.startTime &&
         currentPlaybackTime < item.startTime + item.duration
+    val gapProgress = if (isCurrentGap) {
+        ((currentPlaybackTime - item.startTime).toFloat() / item.duration).coerceIn(0f, 1f)
+    } else if (currentPlaybackTime > item.startTime + item.duration) {
+        1f
+    } else {
+        0f
+    }
 
     val gapHeight = (item.duration / 1000f).coerceIn(18f, 66f)
 
@@ -335,10 +342,27 @@ private fun SyncedVocalGapItem(
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val activeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = iconAlpha)
+        val inactiveColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f)
+        
+        val dotsBrush = if (gapProgress > 0f && gapProgress < 1f) {
+            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                0f to activeColor,
+                gapProgress to activeColor,
+                gapProgress + 0.001f to inactiveColor,
+                1f to inactiveColor
+            )
+        } else {
+            androidx.compose.ui.graphics.SolidColor(if (gapProgress == 1f) activeColor else inactiveColor)
+        }
+
         Text(
-            text = "♪",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = iconAlpha),
+            text = "● ● ●",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                letterSpacing = 4.sp,
+                brush = dotsBrush
+            ),
+            color = androidx.compose.ui.graphics.Color.Unspecified,
             modifier = Modifier.graphicsLayer {
                 scaleX = iconScale
                 scaleY = iconScale
@@ -384,71 +408,44 @@ private fun SyncedLyricItem(
     val isPreviousLine = currentLineIndex == index + 1
     val isnextLine = currentLineIndex == index - 1
     
-    // Distance-based effects
-    val distanceFromCurrent = abs(index - currentLineIndex)
-    
-    // Calculate progress through current line
-    val progressTonextLine = if (isCurrentLine && index + 1 < parsedLyrics.size) {
-        val nextLineTimestamp = parsedLyrics[index + 1].startMs
-        val timeDiff = nextLineTimestamp - line.startMs
-        if (timeDiff > 0) {
-            ((currentPlaybackTime - line.startMs).toFloat() / timeDiff).coerceIn(0f, 1f)
-        } else 0f
-    } else 0f
-    
-    // Smooth scale animation with spring physics - Rhythm style
+    // Refined scale animation with spring physics (Apple style)
     val scale by animateFloatAsState(
-        targetValue = when {
-            isCurrentLine -> 1.10f
-            isnextLine -> 1.03f + (0.07f * progressTonextLine)
-            else -> 1f
-        },
+        targetValue = if (isCurrentLine) 1.05f else 1f,
         animationSpec = if (noAnimation) snap() else spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
+            dampingRatio = 0.8f, // Less bouncy, more fluid
             stiffness = Spring.StiffnessMediumLow
         ),
         label = "lineScale_$index"
     )
     
-    // Enhanced alpha with distance-based gradual fade
+    // Refined alpha
     val alpha by animateFloatAsState(
         targetValue = when {
             isCurrentLine -> 1f
-            index < currentLineIndex -> 0.3f
-            distanceFromCurrent == 1 -> 0.75f
-            distanceFromCurrent == 2 -> 0.55f
-            distanceFromCurrent == 3 -> 0.40f
-            else -> 0.22f
+            index < currentLineIndex -> 0.4f
+            distanceFromCurrent == 1 -> 0.7f
+            distanceFromCurrent == 2 -> 0.5f
+            else -> 0.3f
         },
         animationSpec = if (noAnimation) snap() else spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = 0.8f,
+            stiffness = Spring.StiffnessMediumLow
         ),
         label = "lineAlpha_$index"
     )
     
-    // Vertical translation for flowing effect
-    val verticalTranslation by animateFloatAsState(
-        targetValue = if (isCurrentLine) 0f else if (isPreviousLine) -8f else 0f,
-        animationSpec = if (noAnimation) snap() else spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "lineTranslationY_$index"
-    )
+    // Removed verticalTranslation which could conflict with scroll physics
 
     // Color transition for active line with voice-specific colors
     val textColor = when {
         isCurrentLine -> {
-            // Apply different colors based on voice tag
             when (line.voiceTag) {
-                "v2" -> MaterialTheme.colorScheme.secondary // Different color for second voice
-                "v3" -> MaterialTheme.colorScheme.tertiary  // Third voice
-                else -> MaterialTheme.colorScheme.primary   // Default/v1
+                "v2" -> MaterialTheme.colorScheme.secondary
+                "v3" -> MaterialTheme.colorScheme.tertiary
+                else -> MaterialTheme.colorScheme.primary
             }
         }
         else -> {
-            // Inactive lines also get subtle voice coloring (alpha applied via modifier)
             when (line.voiceTag) {
                 "v2" -> MaterialTheme.colorScheme.secondary
                 "v3" -> MaterialTheme.colorScheme.tertiary
@@ -457,16 +454,13 @@ private fun SyncedLyricItem(
         }
     }
     
-    // Dynamic font weight based on position
     val fontWeight = when {
         isCurrentLine -> if (lyricBold) FontWeight.Black else FontWeight.ExtraBold
-        distanceFromCurrent <= 1 -> if (lyricBold) FontWeight.ExtraBold else FontWeight.SemiBold
-        distanceFromCurrent <= 2 -> if (lyricBold) FontWeight.Bold else FontWeight.Medium
-        else -> if (lyricBold) FontWeight.SemiBold else FontWeight.Normal
+        distanceFromCurrent <= 1 -> if (lyricBold) FontWeight.ExtraBold else FontWeight.Bold
+        else -> if (lyricBold) FontWeight.Bold else FontWeight.SemiBold
     }
     
-    // Subtle letter spacing for emphasis
-    val letterSpacing = if (isCurrentLine) 0.05.sp else 0.sp
+    val letterSpacing = if (isCurrentLine) (-0.25).sp else 0.sp // Negative tracking for larger text
 
     val columnAlignment = when (textAlignment) {
         TextAlign.Start -> Alignment.Start
@@ -483,16 +477,14 @@ private fun SyncedLyricItem(
                     onSeek?.invoke(line.startMs)
                 }
             }
-            .padding(vertical = 14.dp, horizontal = 20.dp)
+            .padding(vertical = 12.dp, horizontal = 20.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                translationY = verticalTranslation
             }
             .alpha(alpha),
         horizontalAlignment = columnAlignment
     ) {
-        // Main lyrics text
         if (line.words.isNotEmpty()) {
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
             androidx.compose.foundation.layout.FlowRow(
@@ -506,25 +498,29 @@ private fun SyncedLyricItem(
                 line.words.forEach { word ->
                     val isWordActive = currentPlaybackTime >= word.startMs && currentPlaybackTime <= word.endMs
                     val isWordPast = currentPlaybackTime > word.endMs
+                    val progress = if (isWordPast) 1f else if (isWordActive) com.gratia.music.lyrics.LyricsTimingEngine.getWordProgress(word, currentPlaybackTime) else 0f
                     
-                    val wordScale by animateFloatAsState(
-                        targetValue = if (isWordActive) 1.10f else 1.0f,
-                        animationSpec = if (noAnimation) snap() else spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "wordScale"
-                    )
+                    val activeColor = androidx.compose.ui.graphics.Color.White
+                    val pastColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f)
+                    val inactiveColor = textColor.copy(alpha = 0.35f)
                     
-                    val wordColor by animateColorAsState(
-                        targetValue = when {
-                            isWordActive -> androidx.compose.ui.graphics.Color.White
-                            isWordPast -> androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f)
-                            else -> textColor.copy(alpha = 0.4f)
-                        },
-                        animationSpec = if (noAnimation) snap<androidx.compose.ui.graphics.Color>() else tween<androidx.compose.ui.graphics.Color>(durationMillis = 150),
-                        label = "wordColor"
-                    )
+                    val brush = if (progress > 0f && progress < 1f) {
+                        // Soft organic mask (blur edge) rather than harsh cutoff
+                        val fadeStart = maxOf(0f, progress - 0.15f)
+                        val fadeEnd = minOf(1f, progress + 0.15f)
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            0f to activeColor,
+                            fadeStart to activeColor,
+                            fadeEnd to inactiveColor,
+                            1f to inactiveColor
+                        )
+                    } else {
+                        androidx.compose.ui.graphics.SolidColor(when {
+                            isWordPast -> pastColor
+                            isWordActive -> activeColor
+                            else -> inactiveColor
+                        })
+                    }
 
                     Text(
                         text = word.text + " ",
@@ -532,13 +528,10 @@ private fun SyncedLyricItem(
                             fontWeight = fontWeight,
                             fontSize = MaterialTheme.typography.headlineSmall.fontSize * textSizeMultiplier,
                             lineHeight = MaterialTheme.typography.headlineSmall.lineHeight * 1.5f * textSizeMultiplier,
-                            letterSpacing = letterSpacing
+                            letterSpacing = letterSpacing,
+                            brush = brush
                         ),
-                        color = wordColor,
-                        modifier = Modifier.graphicsLayer {
-                            scaleX = wordScale
-                            scaleY = wordScale
-                        }
+                        color = androidx.compose.ui.graphics.Color.Unspecified
                     )
                 }
             }

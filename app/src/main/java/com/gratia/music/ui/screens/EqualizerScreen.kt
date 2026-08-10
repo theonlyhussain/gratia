@@ -50,7 +50,7 @@ import com.gratia.music.ui.theme.SpaceGrotesk
 /**
  * Equalizer screen with visual frequency response curve and preset selector.
  *
- * Inspired by Apple Music's clean EQ presentation and Rhythm's band visualization,
+ * Inspired by the industry standard's clean EQ presentation and Gratia's band visualization,
  * but with Gratia's own design language: glassmorphism, spring animations,
  * and premium typography.
  */

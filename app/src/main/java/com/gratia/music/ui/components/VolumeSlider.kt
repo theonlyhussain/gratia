@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.gratia.music.ui.theme.GratiaTheme
 
 /**
- * In-player volume control mimicking Apple Music's bottom slider.
+ * In-player volume control mimicking the industry standard's bottom slider.
  * Syncs automatically with system volume via ContentObserver.
  */
 @Composable

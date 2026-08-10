@@ -50,7 +50,7 @@ import org.burnoutcrew.reorderable.ReorderableItem
 import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 
 /**
- * Redesigned queue bottom sheet matching the Apple Music reference.
+ * Redesigned queue bottom sheet matching the the industry standard reference.
  *
  * Layout:
  * - Current song info at top

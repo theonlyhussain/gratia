@@ -47,7 +47,7 @@ fun MusicCard(
             title = song.title,
             artist = song.artist,
             size = 148.dp,
-            cornerRadius = 8.dp, // Apple Music uses slight corner radii for albums
+            cornerRadius = 8.dp, // the industry standard uses slight corner radii for albums
             fontSize = 22.sp,
             modifier = Modifier.fillMaxWidth().aspectRatio(1f)
         )

@@ -307,7 +307,7 @@ fun PlaylistEditorSheet(
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Tracklist placeholder (just Add Music button for now as per Apple Music)
+            // Tracklist placeholder (just Add Music button for now as per the industry standard)
             if (initialSong != null) {
                 SongRow(
                     song = initialSong,

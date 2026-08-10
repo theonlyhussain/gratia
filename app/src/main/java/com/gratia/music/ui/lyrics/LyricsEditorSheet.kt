@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -354,6 +355,34 @@ fun LyricsEditorSheet(
                             fontFamily = JetBrainsMono,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Insert Gap button
+                    FilledTonalButton(
+                        onClick = {
+                            val cursor = textFieldValue.selection.start
+                            val currentText = textFieldValue.text
+                            val tag = "\n$timeTag \n"
+                            val newText = currentText.substring(0, cursor) +
+                                    tag +
+                                    currentText.substring(cursor)
+                            textFieldValue = TextFieldValue(
+                                text = newText,
+                                selection = TextRange(cursor + tag.length)
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = GratiaTheme.colors.surfaceVariant,
+                            contentColor = GratiaTheme.colors.textPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreHoriz,
+                            contentDescription = "Insert Gap",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }

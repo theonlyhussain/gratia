@@ -51,6 +51,7 @@ class SongRepository(private val songDao: SongDao) {
 
     suspend fun incrementPlayCount(id: String) = songDao.incrementPlayCount(id)
 
+    suspend fun addListenTime(id: String, timeMs: Long) = songDao.addListenTime(id, timeMs)
     fun getSongCount(): Flow<Int> = songDao.getSongCount()
 
     suspend fun updateCoverArt(id: String, path: String, source: String) =

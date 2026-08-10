@@ -142,7 +142,7 @@ fun GratiaAppRoot() {
                         MiniPlayer(playerViewModel = playerViewModel)
                     }
 
-                    // Apple Music Style Bottom Navigation
+                    // the industry standard Style Bottom Navigation
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()

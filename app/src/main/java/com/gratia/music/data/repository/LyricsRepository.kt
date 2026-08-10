@@ -4,6 +4,7 @@ import com.gratia.music.data.dao.LyricsDao
 import com.gratia.music.data.model.LyricsEntity
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.lyrics.LRCLIBProvider
+import com.gratia.music.lyrics.LyricallyProvider
 import com.gratia.music.lyrics.LyricsProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,7 +12,7 @@ import kotlinx.coroutines.withContext
 class LyricsRepository(
     private val lyricsDao: LyricsDao
 ) {
-    private val providers: List<LyricsProvider> = listOf(LRCLIBProvider())
+    private val providers: List<LyricsProvider> = listOf(LyricallyProvider(), LRCLIBProvider())
 
     suspend fun getLyrics(song: SongEntity, forceRefresh: Boolean = false): LyricsEntity? = withContext(Dispatchers.IO) {
         // 1. Check local DB first
@@ -42,7 +43,8 @@ class LyricsRepository(
                     isSynced = result.isSynced,
                     provider = result.providerName,
                     offsetMs = existingOffset,
-                    isManuallyEdited = false
+                    isManuallyEdited = false,
+                    isWordLevel = result.isWordLevel
                 )
                 lyricsDao.insertLyrics(newLyrics)
                 return@withContext newLyrics

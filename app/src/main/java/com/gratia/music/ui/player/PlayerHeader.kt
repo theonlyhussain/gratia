@@ -43,7 +43,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 
 /**
  * Player header with song info, favorite star button, and more options.
- * Matches Apple Music's layout: title + artist on left, star + dots on right.
+ * Matches the industry standard's layout: title + artist on left, star + dots on right.
  */
 @Composable
 fun PlayerHeader(
