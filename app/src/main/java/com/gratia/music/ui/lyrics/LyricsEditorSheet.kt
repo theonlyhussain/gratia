@@ -374,7 +374,7 @@ fun LyricsEditorSheet(
                         },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = GratiaTheme.colors.surfaceVariant,
+                            containerColor = GratiaTheme.colors.surfaceHover,
                             contentColor = GratiaTheme.colors.textPrimary
                         ),
                         contentPadding = PaddingValues(horizontal = 12.dp)

@@ -71,8 +71,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             while (true) {
                 kotlinx.coroutines.delay(10000L)
                 if (isPlaying.value) {
-                    currentSong.value?.let { song ->
-                        songRepository.addListenTime(song.id, 10000L)
+                    val id = currentSong.value?.id
+                    if (id != null) {
+                        songRepository.incrementListenTime(id, 10000L)
                     }
                 }
             }

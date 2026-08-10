@@ -75,6 +75,8 @@ app/src/main/java/com/gratia/music/
 
 We welcome community contributions! Gratia strives for high-quality, polished UI interactions. If you are planning a major feature or significant architectural change, please open an issue first to discuss your ideas and ensure they align with the project's design philosophy.
 
+Please see our [Contributing Guidelines](CONTRIBUTING.md) for more details on how to get started, and ensure you follow our [Code of Conduct](CODE_OF_CONDUCT.md) in all community interactions.
+
 ### Bug Reports & Feature Requests
 Found a bug or have an idea to make Gratia even better? We'd love to hear it! 
 - [**Report a Bug**](https://github.com/theonlyhussain/gratia/issues) 🐛

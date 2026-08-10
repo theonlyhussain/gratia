@@ -408,6 +408,9 @@ private fun SyncedLyricItem(
     val isPreviousLine = currentLineIndex == index + 1
     val isnextLine = currentLineIndex == index - 1
     
+    // Distance-based effects
+    val distanceFromCurrent = kotlin.math.abs(index - currentLineIndex)
+    
     // Refined scale animation with spring physics (Apple style)
     val scale by animateFloatAsState(
         targetValue = if (isCurrentLine) 1.05f else 1f,
