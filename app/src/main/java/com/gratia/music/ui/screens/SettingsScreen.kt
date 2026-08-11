@@ -92,6 +92,7 @@ fun SettingsScreen(
             val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
             val smartUpdateOnboardingShown by settingsDataStore.smartUpdateOnboardingShownFlow.collectAsState(initial = false)
             var showOnboarding by remember { mutableStateOf(false) }
+            val updateState by GratiaApp.instance.updateManager.state.collectAsState()
             
             AppleListRow(
                 title = "Smart Update",
@@ -145,12 +146,20 @@ fun SettingsScreen(
                 },
                 showDivider = false,
                 trailingContent = {
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = "Check",
-                        tint = GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (updateState is com.gratia.music.updater.UpdateState.Checking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = GratiaTheme.colors.accent
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Check",
+                            tint = GratiaTheme.colors.textSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             )
             
@@ -173,8 +182,6 @@ fun SettingsScreen(
                     }
                 )
             }
-            
-            val updateState by GratiaApp.instance.updateManager.state.collectAsState()
             
             if (updateState !is com.gratia.music.updater.UpdateState.Idle) {
                 com.gratia.music.ui.components.UpdatePromptSheet(

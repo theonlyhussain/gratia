@@ -415,24 +415,22 @@ private fun SyncedLyricItem(
     val scale by animateFloatAsState(
         targetValue = if (isCurrentLine) 1.05f else 1f,
         animationSpec = if (noAnimation) snap() else spring(
-            dampingRatio = 0.8f, // Less bouncy, more fluid
-            stiffness = Spring.StiffnessMediumLow
+            dampingRatio = 1.0f, // Critically damped for physical feel
+            stiffness = Spring.StiffnessLow
         ),
         label = "lineScale_$index"
     )
     
-    // Refined alpha
+    // Refined alpha for stronger visual hierarchy
     val alpha by animateFloatAsState(
         targetValue = when {
             isCurrentLine -> 1f
-            index < currentLineIndex -> 0.4f
-            distanceFromCurrent == 1 -> 0.7f
-            distanceFromCurrent == 2 -> 0.5f
-            else -> 0.3f
+            distanceFromCurrent == 1 -> 0.45f
+            else -> 0.25f
         },
         animationSpec = if (noAnimation) snap() else spring(
-            dampingRatio = 0.8f,
-            stiffness = Spring.StiffnessMediumLow
+            dampingRatio = 1.0f,
+            stiffness = Spring.StiffnessLow
         ),
         label = "lineAlpha_$index"
     )
@@ -463,7 +461,7 @@ private fun SyncedLyricItem(
         else -> if (lyricBold) FontWeight.Bold else FontWeight.SemiBold
     }
     
-    val letterSpacing = if (isCurrentLine) (-0.25).sp else 0.sp // Negative tracking for larger text
+    val letterSpacing = if (isCurrentLine) (-0.75).sp else 0.sp // Stronger negative tracking for larger text
 
     val columnAlignment = when (textAlignment) {
         TextAlign.Start -> Alignment.Start
@@ -508,9 +506,9 @@ private fun SyncedLyricItem(
                     val inactiveColor = textColor.copy(alpha = 0.35f)
                     
                     val brush = if (progress > 0f && progress < 1f) {
-                        // Soft organic mask (blur edge) rather than harsh cutoff
-                        val fadeStart = maxOf(0f, progress - 0.15f)
-                        val fadeEnd = minOf(1f, progress + 0.15f)
+                        // Sharp exact mask sliding over the word
+                        val fadeStart = maxOf(0f, progress - 0.01f)
+                        val fadeEnd = minOf(1f, progress + 0.01f)
                         androidx.compose.ui.graphics.Brush.horizontalGradient(
                             0f to activeColor,
                             fadeStart to activeColor,

@@ -116,8 +116,34 @@ object LrcParser {
         val sorted = lines.sortedBy { it.startMs }
         return sorted.mapIndexed { i, line ->
             val nextStart = if (i < sorted.size - 1) sorted[i + 1].startMs else null
-            val resolvedWords = if (line.words.isNotEmpty()) {
-                resolveWordEndTimes(line.words, nextStart)
+            
+            // Generate faked word timings if missing, to guarantee fluid Apple-style animations
+            var lineWords = line.words
+            val lineDuration = (nextStart ?: (line.startMs + 4000L)) - line.startMs
+            if (lineWords.isEmpty() && line.text.isNotBlank() && lineDuration > 0) {
+                val wordsList = line.text.split(Regex("\\s+")).filter { it.isNotBlank() }
+                if (wordsList.isNotEmpty()) {
+                    val totalChars = wordsList.sumOf { it.length }
+                    var currentWordStart = line.startMs
+                    lineWords = wordsList.map { wordText ->
+                        val wordDuration = if (totalChars > 0) {
+                            ((wordText.length.toFloat() / totalChars) * lineDuration).toLong()
+                        } else {
+                            lineDuration / wordsList.size
+                        }
+                        val word = LyricWord(
+                            text = wordText,
+                            startMs = currentWordStart,
+                            endMs = currentWordStart + wordDuration
+                        )
+                        currentWordStart += wordDuration
+                        word
+                    }
+                }
+            }
+
+            val resolvedWords = if (lineWords.isNotEmpty()) {
+                resolveWordEndTimes(lineWords, nextStart)
             } else {
                 emptyList()
             }

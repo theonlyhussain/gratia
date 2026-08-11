@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -134,29 +135,47 @@ fun HomeScreen(
             AppleLargeTitleHeader(
                 title = "Home",
                 action = {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(GratiaTheme.colors.surface)
-                            .bounceClick { onNavigateToProfile() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (avatarPath != null) {
-                            // Ideally load real avatar image here, for now fallback to icon
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(GratiaTheme.colors.surface)
+                                .bounceClick { onNavigateToSettings() },
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = GratiaTheme.colors.accent,
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = GratiaTheme.colors.textSecondary,
                                 modifier = Modifier.size(20.dp)
                             )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = GratiaTheme.colors.accent,
-                                modifier = Modifier.size(20.dp)
-                            )
+                        }
+                        
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(GratiaTheme.colors.surface)
+                                .bounceClick { onNavigateToProfile() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (avatarPath != null) {
+                                // Ideally load real avatar image here, for now fallback to icon
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    tint = GratiaTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile",
+                                    tint = GratiaTheme.colors.accent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
