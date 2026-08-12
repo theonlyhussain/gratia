@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseOut
@@ -22,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.*
@@ -46,6 +48,9 @@ import com.gratia.music.ui.components.bounceClick
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
+import com.gratia.music.GratiaApp
+import com.gratia.music.updater.UpdateState
+import kotlinx.coroutines.launch
 
 val GithubIcon: ImageVector
     get() = ImageVector.Builder(
@@ -432,6 +437,89 @@ fun AboutScreen(
                         fontSize = 11.sp,
                         color = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f)
                     )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Update Section
+                    val updateManager = remember { GratiaApp.instance.updateManager }
+                    val updateState by updateManager.state.collectAsState()
+                    val scope = rememberCoroutineScope()
+                    
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
+                        color = GratiaTheme.colors.surfaceHover,
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            AnimatedContent(targetState = updateState, label = "UpdateStateAnim") { state ->
+                                when (state) {
+                                    is UpdateState.Idle -> {
+                                        Button(
+                                            onClick = { scope.launch { updateManager.checkForUpdate(manualCheck = true) } },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GratiaTheme.colors.accent, contentColor = GratiaTheme.colors.background),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) {
+                                            Text("Check for Updates", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                    is UpdateState.Checking -> {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(color = GratiaTheme.colors.accent, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("Checking for updates...", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textSecondary)
+                                        }
+                                    }
+                                    is UpdateState.UpToDate -> {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Check, contentDescription = null, tint = GratiaTheme.colors.success, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text("You're up to date", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textPrimary)
+                                        }
+                                    }
+                                    is UpdateState.UpdateAvailable -> {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Update available: ${state.version}", fontFamily = Inter, fontWeight = FontWeight.Medium, color = GratiaTheme.colors.textPrimary)
+                                            Spacer(Modifier.height(8.dp))
+                                            Button(
+                                                onClick = { scope.launch { updateManager.downloadUpdate(state.downloadUrl) } },
+                                                colors = ButtonDefaults.buttonColors(containerColor = GratiaTheme.colors.accent, contentColor = GratiaTheme.colors.background),
+                                                shape = RoundedCornerShape(24.dp)
+                                            ) {
+                                                Text("Download & Install", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                                            }
+                                        }
+                                    }
+                                    is UpdateState.Downloading -> {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text("Downloading... ${(state.progress * 100).toInt()}%", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textPrimary)
+                                            Spacer(Modifier.height(8.dp))
+                                            LinearProgressIndicator(progress = state.progress, color = GratiaTheme.colors.accent, trackColor = GratiaTheme.colors.glassBorder, modifier = Modifier.fillMaxWidth(0.8f).clip(RoundedCornerShape(4.dp)))
+                                        }
+                                    }
+                                    is UpdateState.ReadyToInstall -> {
+                                        Button(
+                                            onClick = { updateManager.installUpdate(state.apkFile) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = GratiaTheme.colors.success, contentColor = GratiaTheme.colors.background),
+                                            shape = RoundedCornerShape(24.dp)
+                                        ) {
+                                            Text("Install Update", fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                    is UpdateState.Error -> {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(state.message, fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.error)
+                                            Spacer(Modifier.height(8.dp))
+                                            TextButton(onClick = { scope.launch { updateManager.checkForUpdate(manualCheck = true) } }) {
+                                                Text("Retry", fontFamily = Inter, color = GratiaTheme.colors.accent)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

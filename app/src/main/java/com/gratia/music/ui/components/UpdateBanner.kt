@@ -194,7 +194,7 @@ fun UpdateBanner(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
-                    is UpdateState.Idle -> { /* Hidden */ }
+                    is UpdateState.Idle, is UpdateState.UpToDate -> { /* Hidden */ }
                 }
             }
         }

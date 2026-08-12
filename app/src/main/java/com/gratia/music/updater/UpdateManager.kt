@@ -17,6 +17,7 @@ import java.net.URL
 sealed interface UpdateState {
     object Idle : UpdateState
     object Checking : UpdateState
+    object UpToDate : UpdateState
     data class UpdateAvailable(val version: String, val changelog: String, val downloadUrl: String) : UpdateState
     data class Downloading(val progress: Float) : UpdateState
     data class ReadyToInstall(val apkFile: File) : UpdateState
@@ -64,7 +65,8 @@ class UpdateManager(private val context: Context) {
                     if (isNewerVersion(tagName, currentVersion) && downloadUrl.isNotEmpty()) {
                         _state.value = UpdateState.UpdateAvailable(tagName, body, downloadUrl)
                     } else {
-                        _state.value = UpdateState.Idle
+                        if (manualCheck) _state.value = UpdateState.UpToDate
+                        else _state.value = UpdateState.Idle
                     }
                 } else {
                     if (manualCheck) _state.value = UpdateState.Error("Failed to check for updates")

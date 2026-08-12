@@ -228,21 +228,38 @@ fun ProfileScreen(
             }
         }
 
-        // Remove picture option
-        if (avatarPath != null) {
-            Column(
+        // Remove picture/cover options
+        if (avatarPath != null || bannerPath != null) {
+            Row(
                 modifier = Modifier.fillMaxWidth().offset(y = (-24).dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalArrangement = Arrangement.Center
             ) {
-                TextButton(
-                    onClick = {
-                        avatarPath = null
-                        hasChanges = true
+                if (avatarPath != null) {
+                    TextButton(
+                        onClick = {
+                            avatarPath = null
+                            hasChanges = true
+                        }
+                    ) {
+                        Text("Remove Picture", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.error)
                     }
-                ) {
-                    Text("Remove Picture", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.error)
+                }
+                if (avatarPath != null && bannerPath != null) {
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
+                if (bannerPath != null) {
+                    TextButton(
+                        onClick = {
+                            bannerPath = null
+                            hasChanges = true
+                        }
+                    ) {
+                        Text("Remove Cover", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.error)
+                    }
                 }
             }
+        } else {
+             Spacer(Modifier.height(24.dp))
         }
 
         // Display name field
@@ -282,54 +299,60 @@ fun ProfileScreen(
                 )
             )
 
-            Spacer(Modifier.height(12.dp))
-
             // Save button
-            Button(
-                onClick = {
-                    scope.launch {
-                        val profile = UserProfileEntity(
-                            displayName = displayName.trim().ifBlank { "Music Lover" },
-                            avatarPath = avatarPath,
-                            bannerPath = bannerPath,
-                            updatedAt = System.currentTimeMillis()
-                        )
-                        profileDao.upsertProfile(profile)
-                        // Also save to SharedPrefs for HomeScreen access
-                        context.getSharedPreferences("gratia_profile", android.content.Context.MODE_PRIVATE)
-                            .edit()
-                            .putString("display_name", profile.displayName)
-                            .apply()
-                        
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                        saveSuccess = true
-                        delay(2000)
-                        hasChanges = false
-                        saveSuccess = false
-                    }
-                },
-                enabled = hasChanges && displayName.isNotBlank(),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (saveSuccess) GratiaTheme.colors.success else GratiaTheme.colors.accent,
-                    contentColor = GratiaTheme.colors.background,
-                    disabledContainerColor = GratiaTheme.colors.surfaceHover,
-                    disabledContentColor = GratiaTheme.colors.textSecondary
-                ),
-                modifier = Modifier.fillMaxWidth(0.6f).height(44.dp)
+            AnimatedVisibility(
+                visible = hasChanges && displayName.isNotBlank(),
+                enter = expandVertically(animationSpec = spring(stiffness = 400f)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = spring(stiffness = 400f)) + fadeOut()
             ) {
-                AnimatedContent(
-                    targetState = saveSuccess,
-                    transitionSpec = {
-                        (scaleIn(initialScale = 0.5f, animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f)) + fadeIn()) togetherWith 
-                        (scaleOut(targetScale = 0.8f) + fadeOut())
-                    },
-                    label = "SaveButtonAnimation"
-                ) { isSuccess ->
-                    if (isSuccess) {
-                        Icon(Icons.Default.Check, contentDescription = "Saved", modifier = Modifier.size(20.dp))
-                    } else {
-                        Text("Save", fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val profile = UserProfileEntity(
+                                    displayName = displayName.trim().ifBlank { "Music Lover" },
+                                    avatarPath = avatarPath,
+                                    bannerPath = bannerPath,
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                                profileDao.upsertProfile(profile)
+                                // Also save to SharedPrefs for HomeScreen access
+                                context.getSharedPreferences("gratia_profile", android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putString("display_name", profile.displayName)
+                                    .apply()
+                                
+                                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                saveSuccess = true
+                                delay(2000)
+                                hasChanges = false
+                                saveSuccess = false
+                            }
+                        },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (saveSuccess) GratiaTheme.colors.success else GratiaTheme.colors.accent,
+                            contentColor = GratiaTheme.colors.background,
+                            disabledContainerColor = GratiaTheme.colors.surfaceHover,
+                            disabledContentColor = GratiaTheme.colors.textSecondary
+                        ),
+                        modifier = Modifier.fillMaxWidth(0.6f).height(44.dp)
+                    ) {
+                        AnimatedContent(
+                            targetState = saveSuccess,
+                            transitionSpec = {
+                                (scaleIn(initialScale = 0.5f, animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f)) + fadeIn()) togetherWith 
+                                (scaleOut(targetScale = 0.8f) + fadeOut())
+                            },
+                            label = "SaveButtonAnimation"
+                        ) { isSuccess ->
+                            if (isSuccess) {
+                                Icon(Icons.Default.Check, contentDescription = "Saved", modifier = Modifier.size(20.dp))
+                            } else {
+                                Text("Save", fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -372,8 +395,7 @@ fun ProfileScreen(
             ProfileItem(icon = Icons.Default.Palette, label = "Appearance", detail = currentTheme.name.lowercase().replaceFirstChar { it.uppercase() }, onClick = { showThemeDialog = true })
             ProfileItem(icon = Icons.Default.PrivacyTip, label = "Privacy", detail = "All data stays on your device")
             ProfileItem(icon = Icons.Default.CalendarMonth, label = "Clear Listening History", detail = "Remove local calendar data", onClick = { showClearHistoryDialog = true })
-            ProfileItem(icon = Icons.Default.Code, label = "Developer", detail = "Hussain Shaikh", onClick = onNavigateToAbout)
-            ProfileItem(icon = Icons.Default.Info, label = "About Gratia", detail = "Version $versionName")
+            ProfileItem(icon = Icons.Default.Info, label = "About Gratia & Updates", detail = "Version $versionName", onClick = onNavigateToAbout)
         }
 
         Spacer(Modifier.height(32.dp))
