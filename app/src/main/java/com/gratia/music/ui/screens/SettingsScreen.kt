@@ -29,8 +29,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToAbout: () -> Unit,
-    onNavigateToLicenses: () -> Unit,
     onNavigateToEqualizer: () -> Unit
 ) {
     val context = LocalContext.current
@@ -375,37 +373,6 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(24.dp))
-        }
-
-        // Legal & More
-        item {
-            AppleSectionHeader(title = "About")
-            AppleListRow(
-                title = "GitHub",
-                onClick = { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia"))) },
-                trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
-            )
-            AppleListRow(
-                title = "Privacy Policy",
-                onClick = { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia/blob/main/PRIVACY.md"))) },
-                trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
-            )
-            AppleListRow(
-                title = "Changelog",
-                onClick = { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/theonlyhussain/gratia/releases"))) },
-                trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
-            )
-            AppleListRow(
-                title = "Licenses",
-                onClick = onNavigateToLicenses,
-                trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
-            )
-            AppleListRow(
-                title = "About",
-                onClick = onNavigateToAbout,
-                showDivider = false,
-                trailingContent = { Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp)) }
-            )
         }
     }
 }

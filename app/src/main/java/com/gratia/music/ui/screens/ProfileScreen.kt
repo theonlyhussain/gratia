@@ -78,6 +78,7 @@ fun ProfileScreen(
     var avatarPath by remember { mutableStateOf<String?>(null) }
     var bannerPath by remember { mutableStateOf<String?>(null) }
     var hasChanges by remember { mutableStateOf(false) }
+    var isEditing by remember { mutableStateOf(false) }
     var saveSuccess by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -162,7 +163,7 @@ fun ProfileScreen(
                 .padding(horizontal = 16.dp)
                 .height(140.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .clickable { bannerPicker.launch(arrayOf("image/*")) }
+                .clickable(enabled = isEditing) { bannerPicker.launch(arrayOf("image/*")) }
         ) {
             if (bannerPath != null && File(bannerPath!!).exists()) {
                 AsyncImage(
@@ -187,7 +188,40 @@ fun ProfileScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.CameraAlt, null, tint = GratiaTheme.colors.background.copy(alpha = 0.4f), modifier = Modifier.size(28.dp))
+                    if (isEditing) {
+                        Icon(Icons.Default.CameraAlt, null, tint = GratiaTheme.colors.background.copy(alpha = 0.4f), modifier = Modifier.size(28.dp))
+                    }
+                }
+            }
+            
+            // Edit Toggle
+            IconButton(
+                onClick = { 
+                    isEditing = !isEditing 
+                    // Automatically exit editing if saved
+                    if (!isEditing && !hasChanges) {
+                        // Just exiting edit mode
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.3f))
+            ) {
+                AnimatedContent(
+                    targetState = isEditing, 
+                    label = "EditIcon",
+                    transitionSpec = {
+                        (scaleIn(initialScale = 0.8f) + fadeIn()).togetherWith(scaleOut(targetScale = 0.8f) + fadeOut())
+                    }
+                ) { editing ->
+                    if (editing) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Edit", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+                    } else {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Profile", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }
@@ -202,7 +236,7 @@ fun ProfileScreen(
             Surface(
                 modifier = Modifier
                     .size(80.dp)
-                    .clickable { avatarPicker.launch(arrayOf("image/*")) },
+                    .clickable(enabled = isEditing) { avatarPicker.launch(arrayOf("image/*")) },
                 shape = CircleShape,
                 color = GratiaTheme.colors.surface,
                 shadowElevation = 4.dp,
@@ -229,7 +263,11 @@ fun ProfileScreen(
         }
 
         // Remove picture/cover options
-        if (avatarPath != null || bannerPath != null) {
+        AnimatedVisibility(
+            visible = isEditing && (avatarPath != null || bannerPath != null),
+            enter = fadeIn() + expandVertically(animationSpec = spring(stiffness = 300f)),
+            exit = fadeOut() + shrinkVertically(animationSpec = spring(stiffness = 300f))
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().offset(y = (-24).dp),
                 horizontalArrangement = Arrangement.Center
@@ -258,7 +296,9 @@ fun ProfileScreen(
                     }
                 }
             }
-        } else {
+        }
+
+        if (!isEditing || (avatarPath == null && bannerPath == null)) {
              Spacer(Modifier.height(24.dp))
         }
 
@@ -392,10 +432,9 @@ fun ProfileScreen(
         }
 
         ProfileSection(title = "ABOUT") {
-            ProfileItem(icon = Icons.Default.Palette, label = "Appearance", detail = currentTheme.name.lowercase().replaceFirstChar { it.uppercase() }, onClick = { showThemeDialog = true })
             ProfileItem(icon = Icons.Default.PrivacyTip, label = "Privacy", detail = "All data stays on your device")
             ProfileItem(icon = Icons.Default.CalendarMonth, label = "Clear Listening History", detail = "Remove local calendar data", onClick = { showClearHistoryDialog = true })
-            ProfileItem(icon = Icons.Default.Info, label = "About Gratia & Updates", detail = "Version $versionName", onClick = onNavigateToAbout)
+            ProfileItem(icon = Icons.Default.Info, label = "About Gratia", detail = "Version $versionName", onClick = onNavigateToAbout)
         }
 
         Spacer(Modifier.height(32.dp))

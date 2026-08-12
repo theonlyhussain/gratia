@@ -163,58 +163,19 @@ fun UpdatePromptSheet(
         }
     }
 
-    androidx.compose.ui.window.Dialog(
+    androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+        containerColor = GratiaTheme.colors.background,
+        contentColor = GratiaTheme.colors.textPrimary
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(GratiaTheme.colors.background.copy(alpha = 0.96f))
-                .windowInsetsPadding(WindowInsets.systemBars)
+                .fillMaxWidth()
+                .padding(bottom = 48.dp)
         ) {
-            // Immersive background glow
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        androidx.compose.ui.graphics.Brush.radialGradient(
-                            colors = listOf(
-                                GratiaTheme.colors.accent.copy(alpha = 0.2f),
-                                androidx.compose.ui.graphics.Color.Transparent
-                            ),
-                            radius = 1500f
-                        )
-                    )
-            )
-
-            // Close button
-            if (state !is UpdateState.Downloading) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(16.dp)
-                        .size(40.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(GratiaTheme.colors.surface)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
-                        tint = GratiaTheme.colors.textPrimary
-                    )
-                }
-            }
-
             androidx.compose.animation.AnimatedContent(
                 targetState = state,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center),
+                modifier = Modifier.fillMaxWidth(),
                 transitionSpec = {
                     androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(400)) togetherWith androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(400))
                 },

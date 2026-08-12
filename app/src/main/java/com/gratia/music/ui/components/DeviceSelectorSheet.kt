@@ -3,6 +3,7 @@ package com.gratia.music.ui.components
 import android.content.Intent
 import android.media.AudioDeviceInfo
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -105,6 +106,7 @@ fun DeviceSelectorSheet(
                         artistName = artistName,
                         onClick = {
                             if (!device.isCurrent) {
+                                Toast.makeText(context, "Android manages audio routing. Please use the system switcher.", Toast.LENGTH_SHORT).show()
                                 // Fallback to system media output switcher intent if supported, 
                                 // otherwise open Bluetooth settings
                                 try {

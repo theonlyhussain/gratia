@@ -330,8 +330,6 @@ fun GratiaAppRoot() {
                 composable("settings") {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateToAbout = { navController.navigate("about") },
-                        onNavigateToLicenses = { navController.navigate("licenses") },
                         onNavigateToEqualizer = { navController.navigate("equalizer") }
                     )
                 }

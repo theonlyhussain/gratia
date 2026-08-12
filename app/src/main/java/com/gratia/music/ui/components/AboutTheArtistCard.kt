@@ -16,6 +16,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -111,9 +115,9 @@ fun AboutTheArtistCard(
                     
                     if (artistInfo.isVerified) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            imageVector = VerifiedRosette,
                             contentDescription = "Verified Artist",
-                            tint = GratiaTheme.colors.accent, // Using theme color as requested
+                            tint = GratiaTheme.colors.accent,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -149,3 +153,48 @@ fun AboutTheArtistCard(
         }
     }
 }
+
+val VerifiedRosette: ImageVector
+    get() = ImageVector.Builder(
+        name = "Verified",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        path(fill = SolidColor(Color.White), pathFillType = PathFillType.EvenOdd) {
+            // Outer Scalloped Badge (Rosette)
+            moveTo(12.0f, 1.0f)
+            lineTo(14.8f, 3.2f)
+            lineTo(18.2f, 3.2f)
+            lineTo(19.2f, 6.4f)
+            lineTo(22.0f, 8.2f)
+            lineTo(20.8f, 11.4f)
+            lineTo(22.2f, 14.4f)
+            lineTo(19.6f, 16.6f)
+            lineTo(19.0f, 20.0f)
+            lineTo(15.6f, 20.6f)
+            lineTo(13.2f, 23.0f)
+            lineTo(10.0f, 22.0f)
+            lineTo(6.8f, 23.0f)
+            lineTo(4.4f, 20.6f)
+            lineTo(1.0f, 20.0f)
+            lineTo(0.4f, 16.6f)
+            lineTo(2.2f, 14.4f)
+            lineTo(0.8f, 11.4f)
+            lineTo(2.0f, 8.2f)
+            lineTo(4.8f, 6.4f)
+            lineTo(5.8f, 3.2f)
+            lineTo(9.2f, 3.2f)
+            close()
+            
+            // Inner Checkmark Cutout
+            moveTo(10.5f, 16.5f)
+            lineTo(6.0f, 12.0f)
+            lineTo(7.41f, 10.59f)
+            lineTo(10.5f, 13.67f)
+            lineTo(16.59f, 7.58f)
+            lineTo(18.0f, 9.0f)
+            close()
+        }
+    }.build()
