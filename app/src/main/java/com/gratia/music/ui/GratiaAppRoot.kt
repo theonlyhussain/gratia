@@ -440,7 +440,8 @@ fun GratiaAppRoot() {
             androidx.compose.material3.ModalBottomSheet(
                 onDismissRequest = { queueSheetOpen = false },
                 sheetState = queueSheetState,
-                containerColor = GratiaTheme.colors.surface,
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                dragHandle = null,
                 scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
                 shape = GratiaTheme.shapes.sheet
             ) {

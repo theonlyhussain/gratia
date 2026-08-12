@@ -3,6 +3,7 @@ package com.gratia.music.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,6 +41,11 @@ fun RecommendedForYouCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(32.dp))
+            .then(
+                if (!GratiaTheme.colors.isDark) {
+                    Modifier.border(1.dp, androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.08f), RoundedCornerShape(32.dp))
+                } else Modifier
+            )
             .background(GratiaTheme.colors.surface)
             .bounceClick(onClick = onPlay)
             .padding(24.dp)

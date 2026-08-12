@@ -82,38 +82,23 @@ fun QueueSheet(
         if (idx >= 0) idx + 1 else 0
     } else 0
 
-    // Extract dominant color for tinted background
-    var coverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
-    LaunchedEffect(current?.id, current?.coverArtPath) {
-        if (current != null) {
-            coverColors = CoverColorCache.getColors(current.id, current.coverArtPath)
-        }
-    }
-
-    val bgTop by animateColorAsState(
-        targetValue = coverColors.dominant,
-        animationSpec = tween(500),
-        label = "queueBgTop"
-    )
-    val bgBottom by animateColorAsState(
-        targetValue = coverColors.darkMuted,
-        animationSpec = tween(500),
-        label = "queueBgBottom"
-    )
-
     Column(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxSize()
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(bgTop, bgBottom)
-                )
-            )
-            .padding(top = 12.dp)
+            .background(GratiaTheme.colors.surface)
     ) {
-        Spacer(Modifier.height(16.dp))
+        // Drag handle
+        Box(
+            modifier = Modifier
+                .padding(top = 16.dp, bottom = 8.dp)
+                .width(36.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(GratiaTheme.colors.textSecondary.copy(alpha = 0.3f))
+                .align(Alignment.CenterHorizontally)
+        )
 
         // --- Current song info header ---
         if (current != null) {
@@ -140,7 +125,7 @@ fun QueueSheet(
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp,
-                        color = Color.White,
+                        color = GratiaTheme.colors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -148,7 +133,7 @@ fun QueueSheet(
                         current.artist,
                         fontFamily = Inter,
                         fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = GratiaTheme.colors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -160,7 +145,7 @@ fun QueueSheet(
                     Icon(
                         if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
                         contentDescription = "Favorite",
-                        tint = if (isFav) GratiaTheme.colors.accent else Color.White.copy(alpha = 0.8f),
+                        tint = if (isFav) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -212,13 +197,13 @@ fun QueueSheet(
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = Color.White
+                        color = GratiaTheme.colors.textPrimary
                     )
                     Text(
                         "Clear",
                         fontFamily = Inter,
                         fontSize = 14.sp,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = GratiaTheme.colors.textSecondary,
                         modifier = Modifier.bounceClick { playerViewModel.clearHistory() }
                     )
                 }
@@ -248,14 +233,14 @@ fun QueueSheet(
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
-                color = Color.White,
+                color = GratiaTheme.colors.textPrimary,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
             Text(
                 "From ${current.album ?: "your library"}",
                 fontFamily = Inter,
                 fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.6f),
+                color = GratiaTheme.colors.textSecondary,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
             )
         }
@@ -322,7 +307,7 @@ private fun ShufflePill(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val bgColor by animateColorAsState(
-        targetValue = if (isActive) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
+        targetValue = if (isActive) GratiaTheme.colors.textPrimary.copy(alpha = 0.15f) else GratiaTheme.colors.textPrimary.copy(alpha = 0.05f),
         animationSpec = tween(200),
         label = "shuffleBg"
     )
@@ -345,7 +330,7 @@ private fun ShufflePill(
             Icon(
                 Icons.Default.Shuffle,
                 contentDescription = if (isAlbum) "Mix" else "Shuffle",
-                tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+                tint = if (isActive) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textSecondary,
                 modifier = Modifier.size(18.dp)
             )
             if (isAlbum) {
@@ -355,7 +340,7 @@ private fun ShufflePill(
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Medium,
                     fontSize = 13.sp,
-                    color = if (isActive) Color.White else Color.White.copy(alpha = 0.6f)
+                    color = if (isActive) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textSecondary
                 )
             }
         }
@@ -377,7 +362,7 @@ private fun RepeatPill(
     val hapticFeedback = LocalHapticFeedback.current
     val isActive = repeatMode != RepeatMode.OFF
     val bgColor by animateColorAsState(
-        targetValue = if (isActive) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
+        targetValue = if (isActive) GratiaTheme.colors.textPrimary.copy(alpha = 0.15f) else GratiaTheme.colors.textPrimary.copy(alpha = 0.05f),
         animationSpec = tween(200),
         label = "repeatBg"
     )
@@ -400,7 +385,7 @@ private fun RepeatPill(
             Icon(
                 Icons.Default.Repeat,
                 contentDescription = "Repeat",
-                tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+                tint = if (isActive) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textSecondary,
                 modifier = Modifier.size(20.dp)
             )
 
@@ -412,7 +397,7 @@ private fun RepeatPill(
                     fontFamily = Inter,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
-                    color = Color.White
+                    color = GratiaTheme.colors.textPrimary
                 )
             }
         }
@@ -430,7 +415,7 @@ private fun AutoplayPill(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     val bgColor by animateColorAsState(
-        targetValue = if (isActive) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
+        targetValue = if (isActive) GratiaTheme.colors.textPrimary.copy(alpha = 0.15f) else GratiaTheme.colors.textPrimary.copy(alpha = 0.05f),
         animationSpec = tween(200),
         label = "autoplayBg"
     )
@@ -449,7 +434,7 @@ private fun AutoplayPill(
         Icon(
             Icons.Default.AllInclusive,
             contentDescription = "Autoplay",
-            tint = if (isActive) Color.White else Color.White.copy(alpha = 0.5f),
+            tint = if (isActive) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textSecondary,
             modifier = Modifier.size(20.dp)
         )
     }
@@ -497,7 +482,7 @@ private fun QueueRow(
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Medium,
                 fontSize = 14.sp,
-                color = Color.White,
+                color = GratiaTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -505,7 +490,7 @@ private fun QueueRow(
                 song.artist,
                 fontFamily = Inter,
                 fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.6f),
+                color = GratiaTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -516,7 +501,7 @@ private fun QueueRow(
             Icon(
                 Icons.Default.DragHandle,
                 contentDescription = "Reorder",
-                tint = Color.White.copy(alpha = 0.3f),
+                tint = GratiaTheme.colors.textSecondary,
                 modifier = Modifier.size(20.dp)
             )
         } else {
@@ -541,7 +526,7 @@ private fun QueueEmptyState() {
             Icon(
                 Icons.Default.MusicNote,
                 contentDescription = "Empty queue",
-                tint = Color.White.copy(alpha = 0.2f),
+                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f),
                 modifier = Modifier.size(64.dp)
             )
 
@@ -552,7 +537,7 @@ private fun QueueEmptyState() {
                 fontFamily = SpaceGrotesk,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
-                color = Color.White
+                color = GratiaTheme.colors.textPrimary
             )
 
             Spacer(Modifier.height(8.dp))
@@ -561,7 +546,7 @@ private fun QueueEmptyState() {
                 "Play a song and it will appear here\nwith the rest of your queue",
                 fontFamily = Inter,
                 fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.5f),
+                color = GratiaTheme.colors.textSecondary,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(horizontal = 32.dp),
                 textAlign = TextAlign.Center

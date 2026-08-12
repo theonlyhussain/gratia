@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.outlined.Bedtime
@@ -80,46 +81,59 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
         coverColors.dominant.copy(alpha = 0.08f)
     }
 
-    var offsetX by remember { mutableFloatStateOf(0f) }
-
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    val offsetX = remember { androidx.compose.animation.core.Animatable(0f) }
+    val offsetY = remember { androidx.compose.animation.core.Animatable(0f) }
 
     GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
             .graphicsLayer {
-                translationX = offsetX
-                translationY = offsetY
-                alpha = (1f - (Math.abs(offsetX) / 1000f) - (Math.abs(offsetY) / 500f)).coerceIn(0f, 1f)
+                translationX = offsetX.value
+                translationY = offsetY.value
+                alpha = (1f - (Math.abs(offsetX.value) / 1000f) - (Math.abs(offsetY.value) / 500f)).coerceIn(0f, 1f)
             }
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragEnd = {
-                        if (offsetY > 150f) {
-                            haptics.heavy(view)
-                            playerViewModel.clearQueue()
-                        } else if (offsetX < -200f) {
-                            haptics.light(view)
-                            playerViewModel.nextSong()
-                        } else if (offsetX > 200f) {
-                            haptics.light(view)
-                            playerViewModel.prevSong()
+                        scope.launch {
+                            if (offsetY.value > 150f) {
+                                haptics.heavy(view)
+                                offsetY.animateTo(1000f, animationSpec = tween(300))
+                                playerViewModel.clearQueue()
+                                offsetY.snapTo(0f)
+                            } else if (offsetX.value < -200f) {
+                                haptics.light(view)
+                                offsetX.animateTo(-1000f, animationSpec = tween(300))
+                                playerViewModel.nextSong()
+                                offsetX.snapTo(0f)
+                            } else if (offsetX.value > 200f) {
+                                haptics.light(view)
+                                offsetX.animateTo(1000f, animationSpec = tween(300))
+                                playerViewModel.prevSong()
+                                offsetX.snapTo(0f)
+                            } else {
+                                // Snap back
+                                launch { offsetX.animateTo(0f, animationSpec = androidx.compose.animation.core.spring(stiffness = 300f)) }
+                                launch { offsetY.animateTo(0f, animationSpec = androidx.compose.animation.core.spring(stiffness = 300f)) }
+                            }
                         }
-                        offsetX = 0f
-                        offsetY = 0f
                     },
                     onDragCancel = { 
-                        offsetX = 0f
-                        offsetY = 0f 
+                        scope.launch {
+                            launch { offsetX.animateTo(0f) }
+                            launch { offsetY.animateTo(0f) }
+                        }
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        // Prioritize horizontal unless dragging strongly downwards
-                        if (Math.abs(offsetX) > 20f || Math.abs(dragAmount.x) > Math.abs(dragAmount.y)) {
-                            offsetX += dragAmount.x
-                        } else if (dragAmount.y > 0) {
-                            offsetY += dragAmount.y
+                        scope.launch {
+                            if (Math.abs(offsetX.value) > 20f || Math.abs(dragAmount.x) > Math.abs(dragAmount.y)) {
+                                offsetX.snapTo(offsetX.value + dragAmount.x)
+                            } else if (dragAmount.y > 0 || offsetY.value > 0) {
+                                offsetY.snapTo((offsetY.value + dragAmount.y).coerceAtLeast(0f))
+                            }
                         }
                     }
                 )
