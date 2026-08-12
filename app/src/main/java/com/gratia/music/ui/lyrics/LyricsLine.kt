@@ -1,47 +1,58 @@
 package com.gratia.music.ui.lyrics
 
-import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.unit.dp
 import com.gratia.music.lyrics.LyricLine
-import kotlin.math.pow
 
-val QuadInOutEasing = Easing { fraction ->
-    if (fraction < 0.5f) {
-        2f * fraction * fraction
-    } else {
-        1f - (-2.0 * fraction + 2.0).pow(2.0).toFloat() / 2f
-    }
-}
-
+/**
+ * A single lyrics line within the synced scroll list.
+ *
+ * Visual behaviour:
+ * - **Active line:** full opacity + slight scale-up (1.0 → 1.02) to subtly
+ *   draw attention without looking jarring.
+ * - **Inactive line:** 20 % opacity, normal scale.
+ * - Transition uses a 250 ms ease-out, matching Apple Music's smooth fade.
+ *
+ * Instrumental gaps are delegated to [MusicLine].
+ */
 @Composable
 fun LyricsLine(
     line: LyricLine,
     isActiveLine: Boolean,
     nextLineStartMs: Long?,
-    currentPositionMs: Long
+    currentPositionMs: Long,
+    onSeek: ((Long) -> Unit)? = null
 ) {
     val opacity by animateFloatAsState(
-        targetValue = if (isActiveLine) 1f else 0.1f,
+        targetValue = if (isActiveLine) 1f else 0.2f,
         animationSpec = tween(
-            durationMillis = 100,
-            easing = QuadInOutEasing
+            durationMillis = 250,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing
         ),
         label = "LineOpacity"
     )
 
-    // Handle instrumental gap logic (if content is empty or explicitly marked)
-    // The lyrics-animation repo used line.content === " "
-    val isInstrumental = line.words.isEmpty() || (line.words.size == 1 && line.words[0].text.trim().isEmpty())
+    // Subtle scale effect on the active line for visual emphasis
+    val scale by animateFloatAsState(
+        targetValue = if (isActiveLine) 1.02f else 1f,
+        animationSpec = tween(
+            durationMillis = 300,
+            easing = androidx.compose.animation.core.FastOutSlowInEasing
+        ),
+        label = "LineScale"
+    )
+
+    // Handle instrumental gap logic
+    val isInstrumental = line.words.isEmpty() ||
+            (line.words.size == 1 && line.words[0].text.trim().isEmpty())
 
     if (isInstrumental) {
         val duration = (nextLineStartMs ?: (line.startMs + 2000)) - line.startMs
@@ -49,13 +60,15 @@ fun LyricsLine(
         return
     }
 
-    // WrapLayout to wrap words (Row with Modifier.wrapContentWidth or FlowRow)
+    // Word-synced content
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .alpha(opacity)
-            .padding(bottom = 35.dp),
+            .scale(scale)
+            .clickable(enabled = onSeek != null) { onSeek?.invoke(line.startMs) }
+            .padding(bottom = 28.dp),
         horizontalArrangement = Arrangement.Start
     ) {
         line.words.forEachIndexed { wordIndex, word ->
@@ -72,10 +85,10 @@ fun LyricsLine(
                 durationMs = durationMs.toInt(),
                 currentPositionMs = currentPositionMs
             )
-            
-            // Add a spacer to represent space between words if word text doesn't contain a space
+
+            // Space between words
             if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
-                 Spacer(modifier = Modifier.width(8.dp)) // Approximation of space width
+                Spacer(modifier = Modifier.width(7.dp))
             }
         }
     }

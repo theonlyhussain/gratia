@@ -9,9 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +18,9 @@ import androidx.compose.ui.Alignment
 import com.gratia.music.ui.components.SongMenuSheet
 import com.gratia.music.ui.components.SongInfoDialog
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -33,27 +33,32 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.data.CoverColorCache
 import com.gratia.music.lyrics.LyricsDocument
 import com.gratia.music.lyrics.LyricsParser
+import com.gratia.music.lyrics.LrcParser
 
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.AnimatedText
 import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.lyrics.SyncedLyricsView
+import com.gratia.music.ui.lyrics.LyricsEditorSheet
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.SpaceGrotesk
 import com.gratia.music.ui.LocalSnackbarHostState
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
  * Full-screen cinematic expanded player.
  *
  * Layout (top → bottom):
- * 1. Album art — full-width, edge-to-edge with gradient fade
+ * 1. Album art — full-width, edge-to-edge with gradient fade (or synced lyrics overlay)
  * 2. Song title + artist + favorite star + three-dots
  * 3. Progress/seek bar
  * 4. Play/Pause/Skip controls
- * 5. Bottom bar: Lyrics + Queue (2 buttons only)
+ * 5. Bottom bar: Lyrics + Device + Queue
  *
  * Lyrics mode: tapping Lyrics toggles an overlay that replaces the artwork area
- * with scrolling synced lyrics. Tap any line to seek.
+ * with the full SyncedLyricsView showing word-level animations. Player controls
+ * remain visible and functional throughout.
  */
 @Composable
 fun ExpandedPlayer(
@@ -101,6 +106,9 @@ fun ExpandedPlayer(
     // --- Lyrics overlay state ---
     var showLyricsOverlay by remember { mutableStateOf(false) }
 
+    // --- Lyrics editor state ---
+    var showLyricsEditor by remember { mutableStateOf(false) }
+
     // --- Device selector state ---
     var showDeviceSelector by remember { mutableStateOf(false) }
 
@@ -116,11 +124,29 @@ fun ExpandedPlayer(
         label = "dismissAlpha"
     )
 
-    // --- Synced lyrics parsing ---
-    val parsedLyrics = remember(currentLyrics?.text) {
-        if (currentLyrics?.isSynced == true && currentLyrics?.text?.isNotBlank() == true) {
-            LyricsParser.parse(currentLyrics!!.text)
-        } else null
+    // --- Smooth visual time interpolator for silky lyrics sync ---
+    var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
+    var lastUpdateTime by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+
+    LaunchedEffect(currentTimeMs, isPlaying) {
+        visualTimeMs = currentTimeMs
+        lastUpdateTime = android.os.SystemClock.elapsedRealtime()
+        if (isPlaying) {
+            while (isActive) {
+                androidx.compose.runtime.withFrameNanos {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    visualTimeMs = currentTimeMs + (now - lastUpdateTime)
+                }
+            }
+        }
+    }
+
+    // --- Parse lyrics for the SyncedLyricsView ---
+    val lyricsRaw = currentLyrics?.text ?: ""
+    val parsedLines = remember(lyricsRaw) {
+        if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
+            LrcParser.parse(lyricsRaw)
+        } else emptyList()
     }
 
     BoxWithConstraints(
@@ -221,19 +247,54 @@ fun ExpandedPlayer(
                         )
                     }
                     } else {
-                        // Lyrics overlay — visible when lyrics button is active
-                        Column {
-                            Spacer(Modifier.statusBarsPadding())
-                            Spacer(Modifier.height(16.dp))
-                            InlinePlayerLyrics(
-                                parsedLyrics = parsedLyrics,
-                                currentTimeMs = currentTimeMs,
-                                onSeekToLine = { timeMs -> playerViewModel.seekTo(timeMs) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f)
-                                    .padding(horizontal = 24.dp)
-                            )
+                        // Premium synced lyrics overlay with fade masks
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { alpha = 0.99f }
+                                .drawWithContent {
+                                    drawContent()
+                                    val maskBrush = Brush.verticalGradient(
+                                        0.0f to Color.Transparent,
+                                        0.08f to Color.Black,
+                                        0.92f to Color.Black,
+                                        1.0f to Color.Transparent,
+                                        startY = 0f,
+                                        endY = size.height
+                                    )
+                                    drawRect(brush = maskBrush, blendMode = BlendMode.DstIn)
+                                }
+                        ) {
+                            if (parsedLines.isNotEmpty()) {
+                                SyncedLyricsView(
+                                    lyrics = lyricsRaw,
+                                    parsedLyricsInput = parsedLines,
+                                    currentPlaybackTime = visualTimeMs,
+                                    onSeek = { seekMs -> playerViewModel.seekTo(seekMs) },
+                                    syncOffset = currentLyrics?.offsetMs ?: 0L,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                // No synced lyrics — show a clean empty state
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        GratiaText(
+                                            text = "No synced lyrics available",
+                                            style = GratiaTheme.typography.body,
+                                            color = Color.White.copy(alpha = 0.5f)
+                                        )
+                                        Spacer(Modifier.height(12.dp))
+                                        GratiaText(
+                                            text = "Tap Edit Lyrics from the menu to add them",
+                                            style = GratiaTheme.typography.caption,
+                                            color = Color.White.copy(alpha = 0.3f)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -326,6 +387,7 @@ fun ExpandedPlayer(
             }
         }
 
+        // --- Song Menu (three-dot) ---
         if (showSongMenu) {
             SongMenuSheet(
                 song = song,
@@ -352,7 +414,10 @@ fun ExpandedPlayer(
                     onNavigateToArtist(song.artist)
                 },
                 hasLyrics = currentLyrics != null,
-                onEditLyrics = { onOpenLyrics() },
+                onEditLyrics = {
+                    // Open the lyrics editor sheet directly from the player
+                    showLyricsEditor = true
+                },
                 onSongInfo = { showSongInfo = true },
                 onDelete = {
                     showSongMenu = false
@@ -441,87 +506,18 @@ fun ExpandedPlayer(
                 onDismissRequest = { showDeviceSelector = false }
             )
         }
-    }
-}
 
-/**
- * Inline lyrics view displayed over the artwork area.
- * Shows synced lyrics with the current line highlighted.
- * Tapping a line seeks to that timestamp.
- */
-@Composable
-private fun InlinePlayerLyrics(
-    parsedLyrics: LyricsDocument?,
-    currentTimeMs: Long,
-    onSeekToLine: (Long) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (parsedLyrics == null) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            GratiaText(
-                text = "No synced lyrics available",
-                style = GratiaTheme.typography.body,
-                color = Color.White.copy(alpha = 0.5f)
-            )
-        }
-        return
-    }
-
-    val lines: List<Pair<Long, String>> = when (parsedLyrics) {
-        is LyricsDocument.LineSynced -> parsedLyrics.lines.map { it.startMs to it.text }
-        is LyricsDocument.WordSynced -> parsedLyrics.lines.map { it.startMs to it.text }
-        is LyricsDocument.Plain -> parsedLyrics.text.split("\n").mapIndexed { i, text -> (i * 5000L) to text }
-    }
-
-    val currentLineIndex = lines.indexOfLast { it.first <= currentTimeMs }
-    val listState = rememberLazyListState()
-
-    // Auto-scroll to current line
-    LaunchedEffect(currentLineIndex) {
-        if (currentLineIndex >= 0) {
-            listState.animateScrollToItem(
-                index = currentLineIndex,
-                scrollOffset = -200
-            )
-        }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(vertical = 40.dp)
-    ) {
-        itemsIndexed(lines) { index, (startMs, text) ->
-            val isCurrent = index == currentLineIndex
-            val isPast = index < currentLineIndex
-
-            val alpha by animateFloatAsState(
-                targetValue = when {
-                    isCurrent -> 1f
-                    isPast -> 0.3f
-                    else -> 0.5f
-                },
-                animationSpec = tween(300),
-                label = "lyricAlpha"
-            )
-
-            val textSize = if (isCurrent) 28.sp else 22.sp
-
-            Text(
-                text = text,
-                fontFamily = SpaceGrotesk,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                fontSize = textSize,
-                color = Color.White.copy(alpha = alpha),
-                lineHeight = textSize * 1.2f,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        if (parsedLyrics !is LyricsDocument.Plain) {
-                            onSeekToLine(startMs)
-                        }
-                    }
+        // --- Lyrics Editor Sheet (opened directly from three-dot menu) ---
+        if (showLyricsEditor) {
+            LyricsEditorSheet(
+                song = song,
+                initialLyrics = lyricsRaw,
+                currentTimeMs = visualTimeMs,
+                onDismiss = { showLyricsEditor = false },
+                onSave = { newLyrics, isSynced ->
+                    playerViewModel.saveManualLyrics(newLyrics, isSynced)
+                    showLyricsEditor = false
+                }
             )
         }
     }

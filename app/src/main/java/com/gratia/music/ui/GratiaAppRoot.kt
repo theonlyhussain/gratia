@@ -67,7 +67,6 @@ fun GratiaAppRoot() {
     val playerViewModel: PlayerViewModel = viewModel()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val expandedPlayerOpen by playerViewModel.expandedPlayerOpen.collectAsState()
-    val lyricsOverlayOpen by playerViewModel.lyricsOverlayOpen.collectAsState()
     var queueSheetOpen by remember { mutableStateOf(false) }
     var sleepTimerSheetOpen by remember { mutableStateOf(false) }
 
@@ -317,24 +316,7 @@ fun GratiaAppRoot() {
                         editSongId = songId
                     )
                 }
-                composable(
-                    "fullLyrics/{songId}",
-                    arguments = listOf(navArgument("songId") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val songId = backStackEntry.arguments?.getString("songId")
-                    FullLyricsScreen(
-                        playerViewModel = playerViewModel,
-                        songId = songId,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
-                composable("fullLyrics") {
-                    FullLyricsScreen(
-                        playerViewModel = playerViewModel,
-                        songId = null,
-                        onBack = { navController.popBackStack() }
-                    )
-                }
+
                 composable("profile") {
                     ProfileScreen(
                         onNavigateBack = { navController.popBackStack() },
@@ -434,11 +416,6 @@ fun GratiaAppRoot() {
         ) {
             ExpandedPlayer(
                 playerViewModel = playerViewModel,
-                onOpenLyrics = {
-                    playerViewModel.setExpandedPlayerOpen(false)
-                    val songId = currentSong?.id ?: return@ExpandedPlayer
-                    navController.navigate("fullLyrics/$songId")
-                },
                 onOpenQueue = {
                     queueSheetOpen = true
                 },
@@ -489,27 +466,6 @@ fun GratiaAppRoot() {
             }
         }
 
-        // Lyrics overlay (from lyrics button in expanded player)
-        BackHandler(enabled = lyricsOverlayOpen && currentSong != null) {
-            playerViewModel.setLyricsOverlayOpen(false)
-        }
-        AnimatedVisibility(
-            visible = lyricsOverlayOpen && currentSong != null,
-            enter = slideInVertically(
-                initialOffsetY = { it }, 
-                animationSpec = GratiaTheme.motion.springStandard()
-            ) + fadeIn(animationSpec = tween(GratiaTheme.motion.normal)),
-            exit = slideOutVertically(
-                targetOffsetY = { it }, 
-                animationSpec = tween(GratiaTheme.motion.normal, easing = GratiaTheme.motion.standardEasing)
-            ) + fadeOut(animationSpec = tween(GratiaTheme.motion.normal))
-        ) {
-            FullLyricsScreen(
-                playerViewModel = playerViewModel,
-                songId = currentSong?.id,
-                onBack = { playerViewModel.setLyricsOverlayOpen(false) }
-            )
-        }
 
         } // end of main app else block
 

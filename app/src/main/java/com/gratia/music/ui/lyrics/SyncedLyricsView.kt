@@ -13,6 +13,15 @@ import com.gratia.music.lyrics.LrcParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * Premium synced lyrics view with word-level animations.
+ *
+ * This composable renders the scrolling lyrics list, auto-scrolling to
+ * the active line and displaying word-level highlights when data is available.
+ *
+ * The background is intentionally transparent so it composites properly
+ * over the player's existing blurred album art background.
+ */
 @Composable
 fun SyncedLyricsView(
     lyrics: String,
@@ -53,32 +62,25 @@ fun SyncedLyricsView(
 
     LaunchedEffect(currentLineIndex) {
         if (currentLineIndex >= 0 && parsedLyrics.isNotEmpty()) {
-            // Replicating flatlistRef.current?.scrollToIndex animated: true
-            // FlatList without viewPosition scrolls to the top of the viewport.
-            // But typically lyrics should be centered or slightly above. We'll use animateScrollToItem
-            listState.animateScrollToItem(currentLineIndex, scrollOffset = 0)
+            listState.animateScrollToItem(currentLineIndex, scrollOffset = -100)
         }
     }
 
+    // Transparent background — lets the player's blurred album art show through
     Box(modifier = modifier.fillMaxSize()) {
-        GradientBackground()
-        
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 400.dp) // Bottom spacer
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 60.dp, bottom = 200.dp)
         ) {
-            item {
-                Spacer(modifier = Modifier.height(100.dp)) // ListHeaderComponent
-            }
-
             itemsIndexed(parsedLyrics) { index, item ->
                 val nextStartMs = parsedLyrics.getOrNull(index + 1)?.startMs
                 LyricsLine(
                     line = item,
                     isActiveLine = index == currentLineIndex,
                     nextLineStartMs = nextStartMs,
-                    currentPositionMs = adjustedPlaybackTime
+                    currentPositionMs = adjustedPlaybackTime,
+                    onSeek = onSeek
                 )
             }
         }
