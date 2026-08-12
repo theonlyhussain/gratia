@@ -19,9 +19,13 @@ A modern, meticulously crafted music player focused on fluid playback, stunning 
 ## ✨ Features
 
 - 🎨 **Immersive Aesthetic**: Edge-to-edge player, dynamic backgrounds based on cover art, smooth spring animations, and a pixel-perfect Dark/AMOLED theme.
-- 🎵 **Synced Lyrics Engine**: Kinetic scrolling synced LRC lyrics overlay directly on the player, with a built-in lyrics editor and formatting tools.
+- 🎤 **Word-Level Synced Lyrics**: Premium, word-by-word synchronized lyrics integrated directly into the main player. Smoothly animated, with full playback and seek control right from the lyrics view.
 - ✨ **"Recommended For You"**: Personalized listening suggestions powered by local listening history and high-res artist imagery pulled dynamically via the Deezer API.
+- 🎧 **Device Output Selector**: Seamlessly switch music output to Bluetooth speakers, headphones, or other connected devices directly from the player.
 - 🎛️ **Gapless Crossfade**: Custom dual-engine ExoPlayer implementation for seamless, DJ-style crossfading between tracks.
+- 📲 **Fluid Gestures**: Interactive mini-player with physics-based drag and swipe gestures to skip tracks or dismiss playback.
+- 👤 **Customizable Profiles**: Beautifully animated profile editing UI to personalize your avatar and background cover image.
+- 🔄 **Smart In-App Updates**: A sleek, non-intrusive update manager that detects, downloads, and installs the latest Gratia features effortlessly.
 - 🏷️ **Automated Metadata**: Automatically fetches beautiful cover art and ID3 metadata (including genres) via Deezer API to keep your library pristine.
 - 🔒 **Absolute Privacy**: Complete offline listening capability and strict zero data tracking. Your music is yours.
 
