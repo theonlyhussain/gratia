@@ -52,6 +52,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val currentLyrics: StateFlow<LyricsEntity?> = lyricsManager.currentLyrics
     val isLyricsLoading: StateFlow<Boolean> = lyricsManager.isLoading
 
+    private val _artistInfo = MutableStateFlow<com.gratia.music.data.repository.ArtistInfo?>(null)
+    val artistInfo: StateFlow<com.gratia.music.data.repository.ArtistInfo?> = _artistInfo.asStateFlow()
+
     val sleepTimerActive = sleepTimerManager.isActive
     val sleepTimerRemainingMs = sleepTimerManager.remainingMs
     val sleepTimerDurationMs = sleepTimerManager.durationMs
@@ -64,6 +67,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             songRepository.getFavorites().collectLatest { favs ->
                 _favoriteSongIds.value = favs.map { it.id }.toSet()
+            }
+        }
+        
+        viewModelScope.launch {
+            currentSong.collectLatest { song ->
+                if (song != null) {
+                    _artistInfo.value = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(song.artist)
+                } else {
+                    _artistInfo.value = null
+                }
             }
         }
         

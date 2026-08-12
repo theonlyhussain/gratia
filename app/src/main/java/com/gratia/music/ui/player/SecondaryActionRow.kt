@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +23,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 fun SecondaryActionRow(
     hasLyrics: Boolean = true,
     onOpenLyrics: () -> Unit,
+    onOpenDeviceSelector: () -> Unit,
     onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
     isLyricsActive: Boolean = false
@@ -45,6 +47,16 @@ fun SecondaryActionRow(
                 hasLyrics -> Color.White.copy(alpha = 0.6f)
                 else -> Color.White.copy(alpha = 0.2f)
             }
+        )
+
+        // Device Selector
+        PlayerButton(
+            icon = Icons.Default.Speaker,
+            onClick = onOpenDeviceSelector,
+            contentDescription = "Select Device",
+            size = 48.dp,
+            iconSize = 24.dp,
+            tint = Color.White.copy(alpha = 0.6f)
         )
 
         // Queue

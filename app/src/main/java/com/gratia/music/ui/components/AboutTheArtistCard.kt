@@ -1,0 +1,151 @@
+package com.gratia.music.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.gratia.music.data.repository.ArtistInfo
+import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.ui.theme.Inter
+import com.gratia.music.ui.theme.SpaceGrotesk
+import java.text.NumberFormat
+import java.util.Locale
+
+@Composable
+fun AboutTheArtistCard(
+    artistInfo: ArtistInfo?,
+    modifier: Modifier = Modifier
+) {
+    if (artistInfo == null) return
+
+    var expanded by remember { mutableStateOf(false) }
+    
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(32.dp))
+            .background(GratiaTheme.colors.surface)
+            .clickable { expanded = !expanded }
+    ) {
+        Column {
+            // Top section: Image with "About the artist" text
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+            ) {
+                if (artistInfo.pictureUrl != null) {
+                    AsyncImage(
+                        model = artistInfo.pictureUrl,
+                        contentDescription = "Artist Image",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(GratiaTheme.colors.surfaceHover)
+                    )
+                }
+
+                // Top gradient for text readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.5f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
+                Text(
+                    text = "About the artist",
+                    fontFamily = SpaceGrotesk,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = Color.White,
+                    modifier = Modifier.padding(24.dp)
+                )
+            }
+
+            // Bottom section: Info and Bio
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                // Name and verification
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = artistInfo.name,
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        color = GratiaTheme.colors.textPrimary
+                    )
+                    
+                    if (artistInfo.isVerified) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Verified Artist",
+                            tint = GratiaTheme.colors.accent, // Using theme color as requested
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Fans / Listeners
+                val formattedFans = NumberFormat.getNumberInstance(Locale.getDefault()).format(artistInfo.fanCount)
+                Text(
+                    text = "$formattedFans fans on Deezer",
+                    fontFamily = Inter,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
+                    color = GratiaTheme.colors.textSecondary
+                )
+
+                // Bio
+                if (!artistInfo.biography.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = artistInfo.biography,
+                        fontFamily = Inter,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 15.sp,
+                        color = GratiaTheme.colors.textPrimary.copy(alpha = 0.9f),
+                        maxLines = if (expanded) Int.MAX_VALUE else 4,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 22.sp
+                    )
+                }
+            }
+        }
+    }
+}

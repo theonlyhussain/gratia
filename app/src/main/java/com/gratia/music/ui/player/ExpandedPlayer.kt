@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -99,6 +101,9 @@ fun ExpandedPlayer(
     // --- Lyrics overlay state ---
     var showLyricsOverlay by remember { mutableStateOf(false) }
 
+    // --- Device selector state ---
+    var showDeviceSelector by remember { mutableStateOf(false) }
+
     val motion = GratiaTheme.motion
 
     // --- Swipe-to-dismiss state ---
@@ -118,7 +123,7 @@ fun ExpandedPlayer(
         } else null
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer {
@@ -159,6 +164,9 @@ fun ExpandedPlayer(
                 )
             }
     ) {
+        val screenHeight = maxHeight
+        val scrollState = rememberScrollState()
+
         // --- Background ---
         PlayerBackground(
             coverArtPath = song.coverArtPath,
@@ -179,9 +187,17 @@ fun ExpandedPlayer(
 
         // --- Content ---
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
         ) {
-            // --- Hero Artwork / Lyrics Overlay area ---
+            // Main player container
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(screenHeight)
+            ) {
+                // --- Hero Artwork / Lyrics Overlay area ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -276,7 +292,7 @@ fun ExpandedPlayer(
 
             Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge))
 
-            // --- Secondary Actions: Lyrics + Queue only ---
+            // --- Secondary Actions: Lyrics, Device, Queue ---
             SecondaryActionRow(
                 hasLyrics = currentLyrics != null,
                 onOpenLyrics = {
@@ -284,6 +300,7 @@ fun ExpandedPlayer(
                         showLyricsOverlay = !showLyricsOverlay
                     }
                 },
+                onOpenDeviceSelector = { showDeviceSelector = true },
                 onOpenQueue = onOpenQueue,
                 isLyricsActive = showLyricsOverlay
             )
@@ -295,6 +312,18 @@ fun ExpandedPlayer(
 
             Spacer(Modifier.height(GratiaTheme.spacing.medium))
             Spacer(Modifier.navigationBarsPadding())
+            }
+
+            // --- About the Artist ---
+            val artistInfo by playerViewModel.artistInfo.collectAsState()
+            if (artistInfo != null) {
+                com.gratia.music.ui.components.AboutTheArtistCard(
+                    artistInfo = artistInfo,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+                Spacer(Modifier.navigationBarsPadding())
+                Spacer(Modifier.height(16.dp))
+            }
         }
 
         if (showSongMenu) {
@@ -402,6 +431,14 @@ fun ExpandedPlayer(
                     }
                 },
                 containerColor = GratiaTheme.colors.surface
+            )
+        }
+
+        if (showDeviceSelector) {
+            com.gratia.music.ui.components.DeviceSelectorSheet(
+                songTitle = song.title,
+                artistName = song.artist,
+                onDismissRequest = { showDeviceSelector = false }
             )
         }
     }
