@@ -437,8 +437,12 @@ class GratiaPlayerEngine(
 
             while (elapsed <= duration) {
                 val progress = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
-                val volIn = progress
-                val volOut = 1f - progress
+                
+                // Equal-Power Crossfade Curve
+                // Using sine/cosine maintains constant acoustic energy: sin^2(x) + cos^2(x) = 1
+                val theta = progress * (Math.PI / 2.0)
+                val volIn = kotlin.math.sin(theta).toFloat()
+                val volOut = kotlin.math.cos(theta).toFloat()
 
                 playerA.volume = volIn
                 playerB.volume = volOut.coerceIn(0f, 1f)

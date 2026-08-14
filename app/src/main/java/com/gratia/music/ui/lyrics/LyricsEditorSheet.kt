@@ -387,22 +387,6 @@ fun LyricsEditorSheet(
                     }
                 }
 
-                // Save button
-                Button(
-                    onClick = { onSave(textFieldValue.text, isSyncedMode) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = GratiaTheme.colors.accent,
-                        contentColor = GratiaTheme.colors.background
-                    )
-                ) {
-                    Text(
-                        "Save",
-                        fontFamily = Inter,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
             }
         }
     }

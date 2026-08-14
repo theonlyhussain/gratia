@@ -6,6 +6,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -217,10 +221,25 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     modifier = Modifier.size(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    val rotation by animateFloatAsState(
+                        targetValue = if (isPlaying) 0f else 90f,
+                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+                        label = "miniPlayPauseRot"
+                    )
                     AnimatedContent(
                         targetState = isPlaying,
                         transitionSpec = {
-                            fadeIn(tween(motion.normal)) togetherWith fadeOut(tween(motion.fast))
+                            if (targetState) {
+                                (fadeIn(animationSpec = tween(150)) + 
+                                 scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f), initialScale = 0.6f)) togetherWith
+                                (fadeOut(animationSpec = tween(150)) + 
+                                 scaleOut(animationSpec = tween(150), targetScale = 0.6f))
+                            } else {
+                                (fadeIn(animationSpec = tween(150)) + 
+                                 scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f), initialScale = 0.6f)) togetherWith
+                                (fadeOut(animationSpec = tween(150)) + 
+                                 scaleOut(animationSpec = tween(150), targetScale = 0.6f))
+                            }
                         },
                         label = "miniPlayPause"
                     ) { playing ->
@@ -232,7 +251,10 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                                 playerViewModel.togglePlay()
                             },
                             tint = GratiaTheme.colors.textPrimary,
-                            size = GratiaTheme.icons.normal
+                            size = GratiaTheme.icons.normal,
+                            modifier = Modifier.graphicsLayer {
+                                rotationZ = rotation
+                            }
                         )
                     }
                 }

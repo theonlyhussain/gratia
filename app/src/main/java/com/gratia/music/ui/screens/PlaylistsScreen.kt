@@ -62,9 +62,7 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                     EmptyStateView(
                         icon = Icons.AutoMirrored.Filled.QueueMusic,
                         headline = "No playlists yet",
-                        description = "Create your first playlist to organize your favorite songs",
-                        actionLabel = "Create Playlist",
-                        onActionClick = { showCreateDialog = true }
+                        description = "Create your first playlist to organize your favorite songs"
                     )
                 }
             } else {

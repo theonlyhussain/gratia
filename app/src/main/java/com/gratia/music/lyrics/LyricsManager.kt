@@ -38,6 +38,8 @@ class LyricsManager(
         scope.launch {
             playerManager.currentSong.collectLatest { song ->
                 if (song != null) {
+                    // Instantly clear old lyrics to prevent stale data
+                    _currentLyrics.value = null
                     fetchLyricsForSong(song, forceRefresh = false)
                     prefetchNextSongLyrics(song)
                 } else {

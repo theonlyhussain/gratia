@@ -294,6 +294,20 @@ class TransitionController(
                 return@launch
             }
 
+            // Smart Album Awareness: Disable crossfade for gapless albums
+            val currentAlbum = currentMediaItem.mediaMetadata.albumTitle?.toString()
+            val nextAlbum = nextMediaItem.mediaMetadata.albumTitle?.toString()
+            
+            if (!currentAlbum.isNullOrBlank() && currentAlbum == nextAlbum) {
+                Log.d(TAG, "Smart Album Awareness: Gapless album detected ($currentAlbum). Disabling crossfade.")
+                if (currentState != TransitionState.TRANSITIONING) {
+                    engine.cancelNext()
+                }
+                engine.setPauseAtEndOfMediaItems(false)
+                setState(TransitionState.IDLE)
+                return@launch
+            }
+
             Log.d(TAG, "Preparing next track: ${nextMediaItem.mediaId}")
             setState(TransitionState.PREPARING)
             engine.prepareNext(nextMediaItem)

@@ -106,6 +106,11 @@ fun ExpandedPlayer(
     // --- Lyrics overlay state ---
     var showLyricsOverlay by remember { mutableStateOf(false) }
 
+    // Intercept back button when lyrics are open
+    androidx.activity.compose.BackHandler(enabled = showLyricsOverlay) {
+        showLyricsOverlay = false
+    }
+
     // --- Lyrics editor state ---
     var showLyricsEditor by remember { mutableStateOf(false) }
 
@@ -315,6 +320,7 @@ fun ExpandedPlayer(
                 onClickAlbum = {
                     if (!song.album.isNullOrBlank()) {
                         onDismiss()
+                        onDismiss() // Close the player first
                         onNavigateToAlbum(song.album)
                     }
                 },
@@ -406,6 +412,7 @@ fun ExpandedPlayer(
                 onGoToAlbum = {
                     if (!song.album.isNullOrBlank()) {
                         onDismiss()
+                        onDismiss() // Close the player first
                         onNavigateToAlbum(song.album)
                     }
                 },
