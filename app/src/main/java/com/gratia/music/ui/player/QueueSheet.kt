@@ -100,173 +100,184 @@ fun QueueSheet(
                 .align(Alignment.CenterHorizontally)
         )
 
-        // --- Current song info header ---
-        if (current != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                CoverArtImage(
-                    coverArtPath = current.coverArtPath,
-                    title = current.title,
-                    artist = current.artist,
-                    size = 48.dp,
-                    cornerRadius = 10.dp,
-                    fontSize = 14.sp
-                )
-
-                Spacer(Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        current.title,
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
-                        color = GratiaTheme.colors.textPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        current.artist,
-                        fontFamily = Inter,
-                        fontSize = 12.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // Favorite button
-                IconButton(onClick = { playerViewModel.toggleFavorite(current) }) {
-                    val isFav = favoriteSongIds.contains(current.id)
-                    Icon(
-                        if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isFav) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.size(28.dp)
-                    )
+        val listState = rememberReorderableLazyListState(
+            onMove = { from, to ->
+                // The first item (index 0) is the header.
+                // Reorderable list indices are offset by 1 because of the header.
+                val fromAdjusted = (from.index - 1) + upcomingStartIndex
+                val toAdjusted = (to.index - 1) + upcomingStartIndex
+                if (fromAdjusted >= upcomingStartIndex && toAdjusted >= upcomingStartIndex && fromAdjusted < queue.size && toAdjusted < queue.size) {
+                    playerViewModel.moveInQueue(fromAdjusted, toAdjusted)
                 }
             }
+        )
 
-            Spacer(Modifier.height(12.dp))
-
-            // --- Shuffle / Repeat / Autoplay pill buttons ---
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ShufflePill(
-                    isActive = shuffleEnabled,
-                    isAlbum = current.album != null,
-                    onClick = { playerViewModel.toggleShuffle() },
-                    modifier = Modifier.weight(1f)
-                )
-
-                RepeatPill(
-                    repeatMode = repeatMode,
-                    onClick = { playerViewModel.cycleRepeatMode() },
-                    modifier = Modifier.weight(1f)
-                )
-
-                AutoplayPill(
-                    isActive = autoplayEnabled,
-                    onClick = { playerViewModel.toggleAutoplay() },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // --- History Section ---
-            if (history.isNotEmpty()) {
-                Spacer(Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "History",
-                        fontFamily = SpaceGrotesk,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = GratiaTheme.colors.textPrimary
-                    )
-                    Text(
-                        "Clear",
-                        fontFamily = Inter,
-                        fontSize = 14.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        modifier = Modifier.bounceClick { playerViewModel.clearHistory() }
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                
-                // Show last 3 history items just as a preview, to save space
+        LazyColumn(
+            state = listState.listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .reorderable(listState),
+            contentPadding = PaddingValues(bottom = 32.dp)
+        ) {
+            item {
                 Column {
-                    history.take(3).forEach { song ->
-                        QueueRow(
-                            song = song,
-                            index = -1,
-                            isCurrentSong = false,
-                            onPlay = { playerViewModel.playSong(song, history) },
-                            onRemove = {}, // History items aren't removed individually here
-                            modifier = Modifier.alpha(0.6f),
-                            showDragHandle = false
+                    // --- Current Song ---
+                    if (current != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(GratiaTheme.colors.surface)
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CoverArtImage(
+                                coverArtPath = current.coverArtPath,
+                                title = current.title,
+                                artist = current.artist,
+                                size = 48.dp,
+                                cornerRadius = 10.dp,
+                                fontSize = 14.sp
+                            )
+
+                            Spacer(Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    current.title,
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    color = GratiaTheme.colors.textPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    current.artist,
+                                    fontFamily = Inter,
+                                    fontSize = 12.sp,
+                                    color = GratiaTheme.colors.textSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            // Favorite button
+                            IconButton(onClick = { playerViewModel.toggleFavorite(current) }) {
+                                val isFav = favoriteSongIds.contains(current.id)
+                                Icon(
+                                    if (isFav) Icons.Default.Star else Icons.Default.StarBorder,
+                                    contentDescription = "Favorite",
+                                    tint = if (isFav) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // --- Shuffle / Repeat / Autoplay pill buttons ---
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ShufflePill(
+                                isActive = shuffleEnabled,
+                                isAlbum = current.album != null,
+                                onClick = { playerViewModel.toggleShuffle() },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            RepeatPill(
+                                repeatMode = repeatMode,
+                                onClick = { playerViewModel.cycleRepeatMode() },
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            AutoplayPill(
+                                isActive = autoplayEnabled,
+                                onClick = { playerViewModel.toggleAutoplay() },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
+
+                        // --- History Section ---
+                        if (history.isNotEmpty()) {
+                            Spacer(Modifier.height(24.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "History",
+                                    fontFamily = SpaceGrotesk,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
+                                    color = GratiaTheme.colors.textPrimary
+                                )
+                                Text(
+                                    "Clear",
+                                    fontFamily = Inter,
+                                    fontSize = 14.sp,
+                                    color = GratiaTheme.colors.textSecondary,
+                                    modifier = Modifier.bounceClick { playerViewModel.clearHistory() }
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            
+                            // Show last 3 history items just as a preview, to save space
+                            Column {
+                                history.take(3).forEach { song ->
+                                    QueueRow(
+                                        song = song,
+                                        index = -1,
+                                        isCurrentSong = false,
+                                        onPlay = { playerViewModel.playSong(song, history) },
+                                        onRemove = {}, // History items aren't removed individually here
+                                        modifier = Modifier.alpha(0.6f),
+                                        showDragHandle = false
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(24.dp))
+
+                        // --- "Continue Playing" header ---
+                        Text(
+                            "Continue Playing",
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = GratiaTheme.colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                        Text(
+                            "From ${current.album ?: "your library"}",
+                            fontFamily = Inter,
+                            fontSize = 13.sp,
+                            color = GratiaTheme.colors.textSecondary,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
                         )
                     }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    if (queue.isEmpty()) {
+                        QueueEmptyState()
+                    }
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
-
-            // --- "Continue Playing" header ---
-            Text(
-                "Continue Playing",
-                fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = GratiaTheme.colors.textPrimary,
-                modifier = Modifier.padding(horizontal = 24.dp)
-            )
-            Text(
-                "From ${current.album ?: "your library"}",
-                fontFamily = Inter,
-                fontSize = 13.sp,
-                color = GratiaTheme.colors.textSecondary,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        if (queue.isEmpty()) {
-            QueueEmptyState()
-        } else {
-            val listState = rememberReorderableLazyListState(
-                onMove = { from, to ->
-                    val fromAdjusted = from.index + upcomingStartIndex
-                    val toAdjusted = to.index + upcomingStartIndex
-                    if (fromAdjusted >= upcomingStartIndex && toAdjusted >= upcomingStartIndex && fromAdjusted < queue.size && toAdjusted < queue.size) {
-                        playerViewModel.moveInQueue(fromAdjusted, toAdjusted)
-                    }
-                }
-            )
-
-            LazyColumn(
-                state = listState.listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .reorderable(listState),
-                contentPadding = PaddingValues(bottom = 32.dp)
-            ) {
+            if (queue.isNotEmpty()) {
                 val upcoming = if (upcomingStartIndex < queue.size) {
                     queue.subList(upcomingStartIndex, queue.size)
                 } else emptyList()
