@@ -78,6 +78,7 @@ fun ExpandedPlayer(
 
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
     val isFavorite = currentSong?.id?.let { favoriteSongIds.contains(it) } ?: false
+    val artistInfos by playerViewModel.artistInfos.collectAsState()
 
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
@@ -106,11 +107,6 @@ fun ExpandedPlayer(
     // --- Lyrics overlay state ---
     var showLyricsOverlay by remember { mutableStateOf(false) }
 
-    // Intercept back button when lyrics are open
-    androidx.activity.compose.BackHandler(enabled = showLyricsOverlay) {
-        showLyricsOverlay = false
-    }
-
     // --- Lyrics editor state ---
     var showLyricsEditor by remember { mutableStateOf(false) }
 
@@ -121,6 +117,23 @@ fun ExpandedPlayer(
     var showBiographySheet by remember { mutableStateOf(false) }
     var showCreditsSheet by remember { mutableStateOf(false) }
     var selectedBioArtist by remember { mutableStateOf("") }
+
+    val isAnyOverlayOpen = showBiographySheet || showCreditsSheet || showSongMenu || showLyricsEditor || showDeviceSelector || showLyricsOverlay || showAddToPlaylist || showDeleteConfirm || showSongInfo
+
+    // Intercept back button for ALL overlays to guarantee strict hierarchy
+    androidx.activity.compose.BackHandler(enabled = isAnyOverlayOpen) {
+        if (showBiographySheet) showBiographySheet = false
+        else if (showCreditsSheet) showCreditsSheet = false
+        else if (showSongMenu) showSongMenu = false
+        else if (showLyricsEditor) showLyricsEditor = false
+        else if (showDeviceSelector) showDeviceSelector = false
+        else if (showAddToPlaylist) showAddToPlaylist = false
+        else if (showDeleteConfirm) showDeleteConfirm = false
+        else if (showSongInfo) showSongInfo = false
+        else if (showLyricsOverlay) showLyricsOverlay = false
+    }
+
+
 
     val motion = GratiaTheme.motion
 
@@ -166,7 +179,9 @@ fun ExpandedPlayer(
                 translationY = dismissOffsetY.value
                 alpha = dismissAlpha
             }
-            .pointerInput(Unit) {
+            .pointerInput(isAnyOverlayOpen) {
+                if (isAnyOverlayOpen) return@pointerInput // Disable swipe-to-dismiss when overlays are active
+
                 detectVerticalDragGestures(
                     onDragEnd = {
                         scope.launch {
@@ -257,9 +272,44 @@ fun ExpandedPlayer(
                         )
                     }
                     } else {
-                        // Premium synced lyrics overlay with fade masks
+                        // Independent swipe-down for Lyrics overlay
+                        val lyricsDismissOffsetY = remember { androidx.compose.animation.core.Animatable(0f) }
+                        
                         Box(
                             modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .graphicsLayer {
+                                    translationY = lyricsDismissOffsetY.value
+                                    alpha = (1f - (lyricsDismissOffsetY.value / 600f)).coerceIn(0f, 1f)
+                                }
+                                .pointerInput(Unit) {
+                                    detectVerticalDragGestures(
+                                        onDragEnd = {
+                                            scope.launch {
+                                                if (lyricsDismissOffsetY.value > 200f) {
+                                                    showLyricsOverlay = false
+                                                    lyricsDismissOffsetY.snapTo(0f)
+                                                } else {
+                                                    lyricsDismissOffsetY.animateTo(0f, animationSpec = motion.springStiff())
+                                                }
+                                            }
+                                        },
+                                        onDragCancel = {
+                                            scope.launch { lyricsDismissOffsetY.animateTo(0f, animationSpec = motion.springStiff()) }
+                                        },
+                                        onVerticalDrag = { _, dragAmount ->
+                                            scope.launch {
+                                                if (dragAmount > 0 || lyricsDismissOffsetY.value > 0) {
+                                                    lyricsDismissOffsetY.snapTo((lyricsDismissOffsetY.value + dragAmount).coerceAtLeast(0f))
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                        ) {
+                            Box(
+                                modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer { alpha = 0.99f }
                                 .drawWithContent {
@@ -276,7 +326,7 @@ fun ExpandedPlayer(
                                 }
                         ) {
                             if (parsedLines.isNotEmpty()) {
-                                SyncedLyricsView(
+                                com.gratia.music.ui.lyrics.SyncedLyricsView(
                                     lyrics = lyricsRaw,
                                     parsedLyricsInput = parsedLines,
                                     currentPlaybackTime = visualTimeMs,
@@ -390,7 +440,6 @@ fun ExpandedPlayer(
             }
 
             // --- About the Artist ---
-            val artistInfos by playerViewModel.artistInfos.collectAsState()
             
             if (artistInfos.isNotEmpty()) {
                 com.gratia.music.ui.components.AboutTheArtistCard(
@@ -577,5 +626,25 @@ fun ExpandedPlayer(
                 }
             )
         }
+
+        // --- Artist Info Full Screen Layer ---
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showBiographySheet,
+            enter = androidx.compose.animation.slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = GratiaTheme.motion.springStandard()
+            ) + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = androidx.compose.animation.core.tween(GratiaTheme.motion.normal, easing = GratiaTheme.motion.standardEasing)
+            ) + androidx.compose.animation.fadeOut()
+        ) {
+            com.gratia.music.ui.components.ArtistInfoScreen(
+                artistName = selectedBioArtist,
+                artistInfo = artistInfos.values.firstOrNull { it?.name.equals(selectedBioArtist, ignoreCase = true) } ?: artistInfos[selectedBioArtist],
+                onDismiss = { showBiographySheet = false }
+            )
+        }
     }
+}
 }
