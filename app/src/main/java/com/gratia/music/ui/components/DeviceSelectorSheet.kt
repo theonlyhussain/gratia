@@ -1,9 +1,8 @@
 package com.gratia.music.ui.components
 
 import android.content.Intent
-import android.media.AudioDeviceInfo
+import android.os.Build
 import android.provider.Settings
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,9 +13,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
-import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Speaker
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -32,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.mediarouter.media.MediaRouter
 import com.gratia.music.player.ConnectedDevice
 import com.gratia.music.player.DeviceManager
 import com.gratia.music.ui.theme.GratiaTheme
@@ -84,7 +84,7 @@ fun DeviceSelectorSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp) // extra padding for bottom navigation
+                .padding(bottom = 24.dp)
         ) {
             Text(
                 text = "Connect",
@@ -106,13 +106,13 @@ fun DeviceSelectorSheet(
                         artistName = artistName,
                         onClick = {
                             if (!device.isCurrent) {
-                                Toast.makeText(context, "Android manages audio routing. Please use the system switcher.", Toast.LENGTH_SHORT).show()
-                                // Fallback to system media output switcher intent if supported, 
-                                // otherwise open Bluetooth settings
                                 try {
-                                    context.startActivity(Intent("com.android.settings.panel.action.MEDIA_OUTPUT"))
+                                    val route = device.routeInfo
+                                    if (route != null) {
+                                        route.select()
+                                    }
                                 } catch (e: Exception) {
-                                    context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                                    // Ignore selection errors, Android handles fallback internally
                                 }
                                 onDismissRequest()
                             }
@@ -120,10 +120,10 @@ fun DeviceSelectorSheet(
                     )
                 }
 
-                if (devices.size <= 1) {
+                if (devices.isEmpty()) {
                     item {
                         Text(
-                            text = "No other devices found",
+                            text = "No devices found",
                             fontFamily = Inter,
                             fontSize = 14.sp,
                             color = GratiaTheme.colors.textSecondary,
@@ -142,7 +142,15 @@ fun DeviceSelectorSheet(
                     .clip(RoundedCornerShape(16.dp))
                     .background(GratiaTheme.colors.surfaceHover)
                     .clickable {
-                        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        try {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                context.startActivity(Intent("com.android.settings.panel.action.MEDIA_OUTPUT"))
+                            } else {
+                                context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                            }
+                        } catch (e: Exception) {
+                            context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                        }
                         onDismissRequest()
                     }
                     .padding(vertical = 16.dp),
@@ -157,7 +165,7 @@ fun DeviceSelectorSheet(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Find Bluetooth devices",
+                    text = "Audio Settings",
                     fontFamily = Inter,
                     fontWeight = FontWeight.Medium,
                     fontSize = 15.sp,
@@ -175,7 +183,7 @@ private fun DeviceItem(
     artistName: String,
     onClick: () -> Unit
 ) {
-    val isPhone = device.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+    val isPhone = device.name == "This phone"
 
     val backgroundColor = if (device.isCurrent) GratiaTheme.colors.surfaceHover else Color.Transparent
     val borderColor = if (device.isCurrent) GratiaTheme.colors.accent.copy(alpha = 0.5f) else Color.Transparent
@@ -203,23 +211,6 @@ private fun DeviceItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
-                if (isPhone) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "Normal",
-                            fontFamily = Inter,
-                            fontSize = 10.sp,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                    }
-                }
             }
 
             if (device.isCurrent) {
@@ -237,11 +228,13 @@ private fun DeviceItem(
 
         Spacer(modifier = Modifier.width(16.dp))
 
-        val icon = when {
-            isPhone -> Icons.Default.Smartphone
-            device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || device.type == AudioDeviceInfo.TYPE_BLE_HEADSET -> Icons.Default.BluetoothAudio
-            device.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || device.type == AudioDeviceInfo.TYPE_WIRED_HEADSET -> Icons.Default.Headset
-            else -> Icons.Default.Speaker
+        val icon = when (device.type) {
+            ConnectedDevice.DEVICE_TYPE_BLUETOOTH -> Icons.Default.BluetoothAudio
+            MediaRouter.RouteInfo.DEVICE_TYPE_SPEAKER -> Icons.Default.Speaker
+            MediaRouter.RouteInfo.DEVICE_TYPE_TV -> Icons.Default.Tv
+            else -> {
+                if (isPhone) Icons.Default.Smartphone else Icons.Default.Speaker
+            }
         }
 
         Icon(

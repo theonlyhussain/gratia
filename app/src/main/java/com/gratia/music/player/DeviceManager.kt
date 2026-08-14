@@ -1,126 +1,112 @@
 package com.gratia.music.player
 
 import android.content.Context
-import android.media.AudioDeviceCallback
-import android.media.AudioDeviceInfo
-import android.media.AudioManager
+import androidx.mediarouter.media.MediaControlIntent
+import androidx.mediarouter.media.MediaRouteSelector
+import androidx.mediarouter.media.MediaRouter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 data class ConnectedDevice(
-    val id: Int,
+    val id: String,
     val name: String,
-    val type: Int,
-    val isCurrent: Boolean
-)
+    val type: Int, // MediaRouter DEVICE_TYPE or Custom DEVICE_TYPE_BLUETOOTH
+    val isCurrent: Boolean,
+    val routeInfo: MediaRouter.RouteInfo? = null
+) {
+    companion object {
+        const val DEVICE_TYPE_BLUETOOTH = 3
+    }
+}
 
 class DeviceManager(private val context: Context) {
 
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val mediaRouter = MediaRouter.getInstance(context)
+    private val routeSelector = MediaRouteSelector.Builder()
+        .addControlCategory(MediaControlIntent.CATEGORY_LIVE_AUDIO)
+        .build()
 
     private val _connectedDevices = MutableStateFlow<List<ConnectedDevice>>(emptyList())
     val connectedDevices: StateFlow<List<ConnectedDevice>> = _connectedDevices.asStateFlow()
 
-    private val audioDeviceCallback = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+    private val mediaRouterCallback = object : MediaRouter.Callback() {
+        override fun onRouteAdded(router: MediaRouter, route: MediaRouter.RouteInfo) {
             updateDevices()
         }
 
-        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+        override fun onRouteRemoved(router: MediaRouter, route: MediaRouter.RouteInfo) {
+            updateDevices()
+        }
+
+        override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) {
+            updateDevices()
+        }
+
+        override fun onRouteSelected(router: MediaRouter, route: MediaRouter.RouteInfo, reason: Int) {
+            updateDevices()
+        }
+
+        override fun onRouteUnselected(router: MediaRouter, route: MediaRouter.RouteInfo, reason: Int) {
             updateDevices()
         }
     }
 
     fun startListening() {
-        audioManager.registerAudioDeviceCallback(audioDeviceCallback, null)
+        mediaRouter.addCallback(
+            routeSelector,
+            mediaRouterCallback,
+            MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY or MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN
+        )
         updateDevices()
     }
 
     fun stopListening() {
-        audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+        mediaRouter.removeCallback(mediaRouterCallback)
     }
 
     fun updateDevices() {
-        val outputs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        val validTypes = setOf(
-            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-            AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-            AudioDeviceInfo.TYPE_WIRED_HEADSET,
-            AudioDeviceInfo.TYPE_USB_HEADSET,
-            AudioDeviceInfo.TYPE_USB_DEVICE
-        )
+        val routes = mediaRouter.routes
 
-        // Find highest priority device to mark as "current" (Android routing typically follows this order)
-        var currentDeviceId = -1
-        
-        // Check Bluetooth first
-        val btDevice = outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || it.type == AudioDeviceInfo.TYPE_BLE_HEADSET }
-        if (btDevice != null) {
-            currentDeviceId = btDevice.id
-        } else {
-            // Then wired
-            val wiredDevice = outputs.firstOrNull { 
-                it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || 
-                it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                it.type == AudioDeviceInfo.TYPE_USB_HEADSET 
-            }
-            if (wiredDevice != null) {
-                currentDeviceId = wiredDevice.id
-            } else {
-                // Then speaker
-                val speaker = outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
-                if (speaker != null) {
-                    currentDeviceId = speaker.id
+        val allMapped = mutableListOf<ConnectedDevice>()
+
+        routes.forEach { route ->
+            if (route.matchesSelector(routeSelector) || route.isDefault || route.isBluetooth) {
+                // Determine a user-friendly name
+                val rawName = route.name ?: ""
+                val name = if (route.isDefault && rawName.equals("Phone", ignoreCase = true)) {
+                    "This phone"
+                } else {
+                    rawName
                 }
+
+                // If deviceType is unknown but it's a bluetooth route, mark it as bluetooth
+                val type = if (route.isBluetooth && route.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_UNKNOWN) {
+                    ConnectedDevice.DEVICE_TYPE_BLUETOOTH
+                } else {
+                    route.deviceType
+                }
+
+                allMapped.add(
+                    ConnectedDevice(
+                        id = route.id,
+                        name = name.takeIf { it.isNotBlank() } ?: "Unknown Device",
+                        type = type,
+                        isCurrent = route.isSelected,
+                        routeInfo = route
+                    )
+                )
             }
         }
 
-        val mapped = outputs.filter { validTypes.contains(it.type) }.map { info ->
-            val name = if (info.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                "This phone"
-            } else if (info.productName.isNullOrBlank()) {
-                getGenericName(info.type)
-            } else {
-                info.productName.toString()
-            }
+        // Deduplicate
+        val uniqueDevices = allMapped.distinctBy { it.id }
 
-            ConnectedDevice(
-                id = info.id,
-                name = name,
-                type = info.type,
-                isCurrent = info.id == currentDeviceId
-            )
-        }
-        
-        // Ensure "This phone" is always listed, even if sometimes getDevices omits it when BT is connected (depending on OEM)
-        val finalDevices = if (mapped.none { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }) {
-            mapped + ConnectedDevice(
-                id = 0,
-                name = "This phone",
-                type = AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
-                isCurrent = currentDeviceId == -1 || currentDeviceId == 0
-            )
-        } else {
-            mapped
-        }
-
-        // Sort: Current device first, then bluetooth/wired, then speaker
-        _connectedDevices.value = finalDevices.sortedWith(
+        // Sort: Current device first, then phone speaker, then alphabetical
+        _connectedDevices.value = uniqueDevices.sortedWith(
             compareBy<ConnectedDevice> { !it.isCurrent }
-                .thenBy { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+                .thenBy { it.name != "This phone" }
                 .thenBy { it.name }
         )
-    }
-
-    private fun getGenericName(type: Int): String {
-        return when (type) {
-            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLE_HEADSET -> "Bluetooth Device"
-            AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired Headphones"
-            AudioDeviceInfo.TYPE_USB_HEADSET, AudioDeviceInfo.TYPE_USB_DEVICE -> "USB Audio Device"
-            else -> "Audio Device"
-        }
     }
 }

@@ -39,6 +39,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val autoplayEnabled = playerManager.autoplayEnabled
     val history = playerManager.history
     val playbackError = playerManager.playbackError
+    val audioFormat = playerManager.audioFormat
 
     val songCount = songRepository.getSongCount()
     val playlistCount = playlistDao.getPlaylistCount()
@@ -52,8 +53,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val currentLyrics: StateFlow<LyricsEntity?> = lyricsManager.currentLyrics
     val isLyricsLoading: StateFlow<Boolean> = lyricsManager.isLoading
 
-    private val _artistInfo = MutableStateFlow<com.gratia.music.data.repository.ArtistInfo?>(null)
-    val artistInfo: StateFlow<com.gratia.music.data.repository.ArtistInfo?> = _artistInfo.asStateFlow()
+    private val _artistInfos = MutableStateFlow<Map<String, com.gratia.music.data.repository.ArtistInfo?>>(emptyMap())
+    val artistInfos: StateFlow<Map<String, com.gratia.music.data.repository.ArtistInfo?>> = _artistInfos.asStateFlow()
 
     val sleepTimerActive = sleepTimerManager.isActive
     val sleepTimerRemainingMs = sleepTimerManager.remainingMs
@@ -73,9 +74,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             currentSong.collectLatest { song ->
                 if (song != null) {
-                    _artistInfo.value = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(song.artist)
+                    val artists = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                    val infoMap = mutableMapOf<String, com.gratia.music.data.repository.ArtistInfo?>()
+                    _artistInfos.value = emptyMap() // Clear old ones
+                    artists.forEach { artistName ->
+                        val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(artistName)
+                        infoMap[artistName] = info
+                        _artistInfos.value = infoMap.toMap() // Update state incrementally
+                    }
                 } else {
-                    _artistInfo.value = null
+                    _artistInfos.value = emptyMap()
                 }
             }
         }

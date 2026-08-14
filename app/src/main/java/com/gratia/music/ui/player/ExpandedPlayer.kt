@@ -117,6 +117,11 @@ fun ExpandedPlayer(
     // --- Device selector state ---
     var showDeviceSelector by remember { mutableStateOf(false) }
 
+    // --- Credits and Bio state ---
+    var showBiographySheet by remember { mutableStateOf(false) }
+    var showCreditsSheet by remember { mutableStateOf(false) }
+    var selectedBioArtist by remember { mutableStateOf("") }
+
     val motion = GratiaTheme.motion
 
     // --- Swipe-to-dismiss state ---
@@ -305,6 +310,8 @@ fun ExpandedPlayer(
                 }
             }
 
+            val audioFormat by playerViewModel.audioFormat.collectAsState()
+
             // --- Song Info + Favorite + Menu ---
             PlayerHeader(
                 title = song.title,
@@ -329,7 +336,8 @@ fun ExpandedPlayer(
                     val msg = if (isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
                     scope.launch { snackbarHostState.showSnackbar(msg) }
                 },
-                onMoreClick = { showSongMenu = true }
+                onMoreClick = { showSongMenu = true },
+                audioFormatInfo = audioFormat
             )
 
             Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge))
@@ -382,11 +390,53 @@ fun ExpandedPlayer(
             }
 
             // --- About the Artist ---
-            val artistInfo by playerViewModel.artistInfo.collectAsState()
-            if (artistInfo != null) {
+            val artistInfos by playerViewModel.artistInfos.collectAsState()
+            
+            if (artistInfos.isNotEmpty()) {
                 com.gratia.music.ui.components.AboutTheArtistCard(
-                    artistInfo = artistInfo,
+                    artistInfos = artistInfos,
+                    onArtistClick = { artistName ->
+                        onDismiss()
+                        onNavigateToArtist(artistName)
+                    },
+                    onSeeMoreClick = { artistName ->
+                        selectedBioArtist = artistName
+                        showBiographySheet = true
+                    },
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                )
+            }
+            
+            // --- Credits ---
+            val credits = remember(song, artistInfos) {
+                val list = mutableListOf<com.gratia.music.ui.components.CreditPerson>()
+                
+                // 1. Add Main Artists
+                val mainArtists = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                mainArtists.forEach { name ->
+                    list.add(com.gratia.music.ui.components.CreditPerson(name, listOf("Main Artist")))
+                }
+                
+                // 2. Add Composers
+                val composers = com.gratia.music.utils.ArtistParser.parseArtists(song.composer)
+                composers.forEach { name ->
+                    val existing = list.find { it.name.equals(name, ignoreCase = true) }
+                    if (existing != null) {
+                        list.remove(existing)
+                        list.add(existing.copy(roles = existing.roles + "Composer"))
+                    } else {
+                        list.add(com.gratia.music.ui.components.CreditPerson(name, listOf("Composer")))
+                    }
+                }
+                
+                list
+            }
+            
+            if (credits.isNotEmpty()) {
+                com.gratia.music.ui.components.CreditsCard(
+                    credits = credits,
+                    onShowAllClick = { showCreditsSheet = true },
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 )
                 Spacer(Modifier.navigationBarsPadding())
                 Spacer(Modifier.height(16.dp))

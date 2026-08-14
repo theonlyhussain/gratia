@@ -9,6 +9,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
+import androidx.media3.common.Format
+import androidx.media3.common.C
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -34,6 +37,14 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import android.graphics.BitmapFactory
 import android.graphics.Bitmap
+
+data class AudioFormatInfo(
+    val mimeType: String?,
+    val sampleRate: Int,
+    val bitDepth: Int,
+    val channelCount: Int,
+    val bitrate: Int
+)
 
 /**
  * Manages real audio playback using Media3 MediaController connected to PlaybackService.
@@ -92,6 +103,9 @@ class PlayerManager(private val context: Context) {
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
+    private val _audioFormat = MutableStateFlow<AudioFormatInfo?>(null)
+    val audioFormat: StateFlow<AudioFormatInfo?> = _audioFormat.asStateFlow()
+
     private var progressJob: Job? = null
     private var backgroundSyncJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main)
@@ -147,6 +161,44 @@ class PlayerManager(private val context: Context) {
             Log.e(TAG, "onPlayerError: ${error.errorCodeName} — ${error.message}")
             _playbackError.value = "Couldn't play this song. Try another file or check permission."
             // Don't manually set _isPlaying here — ExoPlayer will fire onIsPlayingChanged(false) 
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+            super.onTracksChanged(tracks)
+            var foundAudioFormat = false
+            for (group in tracks.groups) {
+                if (group.type == C.TRACK_TYPE_AUDIO) {
+                    for (i in 0 until group.length) {
+                        val format = group.getTrackFormat(i)
+                        
+                        // Extract bit depth from PCM encoding if available
+                        val bitDepth = when (format.pcmEncoding) {
+                            C.ENCODING_PCM_16BIT -> 16
+                            C.ENCODING_PCM_24BIT -> 24
+                            C.ENCODING_PCM_32BIT -> 32
+                            C.ENCODING_PCM_FLOAT -> 32
+                            C.ENCODING_PCM_8BIT -> 8
+                            else -> -1
+                        }
+
+                        val formatInfo = AudioFormatInfo(
+                            mimeType = format.sampleMimeType,
+                            sampleRate = format.sampleRate,
+                            bitDepth = bitDepth,
+                            channelCount = format.channelCount,
+                            bitrate = format.bitrate
+                        )
+                        Log.d(TAG, "AudioFormatExtracted: $formatInfo")
+                        _audioFormat.value = formatInfo
+                        foundAudioFormat = true
+                        break
+                    }
+                }
+                if (foundAudioFormat) break
+            }
+            if (!foundAudioFormat) {
+                _audioFormat.value = null
+            }
         }
     }
 

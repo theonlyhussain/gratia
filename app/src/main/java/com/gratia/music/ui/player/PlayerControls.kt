@@ -137,39 +137,12 @@ private fun PlayPauseButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        val rotation by animateFloatAsState(
-            targetValue = if (isPlaying) 0f else 90f,
-            animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
-            label = "playPauseRot"
+        // We use our premium morphing icon instead of a basic AnimatedContent swap
+        com.gratia.music.ui.components.MorphingPlayPauseIcon(
+            isPlaying = isPlaying,
+            color = Color.White,
+            modifier = Modifier.size(36.dp)
         )
-        // Crossfade between Play and Pause icons with bouncy spring and rotation
-        AnimatedContent(
-            targetState = isPlaying,
-            transitionSpec = {
-                if (targetState) {
-                    (fadeIn(animationSpec = tween(150)) + 
-                     scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f), initialScale = 0.6f)) togetherWith
-                    (fadeOut(animationSpec = tween(150)) + 
-                     scaleOut(animationSpec = tween(150), targetScale = 0.6f))
-                } else {
-                    (fadeIn(animationSpec = tween(150)) + 
-                     scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f), initialScale = 0.6f)) togetherWith
-                    (fadeOut(animationSpec = tween(150)) + 
-                     scaleOut(animationSpec = tween(150), targetScale = 0.6f))
-                }
-            },
-            label = "playPauseIcon"
-        ) { playing ->
-            GratiaIcon(
-                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playing) "Pause" else "Play",
-                tint = Color.White, // White icon for the industry standard style over dark blurred background
-                size = 52.dp, // Very large icon
-                modifier = Modifier.graphicsLayer {
-                    rotationZ = rotation
-                }
-            )
-        }
     }
 }
 

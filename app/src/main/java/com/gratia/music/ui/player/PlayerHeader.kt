@@ -57,6 +57,7 @@ fun PlayerHeader(
     onClickAlbum: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
     onMoreClick: () -> Unit = {},
+    audioFormatInfo: com.gratia.music.player.AudioFormatInfo? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -94,6 +95,62 @@ fun PlayerHeader(
                 isMarquee = true,
                 modifier = Modifier.clickable { onClickArtist() }
             )
+
+            // Audio Format Badge
+            if (audioFormatInfo != null) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val isLossless = when (audioFormatInfo.mimeType) {
+                        "audio/flac", "audio/alac", "audio/x-wav", "audio/raw", "audio/x-aiff" -> true
+                        else -> false
+                    }
+                    val formatName = when (audioFormatInfo.mimeType) {
+                        "audio/flac" -> "FLAC"
+                        "audio/alac" -> "ALAC"
+                        "audio/mp4a-latm" -> "AAC"
+                        "audio/mpeg" -> "MP3"
+                        "audio/ogg", "audio/vorbis" -> "OGG"
+                        "audio/x-wav" -> "WAV"
+                        else -> audioFormatInfo.mimeType?.substringAfter("audio/")?.uppercase() ?: "AUDIO"
+                    }
+                    val sampleRateKhz = audioFormatInfo.sampleRate / 1000f
+                    val sampleRateStr = if (sampleRateKhz % 1 == 0f) "${sampleRateKhz.toInt()}" else "$sampleRateKhz"
+                    
+                    val text = buildString {
+                        append(formatName)
+                        if (audioFormatInfo.bitDepth > 0 && isLossless) {
+                            append(" • ${audioFormatInfo.bitDepth}-bit")
+                        }
+                        if (audioFormatInfo.sampleRate > 0) {
+                            append(" / $sampleRateStr kHz")
+                        }
+                    }
+
+                    androidx.compose.material3.Text(
+                        text = text,
+                        style = GratiaTheme.typography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                        color = Color.White.copy(alpha = 0.4f)
+                    )
+
+                    if (isLossless) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color.White.copy(alpha = 0.15f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            val hiRes = audioFormatInfo.bitDepth > 16 || audioFormatInfo.sampleRate > 48000
+                            androidx.compose.material3.Text(
+                                text = if (hiRes) "Hi-Res Lossless" else "Lossless",
+                                style = GratiaTheme.typography.caption.copy(fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                color = Color.White.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.width(12.dp))

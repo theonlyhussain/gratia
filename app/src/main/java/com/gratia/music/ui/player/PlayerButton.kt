@@ -24,11 +24,18 @@ import androidx.compose.ui.unit.dp
 import com.gratia.music.ui.components.GratiaIcon
 import com.gratia.music.ui.theme.GratiaTheme
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 /**
  * Reusable animated icon button for all player controls.
  *
  * Every player button shares:
  * - Press scale animation (0.95 → 1.0, GDL normal)
+ * - Click bump animation (quick scale down and back up on tap)
  * - Configurable size, tint, and glow
  * - Light Haptic feedback on tap
  * - Disabled state with alpha fade (0.3)
@@ -48,15 +55,24 @@ fun PlayerButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    var isClicked by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
     val view = LocalView.current
     val haptics = GratiaTheme.haptics
     val motion = GratiaTheme.motion
 
+    // The scale reacts to both continuous press and momentary clicks
+    val targetScale = when {
+        isPressed && enabled -> 0.90f
+        isClicked -> 0.85f // The satisfying visual bump
+        else -> 1f
+    }
+
     val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) 0.97f else 1f,
+        targetValue = targetScale,
         animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = 0.6f, 
-            stiffness = 400f
+            dampingRatio = 0.5f, // Bouncier for the satisfying click
+            stiffness = 500f
         ),
         label = "btnScale"
     )
@@ -83,6 +99,12 @@ fun PlayerButton(
                 onClick = {
                     if (haptic) {
                         haptics.light(view)
+                    }
+                    // Trigger the visual bump
+                    coroutineScope.launch {
+                        isClicked = true
+                        delay(100)
+                        isClicked = false
                     }
                     onClick()
                 }
