@@ -17,6 +17,13 @@ data class ArtistInfo(
     val biography: String?
 )
 
+data class ContributorInfo(
+    val id: Long,
+    val name: String,
+    val pictureUrl: String?,
+    val role: String
+)
+
 object ArtistInfoRepository {
     private const val TAG = "ArtistInfoRepository"
 
@@ -67,5 +74,66 @@ object ArtistInfoRepository {
             Log.e(TAG, "Failed to fetch artist info: ${e.message}")
         }
         return@withContext null
+    }
+
+    suspend fun getTrackContributors(title: String, artist: String): List<ContributorInfo> = withContext(Dispatchers.IO) {
+        if (title.isBlank() || artist.isBlank()) return@withContext emptyList()
+        val contributors = mutableListOf<ContributorInfo>()
+        try {
+            val cleanTitle = title.replace(Regex("(?i)\\s*\\(.*?\\)"), "").trim()
+            val cleanArtist = artist.split(",")[0].split("&")[0].trim()
+            
+            val query = "artist:\"$cleanArtist\" track:\"$cleanTitle\""
+            val encodedQuery = URLEncoder.encode(query, "UTF-8")
+            val searchUrl = "https://api.deezer.com/search?q=$encodedQuery&limit=1"
+            
+            val url = URL(searchUrl)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+            connection.connectTimeout = 5000
+            connection.readTimeout = 5000
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val responseText = connection.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(responseText)
+                val dataArray = json.optJSONArray("data")
+                
+                if (dataArray != null && dataArray.length() > 0) {
+                    val trackId = dataArray.getJSONObject(0).optLong("id")
+                    
+                    val trackUrl = URL("https://api.deezer.com/track/$trackId")
+                    val trackConnection = trackUrl.openConnection() as HttpURLConnection
+                    trackConnection.requestMethod = "GET"
+                    trackConnection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    trackConnection.connectTimeout = 5000
+                    trackConnection.readTimeout = 5000
+                    
+                    if (trackConnection.responseCode == HttpURLConnection.HTTP_OK) {
+                        val trackResponseText = trackConnection.inputStream.bufferedReader().use { it.readText() }
+                        val trackJson = JSONObject(trackResponseText)
+                        val contributorsArray = trackJson.optJSONArray("contributors")
+                        
+                        if (contributorsArray != null) {
+                            for (i in 0 until contributorsArray.length()) {
+                                val cObj = contributorsArray.getJSONObject(i)
+                                val id = cObj.optLong("id")
+                                val name = cObj.optString("name", "")
+                                val role = cObj.optString("role", "Unknown")
+                                val pictureXl = cObj.optString("picture_xl", "").takeIf { it.isNotEmpty() }
+                                    ?: cObj.optString("picture_medium", "").takeIf { it.isNotEmpty() }
+                                
+                                if (name.isNotBlank()) {
+                                    contributors.add(ContributorInfo(id, name, pictureXl, role))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch track contributors: ${e.message}")
+        }
+        return@withContext contributors
     }
 }

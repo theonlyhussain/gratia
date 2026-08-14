@@ -17,6 +17,9 @@ import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.audio.AudioRendererEventListener
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioOffloadSupportProvider
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.common.TrackSelectionParameters.AudioOffloadPreferences
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import android.os.Handler
@@ -198,6 +201,7 @@ class GratiaPlayerEngine(
         val audioSink = DefaultAudioSink.Builder(context)
             .setEnableFloatOutput(true) // Crucial to prevent down-conversion of 24/32 bit to 16 bit PCM
             .setEnableAudioTrackPlaybackParams(false) // Prevent sonic artifacts from speed algorithms
+            .setAudioOffloadSupportProvider(DefaultAudioOffloadSupportProvider(context)) // Enable offloading queries
             .build()
 
         val renderersFactory = object : DefaultRenderersFactory(context) {
@@ -232,9 +236,19 @@ class GratiaPlayerEngine(
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
 
+        val trackSelector = DefaultTrackSelector(context)
+        val audioOffloadPreferences = AudioOffloadPreferences.Builder()
+            .setAudioOffloadMode(AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
+            .setIsGaplessSupportRequired(true)
+            .build()
+        trackSelector.parameters = trackSelector.buildUponParameters()
+            .setAudioOffloadPreferences(audioOffloadPreferences)
+            .build()
+
         return ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setTrackSelector(trackSelector)
             .build().apply {
                 setAudioAttributes(audioAttributes, handleAudioFocus)
                 setHandleAudioBecomingNoisy(true)

@@ -79,6 +79,7 @@ fun ExpandedPlayer(
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
     val isFavorite = currentSong?.id?.let { favoriteSongIds.contains(it) } ?: false
     val artistInfos by playerViewModel.artistInfos.collectAsState()
+    val trackCredits by playerViewModel.trackCredits.collectAsState()
 
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
@@ -642,6 +643,7 @@ fun ExpandedPlayer(
             com.gratia.music.ui.components.ArtistInfoScreen(
                 artistName = selectedBioArtist,
                 artistInfo = artistInfos.values.firstOrNull { it?.name.equals(selectedBioArtist, ignoreCase = true) } ?: artistInfos[selectedBioArtist],
+                trackCredits = trackCredits,
                 onDismiss = { showBiographySheet = false }
             )
         }

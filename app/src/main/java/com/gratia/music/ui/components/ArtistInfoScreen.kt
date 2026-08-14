@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 fun ArtistInfoScreen(
     artistName: String,
     artistInfo: ArtistInfo?,
+    trackCredits: List<com.gratia.music.data.repository.ContributorInfo> = emptyList(),
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -206,6 +207,76 @@ fun ArtistInfoScreen(
                         fontSize = 16.sp,
                         color = GratiaTheme.colors.textSecondary
                     )
+                }
+
+                // Credits Section
+                if (trackCredits.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Text(
+                        text = "Credits",
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = GratiaTheme.colors.textPrimary,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                    
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        trackCredits.forEach { credit ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (credit.pictureUrl != null) {
+                                    AsyncImage(
+                                        model = credit.pictureUrl,
+                                        contentDescription = credit.name,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(GratiaTheme.colors.surfaceHover)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .clip(CircleShape)
+                                            .background(GratiaTheme.colors.surfaceHover),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = credit.name.firstOrNull()?.toString() ?: "?",
+                                            color = GratiaTheme.colors.textPrimary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = credit.name,
+                                        fontFamily = Inter,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 16.sp,
+                                        color = GratiaTheme.colors.textPrimary
+                                    )
+                                    Text(
+                                        text = credit.role,
+                                        fontFamily = Inter,
+                                        fontWeight = FontWeight.Normal,
+                                        fontSize = 14.sp,
+                                        color = GratiaTheme.colors.textSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

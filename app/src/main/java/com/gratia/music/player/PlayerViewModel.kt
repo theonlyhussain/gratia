@@ -64,6 +64,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _favoriteSongIds = MutableStateFlow<Set<String>>(emptySet())
     val favoriteSongIds: StateFlow<Set<String>> = _favoriteSongIds.asStateFlow()
 
+    private val _trackCredits = MutableStateFlow<List<com.gratia.music.data.repository.ContributorInfo>>(emptyList())
+    val trackCredits: StateFlow<List<com.gratia.music.data.repository.ContributorInfo>> = _trackCredits.asStateFlow()
+
     init {
         viewModelScope.launch {
             songRepository.getFavorites().collectLatest { favs ->
@@ -74,16 +77,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             currentSong.collectLatest { song ->
                 if (song != null) {
-                    val artists = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
-                    val infoMap = mutableMapOf<String, com.gratia.music.data.repository.ArtistInfo?>()
                     _artistInfos.value = emptyMap() // Clear old ones
-                    artists.forEach { artistName ->
-                        val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(artistName)
-                        infoMap[artistName] = info
-                        _artistInfos.value = infoMap.toMap() // Update state incrementally
+                    _trackCredits.value = emptyList() // Clear old credits
+                    
+                    val contributors = com.gratia.music.data.repository.ArtistInfoRepository.getTrackContributors(song.title, song.artist)
+                    _trackCredits.value = contributors
+
+                    val infoMap = mutableMapOf<String, com.gratia.music.data.repository.ArtistInfo?>()
+
+                    if (contributors.isNotEmpty()) {
+                        contributors.forEach { contributor ->
+                            val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(contributor.name)
+                            infoMap[contributor.name] = info
+                            _artistInfos.value = infoMap.toMap() // Update state incrementally
+                        }
+                    } else {
+                        val artists = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                        artists.forEach { artistName ->
+                            val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(artistName)
+                            infoMap[artistName] = info
+                            _artistInfos.value = infoMap.toMap() // Update state incrementally
+                        }
                     }
                 } else {
                     _artistInfos.value = emptyMap()
+                    _trackCredits.value = emptyList()
                 }
             }
         }
