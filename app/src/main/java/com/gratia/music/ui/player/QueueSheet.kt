@@ -76,6 +76,8 @@ fun QueueSheet(
     val repeatMode by playerViewModel.repeatMode.collectAsState()
     val autoplayEnabled by playerViewModel.autoplayEnabled.collectAsState()
 
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
+
     val current = currentSong
     val upcomingStartIndex = if (current != null) {
         val idx = queue.indexOfFirst { it.id == current.id }
@@ -123,6 +125,14 @@ fun QueueSheet(
                 Column {
                     // --- Current Song ---
                     if (current != null) {
+                        Text(
+                            "Continue Playing",
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = GratiaTheme.colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp)
+                        )
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -136,19 +146,19 @@ fun QueueSheet(
                                 coverArtPath = current.coverArtPath,
                                 title = current.title,
                                 artist = current.artist,
-                                size = 48.dp,
-                                cornerRadius = 10.dp,
-                                fontSize = 14.sp
+                                size = 64.dp,
+                                cornerRadius = 12.dp,
+                                fontSize = 16.sp
                             )
 
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(16.dp))
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     current.title,
                                     fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp,
                                     color = GratiaTheme.colors.textPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -156,7 +166,7 @@ fun QueueSheet(
                                 Text(
                                     current.artist,
                                     fontFamily = Inter,
-                                    fontSize = 12.sp,
+                                    fontSize = 14.sp,
                                     color = GratiaTheme.colors.textSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -206,64 +216,20 @@ fun QueueSheet(
 
                         Spacer(Modifier.height(16.dp))
 
-                        // --- History Section ---
-                        if (history.isNotEmpty()) {
-                            Spacer(Modifier.height(24.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 24.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    "History",
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                    color = GratiaTheme.colors.textPrimary
-                                )
-                                Text(
-                                    "Clear",
-                                    fontFamily = Inter,
-                                    fontSize = 14.sp,
-                                    color = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier.bounceClick { playerViewModel.clearHistory() }
-                                )
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            
-                            // Show last 3 history items just as a preview, to save space
-                            Column {
-                                history.take(3).forEach { song ->
-                                    QueueRow(
-                                        song = song,
-                                        index = -1,
-                                        isCurrentSong = false,
-                                        onPlay = { playerViewModel.playSong(song, history) },
-                                        onRemove = {}, // History items aren't removed individually here
-                                        modifier = Modifier.alpha(0.6f),
-                                        showDragHandle = false
-                                    )
-                                }
-                            }
-                        }
-
                         Spacer(Modifier.height(24.dp))
-
-                        // --- "Continue Playing" header ---
+                        // --- "Up Next" header ---
                         Text(
-                            "Continue Playing",
+                            "Up Next",
                             fontFamily = SpaceGrotesk,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
+                            fontSize = 20.sp,
                             color = GratiaTheme.colors.textPrimary,
                             modifier = Modifier.padding(horizontal = 24.dp)
                         )
                         Text(
                             "From ${current.album ?: "your library"}",
                             fontFamily = Inter,
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
                             color = GratiaTheme.colors.textSecondary,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
                         )
@@ -301,6 +267,87 @@ fun QueueSheet(
                     }
                 }
             }
+
+            if (history.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(32.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "History",
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+                        Text(
+                            "Clear",
+                            fontFamily = Inter,
+                            fontSize = 15.sp,
+                            color = GratiaTheme.colors.accent,
+                            modifier = Modifier.bounceClick { showClearHistoryDialog = true }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                
+                itemsIndexed(
+                    history.reversed(),
+                    key = { index, song -> "history_${song.id}_$index" }
+                ) { index, song ->
+                    QueueRow(
+                        song = song,
+                        index = -1,
+                        isCurrentSong = false,
+                        onPlay = { playerViewModel.playSong(song, history) },
+                        onRemove = {},
+                        modifier = Modifier.alpha(0.75f),
+                        showDragHandle = false
+                    )
+                }
+            }
+        }
+        
+        if (showClearHistoryDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearHistoryDialog = false },
+                title = {
+                    Text(
+                        "Clear listening history?",
+                        fontFamily = SpaceGrotesk,
+                        fontWeight = FontWeight.Bold,
+                        color = GratiaTheme.colors.textPrimary
+                    )
+                },
+                text = {
+                    Text(
+                        "Clearing your history will allow previously played songs to become eligible for playback again.",
+                        fontFamily = Inter,
+                        color = GratiaTheme.colors.textSecondary
+                    )
+                },
+                containerColor = GratiaTheme.colors.surface,
+                titleContentColor = GratiaTheme.colors.textPrimary,
+                textContentColor = GratiaTheme.colors.textSecondary,
+                confirmButton = {
+                    TextButton(onClick = {
+                        playerViewModel.clearHistory()
+                        showClearHistoryDialog = false
+                    }) {
+                        Text("Clear History", color = GratiaTheme.colors.accent, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearHistoryDialog = false }) {
+                        Text("Cancel", color = GratiaTheme.colors.textPrimary)
+                    }
+                }
+            )
         }
     }
 }
@@ -473,26 +520,26 @@ private fun QueueRow(
                 hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 onPlay()
             }
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CoverArtImage(
             coverArtPath = song.coverArtPath,
             title = song.title,
             artist = song.artist,
-            size = 44.dp,
+            size = 56.dp,
             cornerRadius = 8.dp,
-            fontSize = 11.sp
+            fontSize = 14.sp
         )
 
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(16.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 song.title,
                 fontFamily = SpaceGrotesk,
-                fontWeight = FontWeight.Medium,
-                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 16.sp,
                 color = GratiaTheme.colors.textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -500,7 +547,7 @@ private fun QueueRow(
             Text(
                 song.artist,
                 fontFamily = Inter,
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 color = GratiaTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

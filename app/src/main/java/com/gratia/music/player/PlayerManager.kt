@@ -637,6 +637,9 @@ class PlayerManager(private val context: Context) {
 
     fun clearHistory() {
         _history.value = emptyList()
+        scope.launch(Dispatchers.IO) {
+            listeningRepo.clearHistory()
+        }
     }
 
     fun clearError() {
