@@ -26,7 +26,8 @@ fun SecondaryActionRow(
     onOpenDeviceSelector: () -> Unit,
     onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
-    isLyricsActive: Boolean = false
+    isLyricsActive: Boolean = false,
+    isQueueActive: Boolean = false
 ) {
     Row(
         modifier = modifier
@@ -66,7 +67,7 @@ fun SecondaryActionRow(
             contentDescription = "Queue",
             size = 48.dp,
             iconSize = 24.dp,
-            tint = Color.White.copy(alpha = 0.6f)
+            tint = if (isQueueActive) Color.White else Color.White.copy(alpha = 0.6f)
         )
     }
 }

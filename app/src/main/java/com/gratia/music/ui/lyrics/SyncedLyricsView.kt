@@ -54,6 +54,12 @@ fun SyncedLyricsView(
         }
     }
 
+    LaunchedEffect(lyrics) {
+        if (parsedLyrics.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
+    }
+
     val currentLineIndex by remember(adjustedPlaybackTime, parsedLyrics) {
         derivedStateOf {
             parsedLyrics.indexOfLast { it.startMs <= adjustedPlaybackTime }

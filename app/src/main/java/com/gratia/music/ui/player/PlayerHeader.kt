@@ -155,30 +155,21 @@ fun PlayerHeader(
 
         Spacer(Modifier.width(12.dp))
 
-        // Favorite star button with circle outline
-        FavoriteStarButton(
-            isFavorite = isFavorite,
-            onToggle = onToggleFavorite
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Favorite star button
+            FavoriteStarButton(
+                isFavorite = isFavorite,
+                onToggle = onToggleFavorite
+            )
 
-        Spacer(Modifier.width(8.dp))
-
-        // More options button
-        GratiaIconButton(
-            icon = Icons.Default.MoreHoriz,
-            onClick = onMoreClick,
-            contentDescription = "More",
-            tint = Color.White.copy(alpha = 0.8f),
-            size = GratiaTheme.icons.normal,
-            modifier = Modifier.padding(8.dp)
-        )
+            // More options button
+            MoreButton(onClick = onMoreClick)
+        }
     }
 }
 
 /**
- * Animated favorite star button with circle border.
- * Unfavorited: outlined circle + outlined star.
- * Favorited: filled circle + filled star with spring pop animation.
+ * Animated favorite star button with translucent circle background matching inspo.
  */
 @Composable
 private fun FavoriteStarButton(
@@ -192,7 +183,7 @@ private fun FavoriteStarButton(
 
     // Spring pop animation on state change
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.8f else 1.0f,
+        targetValue = if (isPressed) 0.85f else 1.0f,
         animationSpec = spring(
             dampingRatio = 0.5f,
             stiffness = 600f
@@ -200,16 +191,9 @@ private fun FavoriteStarButton(
         label = "favScale"
     )
 
-    // Circle background color
-    val circleColor by animateColorAsState(
-        targetValue = if (isFavorite) Color.White else Color.Transparent,
-        animationSpec = if (isFavorite) tween(0) else tween(200),
-        label = "circleColor"
-    )
-
     // Star icon color
     val starColor by animateColorAsState(
-        targetValue = if (isFavorite) Color(0xFF1C1C1E) else Color.White.copy(alpha = 0.8f),
+        targetValue = if (isFavorite) Color.White else Color.White.copy(alpha = 0.8f),
         animationSpec = if (isFavorite) tween(0) else tween(200),
         label = "starColor"
     )
@@ -219,12 +203,7 @@ private fun FavoriteStarButton(
             .size(36.dp)
             .scale(scale)
             .clip(CircleShape)
-            .background(circleColor)
-            .border(
-                width = 1.5.dp,
-                color = Color.White.copy(alpha = if (isFavorite) 0f else 0.5f),
-                shape = CircleShape
-            )
+            .background(Color.White.copy(alpha = 0.15f))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -239,6 +218,49 @@ private fun FavoriteStarButton(
             imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
             contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
             tint = starColor,
+            size = 20.dp
+        )
+    }
+}
+
+/**
+ * More options button with translucent circle background.
+ */
+@Composable
+private fun MoreButton(
+    onClick: () -> Unit
+) {
+    val view = LocalView.current
+    val haptics = GratiaTheme.haptics
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.85f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 600f),
+        label = "moreScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .scale(scale)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.15f))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    haptics.medium(view)
+                    onClick()
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        GratiaIcon(
+            imageVector = Icons.Default.MoreHoriz,
+            contentDescription = "More options",
+            tint = Color.White.copy(alpha = 0.8f),
             size = 20.dp
         )
     }

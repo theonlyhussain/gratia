@@ -161,18 +161,17 @@ fun HomeScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             if (avatarPath != null) {
-                                // Ideally load real avatar image here, for now fallback to icon
-                                Icon(
-                                    imageVector = Icons.Default.Person,
+                                coil.compose.AsyncImage(
+                                    model = avatarPath,
                                     contentDescription = "Profile",
-                                    tint = GratiaTheme.colors.accent,
-                                    modifier = Modifier.size(20.dp)
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = "Profile",
-                                    tint = GratiaTheme.colors.accent,
+                                    tint = GratiaTheme.colors.textSecondary,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }

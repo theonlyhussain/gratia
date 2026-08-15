@@ -45,7 +45,7 @@ import androidx.activity.compose.BackHandler
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.player.ExpandedPlayer
 import com.gratia.music.ui.player.MiniPlayer
-import com.gratia.music.ui.player.QueueSheet
+
 import com.gratia.music.ui.screens.*
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -67,7 +67,7 @@ fun GratiaAppRoot() {
     val playerViewModel: PlayerViewModel = viewModel()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val expandedPlayerOpen by playerViewModel.expandedPlayerOpen.collectAsState()
-    var queueSheetOpen by remember { mutableStateOf(false) }
+
     var sleepTimerSheetOpen by remember { mutableStateOf(false) }
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -414,9 +414,6 @@ fun GratiaAppRoot() {
         ) {
             ExpandedPlayer(
                 playerViewModel = playerViewModel,
-                onOpenQueue = {
-                    queueSheetOpen = true
-                },
                 onOpenSleepTimer = {
                     sleepTimerSheetOpen = true
                 },
@@ -432,23 +429,7 @@ fun GratiaAppRoot() {
             )
         }
 
-        // Queue Bottom Sheet
-        if (queueSheetOpen) {
-            val queueSheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            androidx.compose.material3.ModalBottomSheet(
-                onDismissRequest = { queueSheetOpen = false },
-                sheetState = queueSheetState,
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                dragHandle = null,
-                scrimColor = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
-                shape = GratiaTheme.shapes.sheet
-            ) {
-                QueueSheet(
-                    playerViewModel = playerViewModel,
-                    onDismiss = { queueSheetOpen = false }
-                )
-            }
-        }
+        // Queue is now handled inline inside ExpandedPlayer
 
         // Sleep Timer Bottom Sheet
         if (sleepTimerSheetOpen) {
