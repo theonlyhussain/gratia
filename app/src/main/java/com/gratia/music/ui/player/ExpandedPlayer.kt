@@ -264,17 +264,17 @@ fun ExpandedPlayer(
     // ======================================================================
     // SMOOTH VISUAL TIME INTERPOLATOR — for silky lyrics sync
     // ======================================================================
-    var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
+    val visualTimeState = remember { mutableLongStateOf(currentTimeMs) }
     var lastUpdateTime by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
 
     LaunchedEffect(currentTimeMs, isPlaying) {
-        visualTimeMs = currentTimeMs
+        visualTimeState.longValue = currentTimeMs
         lastUpdateTime = android.os.SystemClock.elapsedRealtime()
         if (isPlaying) {
             while (isActive) {
                 androidx.compose.runtime.withFrameNanos {
                     val now = android.os.SystemClock.elapsedRealtime()
-                    visualTimeMs = currentTimeMs + (now - lastUpdateTime)
+                    visualTimeState.longValue = currentTimeMs + (now - lastUpdateTime)
                 }
             }
         }
@@ -489,7 +489,7 @@ fun ExpandedPlayer(
                     controlsAlpha = controlsAlpha,
                     headerAlpha = headerAlpha,
                     isFullscreenContent = isFullscreenContent,
-                    visualTimeMs = visualTimeMs,
+                    visualTimeProvider = { visualTimeState.longValue },
                     lyricsRaw = lyricsRaw,
                     parsedLines = parsedLines,
                     queueListState = queueListState,
@@ -685,7 +685,7 @@ fun ExpandedPlayer(
             LyricsEditorSheet(
                 song = song,
                 initialLyrics = lyricsRaw,
-                currentTimeMs = visualTimeMs,
+                currentTimeMs = visualTimeState.longValue,
                 onDismiss = { showLyricsEditor = false },
                 onSave = { newLyrics, isSynced ->
                     playerViewModel.saveManualLyrics(newLyrics, isSynced)
@@ -917,7 +917,7 @@ private fun ContentModeLayout(
     controlsAlpha: Float,
     headerAlpha: Float,
     isFullscreenContent: Boolean,
-    visualTimeMs: Long,
+    visualTimeProvider: () -> Long,
     lyricsRaw: String,
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
     queueListState: androidx.compose.foundation.lazy.LazyListState,
@@ -990,7 +990,7 @@ private fun ContentModeLayout(
                         LyricsContentArea(
                             lyricsRaw = lyricsRaw,
                             parsedLines = parsedLines,
-                            visualTimeMs = visualTimeMs,
+                            visualTimeProvider = visualTimeProvider,
                             syncOffset = syncOffset,
                             onSeek = onSeekLyrics,
                             onInteraction = onUserInteraction
@@ -1074,7 +1074,7 @@ private fun ContentModeLayout(
 private fun LyricsContentArea(
     lyricsRaw: String,
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
-    visualTimeMs: Long,
+    visualTimeProvider: () -> Long,
     syncOffset: Long,
     onSeek: (Long) -> Unit,
     onInteraction: () -> Unit
@@ -1101,7 +1101,7 @@ private fun LyricsContentArea(
             SyncedLyricsView(
                 lyrics = lyricsRaw,
                 parsedLyricsInput = parsedLines,
-                currentPlaybackTime = visualTimeMs,
+                currentPlaybackTimeProvider = visualTimeProvider,
                 onSeek = { seekMs ->
                     onInteraction()
                     onSeek(seekMs)

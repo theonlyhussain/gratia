@@ -5,6 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -32,10 +34,17 @@ import com.gratia.music.lyrics.LyricWord
 fun AnimatedWord(
     word: LyricWord,
     durationMs: Int,
-    currentPositionMs: Long
+    currentPositionProvider: () -> Long
 ) {
-    val isActive = currentPositionMs in word.startMs..word.endMs
-    val isPast = currentPositionMs > word.endMs
+    // Read the continuously updating time inside a derivedStateOf so that
+    // this Composable ONLY recomposes when the actual state changes (future -> active -> past),
+    // rather than on every single frame!
+    val isActive by remember { 
+        derivedStateOf { currentPositionProvider() in word.startMs..word.endMs } 
+    }
+    val isPast by remember { 
+        derivedStateOf { currentPositionProvider() > word.endMs } 
+    }
 
     // Smooth opacity transition — no character splitting, no horizontal mask
     val targetAlpha = when {

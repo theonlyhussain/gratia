@@ -32,7 +32,7 @@ fun LyricsLine(
     line: LyricLine,
     isActiveLine: Boolean,
     nextLineStartMs: Long?,
-    currentPositionMs: Long,
+    currentPositionProvider: () -> Long,
     onSeek: ((Long) -> Unit)? = null
 ) {
     val opacity by animateFloatAsState(
@@ -94,7 +94,7 @@ fun LyricsLine(
             AnimatedWord(
                 word = word,
                 durationMs = durationMs.toInt(),
-                currentPositionMs = currentPositionMs
+                currentPositionProvider = currentPositionProvider
             )
 
             // Space between words

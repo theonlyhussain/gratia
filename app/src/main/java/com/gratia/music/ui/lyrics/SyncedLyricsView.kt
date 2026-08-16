@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SyncedLyricsView(
     lyrics: String,
-    currentPlaybackTime: Long,
+    currentPlaybackTimeProvider: () -> Long,
     modifier: Modifier = Modifier,
     listState: LazyListState = rememberLazyListState(),
     parsedLyricsInput: List<LyricLine>? = null,
@@ -50,7 +50,9 @@ fun SyncedLyricsView(
     textAlignment: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Center,
     onTapLyricsView: (() -> Unit)? = null
 ) {
-    val adjustedPlaybackTime = currentPlaybackTime + syncOffset
+    val adjustedPlaybackTimeProvider = remember(syncOffset) {
+        { currentPlaybackTimeProvider() + syncOffset }
+    }
 
     val parsedLyrics by produceState(
         initialValue = parsedLyricsInput ?: emptyList(),
@@ -72,9 +74,16 @@ fun SyncedLyricsView(
         }
     }
 
-    // Calculate the active line index. We don't use derivedStateOf here because
-    // adjustedPlaybackTime is a raw Long, not a State, so it wouldn't trigger updates.
-    val currentLineIndex = parsedLyrics.indexOfLast { it.startMs <= adjustedPlaybackTime }
+    // Calculate the active line index using derivedStateOf.
+    // Because we read the playback time from the provider INSIDE derivedStateOf,
+    // this will only trigger a recomposition when the line index actually changes,
+    // saving us from recomposing 120 times a second!
+    val currentLineIndex by remember(parsedLyrics) {
+        derivedStateOf {
+            val adjustedTime = adjustedPlaybackTimeProvider()
+            parsedLyrics.indexOfLast { it.startMs <= adjustedTime }
+        }
+    }
 
     // Auto-scroll to the active line with a smooth animation
     LaunchedEffect(currentLineIndex) {
@@ -118,7 +127,7 @@ fun SyncedLyricsView(
                     line = item,
                     isActiveLine = index == currentLineIndex,
                     nextLineStartMs = nextStartMs,
-                    currentPositionMs = adjustedPlaybackTime,
+                    currentPositionProvider = adjustedPlaybackTimeProvider,
                     onSeek = onSeek
                 )
             }
