@@ -37,7 +37,7 @@ A modern, meticulously crafted music player focused on fluid playback, stunning 
 | **Architecture** | MVVM / Repository Pattern |
 | **Database** | Room |
 | **Media Playback** | Media3 / ExoPlayer (Custom Gapless Engine) |
-| **API Integration** | Deezer API (Metadata), LRCLIB & Lyrically (Lyrics) |
+| **API Integration** | Deezer API (Metadata & Images), LRCLIB & Lyrically (Lyrics), Wikipedia API (Artist Bios), GitHub API (Updates) |
 
 ## 🚀 Installation
 
