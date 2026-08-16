@@ -216,30 +216,18 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     )
                 }
 
-                // Play/Pause
+                // Play/Pause — fast 120ms crossfade for 120Hz responsiveness
                 Box(
                     modifier = Modifier.size(40.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    val rotation by animateFloatAsState(
-                        targetValue = if (isPlaying) 0f else 90f,
-                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
-                        label = "miniPlayPauseRot"
-                    )
                     AnimatedContent(
                         targetState = isPlaying,
                         transitionSpec = {
-                            if (targetState) {
-                                (fadeIn(animationSpec = tween(150)) + 
-                                 scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f), initialScale = 0.6f)) togetherWith
-                                (fadeOut(animationSpec = tween(150)) + 
-                                 scaleOut(animationSpec = tween(150), targetScale = 0.6f))
-                            } else {
-                                (fadeIn(animationSpec = tween(150)) + 
-                                 scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f), initialScale = 0.6f)) togetherWith
-                                (fadeOut(animationSpec = tween(150)) + 
-                                 scaleOut(animationSpec = tween(150), targetScale = 0.6f))
-                            }
+                            (fadeIn(animationSpec = tween(120)) + 
+                             scaleIn(animationSpec = tween(120), initialScale = 0.85f)) togetherWith
+                            (fadeOut(animationSpec = tween(100)) + 
+                             scaleOut(animationSpec = tween(100), targetScale = 0.85f))
                         },
                         label = "miniPlayPause"
                     ) { playing ->
@@ -251,10 +239,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                                 playerViewModel.togglePlay()
                             },
                             tint = GratiaTheme.colors.textPrimary,
-                            size = GratiaTheme.icons.normal,
-                            modifier = Modifier.graphicsLayer {
-                                rotationZ = rotation
-                            }
+                            size = GratiaTheme.icons.normal
                         )
                     }
                 }

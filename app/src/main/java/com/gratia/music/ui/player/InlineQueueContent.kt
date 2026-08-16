@@ -263,14 +263,14 @@ fun InlineQueueContent(
                     "Clear listening history?",
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    color = GratiaTheme.colors.textPrimary
                 )
             },
             text = {
                 Text(
                     "Clearing your history will allow previously played songs to become eligible for playback again.",
                     fontFamily = Inter,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = GratiaTheme.colors.textSecondary
                 )
             },
             containerColor = GratiaTheme.colors.surface,
@@ -284,7 +284,7 @@ fun InlineQueueContent(
             },
             dismissButton = {
                 TextButton(onClick = { showClearHistoryDialog = false }) {
-                    Text("Cancel", color = Color.White)
+                    Text("Cancel", color = GratiaTheme.colors.textSecondary)
                 }
             }
         )

@@ -19,6 +19,14 @@ import kotlinx.coroutines.withContext
  * This composable renders the scrolling lyrics list, auto-scrolling to
  * the active line and displaying word-level highlights when data is available.
  *
+ * Performance considerations:
+ * - `currentLineIndex` uses `derivedStateOf` so the LazyColumn only
+ *   recomposes when the ACTIVE LINE changes, not every playback tick.
+ * - Individual `LyricsLine` items use `graphicsLayer` for alpha/scale
+ *   so word animations don't cause layout passes.
+ * - Stable keys prevent unnecessary item recreation.
+ * - Generous padding gives text breathing room and prevents clipping.
+ *
  * The background is intentionally transparent so it composites properly
  * over the player's existing blurred album art background.
  */
@@ -60,12 +68,15 @@ fun SyncedLyricsView(
         }
     }
 
-    val currentLineIndex by remember(adjustedPlaybackTime, parsedLyrics) {
+    // derivedStateOf ensures this only recalculates when the actual line index changes,
+    // NOT on every playback timer tick. This is the key performance optimization.
+    val currentLineIndex by remember {
         derivedStateOf {
             parsedLyrics.indexOfLast { it.startMs <= adjustedPlaybackTime }
         }
     }
 
+    // Auto-scroll to the active line with a smooth animation
     LaunchedEffect(currentLineIndex) {
         if (currentLineIndex >= 0 && parsedLyrics.isNotEmpty()) {
             listState.animateScrollToItem(currentLineIndex, scrollOffset = -100)
@@ -77,9 +88,13 @@ fun SyncedLyricsView(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 60.dp, bottom = 200.dp)
+            // Generous padding for breathing room — prevents long lines from feeling cramped
+            contentPadding = PaddingValues(start = 32.dp, end = 32.dp, top = 60.dp, bottom = 200.dp)
         ) {
-            itemsIndexed(parsedLyrics) { index, item ->
+            itemsIndexed(
+                parsedLyrics,
+                key = { index, item -> "lyric_${item.startMs}_$index" }
+            ) { index, item ->
                 val nextStartMs = parsedLyrics.getOrNull(index + 1)?.startMs
                 LyricsLine(
                     line = item,

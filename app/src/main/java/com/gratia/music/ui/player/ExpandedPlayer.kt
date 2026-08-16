@@ -4,13 +4,17 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -25,6 +29,7 @@ import androidx.compose.ui.Alignment
 import com.gratia.music.ui.components.SongMenuSheet
 import com.gratia.music.ui.components.SongInfoDialog
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -35,6 +40,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +62,7 @@ import com.gratia.music.ui.LocalSnackbarHostState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /**
  * Content mode for the expanded player.
@@ -73,10 +81,16 @@ enum class PlayerContentMode {
  * Full-screen expanded player with a unified transformation system.
  *
  * Supports three content modes (Normal, Lyrics, Queue) that share a single
- * collapsing-header animation architecture. The player feels like one
- * continuously transforming surface rather than separate screens.
+ * continuous transition animation. The player feels like one surface that
+ * physically transforms rather than separate screens.
  *
- * Layout in Normal mode:
+ * Animation Architecture:
+ * - `transitionProgress` (Animatable 0f→1f): drives artwork position/scale,
+ *   header visibility, and content crossfade as ONE coordinated motion
+ * - `dismissOffsetY` (Animatable): swipe-to-dismiss gesture tracking
+ * - `peekOffsetX` (Animatable): horizontal song-peek gesture tracking
+ *
+ * Layout in Normal mode (transitionProgress = 0f):
  * 1. Large Artwork (dominant visual element)
  * 2. Track Info + Favorite + More
  * 3. Progress bar
@@ -84,16 +98,17 @@ enum class PlayerContentMode {
  * 5. Action row (Lyrics / Connect / Queue)
  * 6. Scrollable: About the Artist, Credits
  *
- * Layout in Lyrics/Queue mode:
+ * Layout in Lyrics/Queue mode (transitionProgress = 1f):
  * 1. Compact Header (small artwork + track info + favorite + more)
  * 2. Content area (Lyrics or Queue, scrollable)
  * 3. Progress bar
  * 4. Playback controls
  * 5. Action row
  *
- * Fullscreen content mode (after inactivity):
- * 1. Content fills the screen
- * 2. Tap to restore the header/controls
+ * Lyrics fullscreen (after inactivity):
+ * 1. Compact header dims but stays visible
+ * 2. Lyrics fill most of the screen
+ * 3. Tap to restore full controls
  */
 @Composable
 fun ExpandedPlayer(
@@ -118,6 +133,7 @@ fun ExpandedPlayer(
 
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
     val song = currentSong ?: return
 
@@ -154,27 +170,32 @@ fun ExpandedPlayer(
     // --- Content mode state ---
     var contentMode by remember { mutableStateOf(PlayerContentMode.Normal) }
 
-    // --- Fullscreen content mode (header hidden after inactivity) ---
+    // --- Fullscreen content mode (header dimmed after inactivity, Lyrics only) ---
     var isFullscreenContent by remember { mutableStateOf(false) }
 
-    // --- Collapse progress: 0f = full header, 1f = fully collapsed ---
-    val collapseProgress by animateFloatAsState(
-        targetValue = when {
-            contentMode == PlayerContentMode.Normal -> 0f
-            isFullscreenContent -> 1f
-            else -> 0f // Compact header visible
-        },
-        animationSpec = tween(
-            durationMillis = if (isFullscreenContent) 600 else 400,
-            easing = GratiaTheme.motion.standardEasing
-        ),
-        label = "collapseProgress"
-    )
+    // ======================================================================
+    // CONTINUOUS TRANSITION PROGRESS (the core animation value)
+    // 0f = Normal player, 1f = Lyrics/Queue compact mode
+    // ======================================================================
+    val transitionProgress = remember { Animatable(0f) }
 
-    // --- Inactivity timer for fullscreen content mode ---
+    // Drive the transition based on contentMode
+    LaunchedEffect(contentMode) {
+        val target = if (contentMode == PlayerContentMode.Normal) 0f else 1f
+        transitionProgress.animateTo(
+            targetValue = target,
+            animationSpec = spring(
+                dampingRatio = 0.85f,
+                stiffness = 300f
+            )
+        )
+    }
+
+    // ======================================================================
+    // INACTIVITY TIMER — Lyrics fullscreen (NOT Queue)
+    // ======================================================================
     var lastInteractionTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    // Reset interaction on any touch
     fun onUserInteraction() {
         lastInteractionTime = System.currentTimeMillis()
         if (isFullscreenContent) {
@@ -182,19 +203,19 @@ fun ExpandedPlayer(
         }
     }
 
-    // Auto-collapse after inactivity (only in Lyrics/Queue mode)
+    // Auto-collapse after inactivity (only in Lyrics mode, NOT Queue)
     LaunchedEffect(contentMode, lastInteractionTime) {
-        if (contentMode != PlayerContentMode.Normal) {
-            delay(3500L)
-            if (System.currentTimeMillis() - lastInteractionTime >= 3400L) {
+        if (contentMode == PlayerContentMode.Lyrics) {
+            delay(4000L)
+            if (System.currentTimeMillis() - lastInteractionTime >= 3900L) {
                 isFullscreenContent = true
             }
         }
     }
 
-    // Reset fullscreen when returning to Normal mode
+    // Reset fullscreen when returning to Normal mode or switching to Queue
     LaunchedEffect(contentMode) {
-        if (contentMode == PlayerContentMode.Normal) {
+        if (contentMode != PlayerContentMode.Lyrics) {
             isFullscreenContent = false
         }
     }
@@ -222,7 +243,9 @@ fun ExpandedPlayer(
 
     val motion = GratiaTheme.motion
 
-    // --- Swipe-to-dismiss state (only in Normal mode) ---
+    // ======================================================================
+    // SWIPE-TO-DISMISS — physically follows finger
+    // ======================================================================
     val dismissOffsetY = remember { Animatable(0f) }
     val dismissAlpha by animateFloatAsState(
         targetValue = if (dismissOffsetY.value > 0f) {
@@ -232,7 +255,15 @@ fun ExpandedPlayer(
         label = "dismissAlpha"
     )
 
-    // --- Smooth visual time interpolator for silky lyrics sync ---
+    // ======================================================================
+    // HORIZONTAL PEEK GESTURE — for song switching
+    // ======================================================================
+    val peekOffsetX = remember { Animatable(0f) }
+    var peekVelocity by remember { mutableFloatStateOf(0f) }
+
+    // ======================================================================
+    // SMOOTH VISUAL TIME INTERPOLATOR — for silky lyrics sync
+    // ======================================================================
     var visualTimeMs by remember { mutableLongStateOf(currentTimeMs) }
     var lastUpdateTime by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
 
@@ -260,23 +291,19 @@ fun ExpandedPlayer(
     // Queue list state
     val queueListState = rememberLazyListState()
 
-    // --- Controls & header visibility ---
+    // --- Controls & header visibility (for fullscreen lyrics dimming) ---
     val controlsAlpha by animateFloatAsState(
         targetValue = if (isFullscreenContent) 0f else 1f,
         animationSpec = tween(400, easing = motion.standardEasing),
         label = "controlsAlpha"
     )
 
-    // --- NestedScroll for content-driven collapse in fullscreen mode ---
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: NestedScrollSource): androidx.compose.ui.geometry.Offset {
-                // Scrolling up in content → don't consume, let content scroll
-                // Scrolling down at top → restore header
-                return androidx.compose.ui.geometry.Offset.Zero
-            }
-        }
-    }
+    // Header alpha for fullscreen mode — dims but stays visible
+    val headerAlpha by animateFloatAsState(
+        targetValue = if (isFullscreenContent) 0.4f else 1f,
+        animationSpec = tween(400, easing = motion.standardEasing),
+        label = "headerAlpha"
+    )
 
     BoxWithConstraints(
         modifier = Modifier
@@ -285,45 +312,9 @@ fun ExpandedPlayer(
                 translationY = dismissOffsetY.value
                 alpha = dismissAlpha
             }
-            .pointerInput(isAnyOverlayOpen, contentMode) {
-                if (isAnyOverlayOpen) return@pointerInput
-                // Only allow swipe-to-dismiss in Normal mode
-                if (contentMode != PlayerContentMode.Normal) return@pointerInput
-
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        scope.launch {
-                            if (dismissOffsetY.value > 300f) {
-                                onDismiss()
-                                dismissOffsetY.snapTo(0f)
-                            } else {
-                                dismissOffsetY.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = motion.springStiff()
-                                )
-                            }
-                        }
-                    },
-                    onDragCancel = {
-                        scope.launch {
-                            dismissOffsetY.animateTo(
-                                targetValue = 0f,
-                                animationSpec = motion.springStiff()
-                            )
-                        }
-                    },
-                    onVerticalDrag = { _, dragAmount ->
-                        scope.launch {
-                            if (dragAmount > 0 || dismissOffsetY.value > 0) {
-                                val newValue = (dismissOffsetY.value + dragAmount).coerceAtLeast(0f)
-                                dismissOffsetY.snapTo(newValue)
-                            }
-                        }
-                    }
-                )
-            }
     ) {
         val screenHeight = maxHeight
+        val screenWidthPx = with(density) { maxWidth.toPx() }
 
         // --- Background ---
         PlayerBackground(
@@ -344,11 +335,53 @@ fun ExpandedPlayer(
         )
 
         // ========== MAIN CONTENT LAYOUT ==========
+        // The entire player is one unified Column. The `transitionProgress`
+        // controls how much the artwork shrinks and where content appears.
+
+        val tp = transitionProgress.value // shorthand
+
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(isAnyOverlayOpen, contentMode) {
+                    if (isAnyOverlayOpen) return@pointerInput
+                    if (contentMode != PlayerContentMode.Normal) return@pointerInput
+
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            scope.launch {
+                                if (dismissOffsetY.value > 300f) {
+                                    onDismiss()
+                                    dismissOffsetY.snapTo(0f)
+                                } else {
+                                    dismissOffsetY.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = motion.springStiff()
+                                    )
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            scope.launch {
+                                dismissOffsetY.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = motion.springStiff()
+                                )
+                            }
+                        },
+                        onVerticalDrag = { _, dragAmount ->
+                            scope.launch {
+                                if (dragAmount > 0 || dismissOffsetY.value > 0) {
+                                    val newValue = (dismissOffsetY.value + dragAmount).coerceAtLeast(0f)
+                                    dismissOffsetY.snapTo(newValue)
+                                }
+                            }
+                        }
+                    )
+                }
         ) {
-            // ===== NORMAL MODE =====
-            if (contentMode == PlayerContentMode.Normal) {
+            // ===== NORMAL MODE (transitionProgress ≈ 0f) =====
+            if (tp < 0.01f && contentMode == PlayerContentMode.Normal) {
                 NormalModeContent(
                     song = song,
                     coverColors = coverColors,
@@ -364,6 +397,7 @@ fun ExpandedPlayer(
                     trackCredits = trackCredits,
                     audioFormat = playerViewModel.audioFormat.collectAsState().value,
                     screenHeight = screenHeight,
+                    peekOffsetX = peekOffsetX.value,
                     onSeek = { newProgress ->
                         playerViewModel.seekTo((newProgress * durationMs).toLong())
                     },
@@ -408,12 +442,40 @@ fun ExpandedPlayer(
                         showBiographySheet = true
                     },
                     onShowAllCredits = { showCreditsSheet = true },
+                    onHorizontalDrag = { delta ->
+                        scope.launch { peekOffsetX.snapTo(peekOffsetX.value + delta) }
+                        peekVelocity = delta
+                    },
+                    onHorizontalDragEnd = {
+                        scope.launch {
+                            val threshold = screenWidthPx * 0.3f
+                            val fastSwipe = abs(peekVelocity) > 8f
+                            when {
+                                peekOffsetX.value < -threshold || (peekOffsetX.value < -50f && fastSwipe && peekVelocity < 0) -> {
+                                    // Swiped left → next song
+                                    peekOffsetX.animateTo(-screenWidthPx, animationSpec = tween(200))
+                                    playerViewModel.nextSong()
+                                    peekOffsetX.snapTo(0f)
+                                }
+                                peekOffsetX.value > threshold || (peekOffsetX.value > 50f && fastSwipe && peekVelocity > 0) -> {
+                                    // Swiped right → previous song
+                                    peekOffsetX.animateTo(screenWidthPx, animationSpec = tween(200))
+                                    playerViewModel.prevSong()
+                                    peekOffsetX.snapTo(0f)
+                                }
+                                else -> {
+                                    // Spring back
+                                    peekOffsetX.animateTo(0f, animationSpec = motion.springStiff())
+                                }
+                            }
+                        }
+                    },
                     playerViewModel = playerViewModel
                 )
             }
 
-            // ===== LYRICS / QUEUE MODE =====
-            if (contentMode != PlayerContentMode.Normal) {
+            // ===== LYRICS / QUEUE MODE (transitionProgress ≈ 1f) =====
+            if (tp > 0.01f || contentMode != PlayerContentMode.Normal) {
                 ContentModeLayout(
                     song = song,
                     contentMode = contentMode,
@@ -425,6 +487,7 @@ fun ExpandedPlayer(
                     durationMs = durationMs,
                     currentLyrics = currentLyrics,
                     controlsAlpha = controlsAlpha,
+                    headerAlpha = headerAlpha,
                     isFullscreenContent = isFullscreenContent,
                     visualTimeMs = visualTimeMs,
                     lyricsRaw = lyricsRaw,
@@ -654,7 +717,7 @@ fun ExpandedPlayer(
 }
 
 // =============================================================================
-// NORMAL MODE — Full player with large artwork
+// NORMAL MODE — Full player with large artwork + horizontal peek gesture
 // =============================================================================
 
 @Composable
@@ -673,6 +736,7 @@ private fun NormalModeContent(
     trackCredits: List<com.gratia.music.data.repository.ContributorInfo>,
     audioFormat: com.gratia.music.player.AudioFormatInfo?,
     screenHeight: androidx.compose.ui.unit.Dp,
+    peekOffsetX: Float,
     onSeek: (Float) -> Unit,
     onDragStart: () -> Unit,
     onDragEnd: () -> Unit,
@@ -690,6 +754,8 @@ private fun NormalModeContent(
     onArtistClick: (String) -> Unit,
     onSeeMoreArtist: (String) -> Unit,
     onShowAllCredits: () -> Unit,
+    onHorizontalDrag: (Float) -> Unit,
+    onHorizontalDragEnd: () -> Unit,
     playerViewModel: PlayerViewModel
 ) {
     val scrollState = rememberScrollState()
@@ -705,13 +771,27 @@ private fun NormalModeContent(
                 .fillMaxWidth()
                 .height(screenHeight)
         ) {
-            // --- Hero Artwork area ---
+            // --- Hero Artwork area with horizontal peek gesture ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = { onHorizontalDragEnd() },
+                            onDragCancel = { onHorizontalDragEnd() },
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                onHorizontalDrag(dragAmount)
+                            }
+                        )
+                    }
             ) {
-                Column {
+                Column(
+                    modifier = Modifier.graphicsLayer {
+                        translationX = peekOffsetX
+                    }
+                ) {
                     Spacer(Modifier.statusBarsPadding())
                     ArtworkView(
                         coverArtPath = song.coverArtPath,
@@ -835,6 +915,7 @@ private fun ContentModeLayout(
     durationMs: Long,
     currentLyrics: com.gratia.music.data.model.LyricsEntity?,
     controlsAlpha: Float,
+    headerAlpha: Float,
     isFullscreenContent: Boolean,
     visualTimeMs: Long,
     lyricsRaw: String,
@@ -862,15 +943,13 @@ private fun ContentModeLayout(
     ) {
         Spacer(Modifier.statusBarsPadding())
 
-        // --- Compact header (animated visibility) ---
-        AnimatedVisibility(
-            visible = !isFullscreenContent,
-            enter = fadeIn(tween(300)) + androidx.compose.animation.expandVertically(
-                animationSpec = tween(300, easing = GratiaTheme.motion.standardEasing)
-            ),
-            exit = fadeOut(tween(300)) + androidx.compose.animation.shrinkVertically(
-                animationSpec = tween(300, easing = GratiaTheme.motion.standardEasing)
-            )
+        // --- Compact header (always visible, dims in fullscreen lyrics) ---
+        // In fullscreen mode: header dims to 40% alpha but stays visible
+        // so the user always knows what song is playing
+        Box(
+            modifier = Modifier.graphicsLayer {
+                alpha = headerAlpha
+            }
         ) {
             CompactPlayerHeader(
                 coverArtPath = song.coverArtPath,
@@ -891,7 +970,8 @@ private fun ContentModeLayout(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    // Tap content area to restore header in fullscreen mode
+                    // Tap content area to restore controls in fullscreen mode
+                    // This does NOT seek — that prevents accidental seeking
                     if (isFullscreenContent) {
                         onUserInteraction()
                     }
@@ -931,14 +1011,16 @@ private fun ContentModeLayout(
             }
         }
 
-        // --- Bottom controls (animated visibility) ---
+        // --- Bottom controls ---
+        // In Lyrics fullscreen: controls fade out but can be revealed by tap
+        // In Queue mode: controls always visible (no inactivity collapse)
         AnimatedVisibility(
-            visible = !isFullscreenContent,
-            enter = fadeIn(tween(300)) + androidx.compose.animation.expandVertically(
+            visible = !isFullscreenContent || contentMode == PlayerContentMode.Queue,
+            enter = fadeIn(tween(300)) + expandVertically(
                 expandFrom = Alignment.Bottom,
                 animationSpec = tween(300, easing = GratiaTheme.motion.standardEasing)
             ),
-            exit = fadeOut(tween(300)) + androidx.compose.animation.shrinkVertically(
+            exit = fadeOut(tween(300)) + shrinkVertically(
                 shrinkTowards = Alignment.Bottom,
                 animationSpec = tween(300, easing = GratiaTheme.motion.standardEasing)
             )

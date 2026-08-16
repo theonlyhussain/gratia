@@ -108,6 +108,7 @@ fun PlayerControls(
 /**
  * The hero play/pause button — clean, standalone icon.
  * No circular background, matching the minimal inspiration design.
+ * Fast 150ms crossfade for responsive 120Hz-friendly transitions.
  */
 @Composable
 private fun PlayPauseButton(
@@ -130,7 +131,10 @@ private fun PlayPauseButton(
     Box(
         modifier = Modifier
             .size(72.dp)
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
@@ -142,12 +146,12 @@ private fun PlayPauseButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Crossfade between Play and Pause icons
+        // Fast crossfade between Play and Pause icons (150ms for 120Hz responsiveness)
         AnimatedContent(
             targetState = isPlaying,
             transitionSpec = {
-                (fadeIn(tween(motion.normal)) + scaleIn(tween(motion.normal), initialScale = 0.8f)) togetherWith
-                    (fadeOut(tween(motion.fast)) + scaleOut(tween(motion.fast), targetScale = 0.8f))
+                (fadeIn(tween(motion.fast)) + scaleIn(tween(motion.fast), initialScale = 0.85f)) togetherWith
+                    (fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.85f))
             },
             label = "playPauseIcon"
         ) { playing ->

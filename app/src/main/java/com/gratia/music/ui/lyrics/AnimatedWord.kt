@@ -2,15 +2,13 @@ package com.gratia.music.ui.lyrics
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.lyrics.LyricWord
 
@@ -24,8 +22,11 @@ import com.gratia.music.lyrics.LyricWord
  * - **Active (currently being sung):** full opacity, slight upward lift
  * - **Past:** dims back to 55 % opacity so the focus moves forward
  *
- * The transitions use a 220 ms ease-out curve, producing a smooth "glow"
- * that naturally follows the music without any flickering or karaoke artifacts.
+ * Performance:
+ * - All visual changes (alpha, translationY) are done via `graphicsLayer`
+ *   so they don't trigger Compose layout/measure passes. This is critical
+ *   for smooth rendering at 120Hz when the playback timer is updating
+ *   the current position every frame.
  */
 @Composable
 fun AnimatedWord(
@@ -53,7 +54,7 @@ fun AnimatedWord(
 
     // Subtle upward lift on the active word (Apple-style "breathing")
     val translateY by animateFloatAsState(
-        targetValue = if (isActive) -1.5f else 0f,
+        targetValue = if (isActive) -2f else 0f,
         animationSpec = tween(
             durationMillis = 200,
             easing = androidx.compose.animation.core.FastOutSlowInEasing
@@ -66,8 +67,11 @@ fun AnimatedWord(
         fontSize = 28.sp,
         fontWeight = if (isActive) FontWeight.Bold else FontWeight.ExtraBold,
         color = Color.White,
+        lineHeight = 36.sp,
         modifier = Modifier
-            .alpha(alpha)
-            .offset(y = translateY.dp)
+            .graphicsLayer {
+                this.alpha = alpha
+                this.translationY = translateY
+            }
     )
 }
