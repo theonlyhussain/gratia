@@ -1,5 +1,9 @@
 package com.gratia.music.ui.lyrics
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -81,9 +85,27 @@ fun SyncedLyricsView(
 
     // Transparent background — lets the player's blurred album art show through
     Box(modifier = modifier.fillMaxSize()) {
+        
+        // Detect manual scrolling to wake up the screen and show controls
+        val nestedScrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPreScroll(
+                    available: Offset,
+                    source: NestedScrollSource
+                ): Offset {
+                    if (source == NestedScrollSource.Drag) {
+                        onTapLyricsView?.invoke()
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
+
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(nestedScrollConnection),
             // Generous padding for breathing room — prevents long lines from feeling cramped
             contentPadding = PaddingValues(start = 32.dp, end = 32.dp, top = 60.dp, bottom = 200.dp)
         ) {

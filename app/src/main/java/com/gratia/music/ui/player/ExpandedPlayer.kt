@@ -1106,6 +1106,7 @@ private fun LyricsContentArea(
                     onInteraction()
                     onSeek(seekMs)
                 },
+                onTapLyricsView = onInteraction,
                 syncOffset = syncOffset,
                 modifier = Modifier.fillMaxSize()
             )
