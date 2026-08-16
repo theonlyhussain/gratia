@@ -407,7 +407,9 @@ fun LibrarySubView(
                     }
                 }
                 "Artists" -> {
-                    val artists = remember(allSongs) { allSongs.map { it.artist }.distinct().sorted() }
+                    val artists = remember(allSongs) { 
+                        allSongs.flatMap { com.gratia.music.utils.ArtistParser.parseArtists(it.artist) }.distinct().sorted() 
+                    }
                     if (artists.isEmpty()) {
                         EmptyStateView(
                             icon = Icons.Default.Person,
@@ -420,7 +422,7 @@ fun LibrarySubView(
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                         ) {
                             items(artists) { artist ->
-                                val coverArtPath = allSongs.firstOrNull { it.artist == artist && it.coverArtPath != null }?.coverArtPath
+                                val coverArtPath = allSongs.firstOrNull { com.gratia.music.utils.ArtistParser.parseArtists(it.artist).contains(artist) && it.coverArtPath != null }?.coverArtPath
                                 AppleListRow(
                                     title = artist,
                                     leadingContent = {

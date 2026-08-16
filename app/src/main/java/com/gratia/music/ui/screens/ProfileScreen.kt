@@ -96,7 +96,7 @@ fun ProfileScreen(
     // Load profile data
     LaunchedEffect(profileFlow) {
         val profile = profileFlow
-        if (profile != null) {
+        if (profile != null && !hasChanges) {
             displayName = profile.displayName
             avatarPath = profile.avatarPath
             bannerPath = profile.bannerPath
@@ -110,12 +110,17 @@ fun ProfileScreen(
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             withContext(Dispatchers.IO) {
-                val file = File(context.filesDir, "profile_avatar.jpg")
+                val timestamp = System.currentTimeMillis()
+                val file = File(context.filesDir, "profile_avatar_$timestamp.jpg")
                 try {
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         file.outputStream().use { output ->
                             input.copyTo(output)
                         }
+                    }
+                    val currentDbAvatar = profileFlow?.avatarPath
+                    if (avatarPath != null && avatarPath != currentDbAvatar) {
+                        File(avatarPath!!).delete()
                     }
                     avatarPath = file.absolutePath
                     hasChanges = true
@@ -130,12 +135,17 @@ fun ProfileScreen(
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             withContext(Dispatchers.IO) {
-                val file = File(context.filesDir, "profile_banner.jpg")
+                val timestamp = System.currentTimeMillis()
+                val file = File(context.filesDir, "profile_banner_$timestamp.jpg")
                 try {
                     context.contentResolver.openInputStream(uri)?.use { input ->
                         file.outputStream().use { output ->
                             input.copyTo(output)
                         }
+                    }
+                    val currentDbBanner = profileFlow?.bannerPath
+                    if (bannerPath != null && bannerPath != currentDbBanner) {
+                        File(bannerPath!!).delete()
                     }
                     bannerPath = file.absolutePath
                     hasChanges = true
@@ -214,7 +224,11 @@ fun ProfileScreen(
                     targetState = isEditing, 
                     label = "EditIcon",
                     transitionSpec = {
-                        (scaleIn(initialScale = 0.8f) + fadeIn()).togetherWith(scaleOut(targetScale = 0.8f) + fadeOut())
+                        (scaleIn(initialScale = 0.5f, animationSpec = spring(stiffness = 300f)) + 
+                         fadeIn(animationSpec = androidx.compose.animation.core.tween(200))).togetherWith(
+                            scaleOut(targetScale = 0.5f, animationSpec = spring(stiffness = 300f)) + 
+                            fadeOut(animationSpec = androidx.compose.animation.core.tween(200))
+                        )
                     }
                 ) { editing ->
                     if (editing) {
@@ -265,11 +279,12 @@ fun ProfileScreen(
         // Remove picture/cover options
         AnimatedVisibility(
             visible = isEditing && (avatarPath != null || bannerPath != null),
+            modifier = Modifier.offset(y = (-24).dp),
             enter = fadeIn() + expandVertically(animationSpec = spring(stiffness = 300f)),
             exit = fadeOut() + shrinkVertically(animationSpec = spring(stiffness = 300f))
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().offset(y = (-24).dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
                 if (avatarPath != null) {
@@ -298,7 +313,12 @@ fun ProfileScreen(
             }
         }
 
-        if (!isEditing || (avatarPath == null && bannerPath == null)) {
+        AnimatedVisibility(
+            visible = !isEditing || (avatarPath == null && bannerPath == null),
+            modifier = Modifier.offset(y = (-24).dp),
+            enter = expandVertically(animationSpec = spring(stiffness = 300f)),
+            exit = shrinkVertically(animationSpec = spring(stiffness = 300f))
+        ) {
              Spacer(Modifier.height(24.dp))
         }
 

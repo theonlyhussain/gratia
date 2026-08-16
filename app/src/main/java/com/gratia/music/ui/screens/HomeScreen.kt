@@ -91,6 +91,8 @@ fun HomeScreen(
 
     val context = LocalContext.current
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val updateState by com.gratia.music.GratiaApp.instance.updateManager.state.collectAsState()
+    val isOled by settingsDataStore.oledThemeEnabledFlow.collectAsState(initial = false)
     val initialScanCompleted by settingsDataStore.initialScanCompletedFlow.collectAsState(initial = false)
     var isScanning by remember { mutableStateOf(false) }
 
@@ -150,6 +152,16 @@ fun HomeScreen(
                                 tint = GratiaTheme.colors.textSecondary,
                                 modifier = Modifier.size(20.dp)
                             )
+                            if (updateState is com.gratia.music.updater.UpdateState.UpdateAvailable || updateState is com.gratia.music.updater.UpdateState.ReadyToInstall) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(GratiaTheme.colors.error)
+                                )
+                            }
                         }
                         
                         Box(

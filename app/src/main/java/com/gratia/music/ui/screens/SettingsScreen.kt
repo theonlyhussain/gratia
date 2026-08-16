@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +31,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSmartUpdate: () -> Unit,
     onNavigateToEqualizer: () -> Unit
 ) {
     val context = LocalContext.current
@@ -88,118 +91,33 @@ fun SettingsScreen(
             AppleSectionHeader(title = "Updates")
             
             val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
-            val smartUpdateOnboardingShown by settingsDataStore.smartUpdateOnboardingShownFlow.collectAsState(initial = false)
-            var showOnboarding by remember { mutableStateOf(false) }
             val updateState by GratiaApp.instance.updateManager.state.collectAsState()
             
             AppleListRow(
                 title = "Smart Update",
-                subtitle = "Automatically check for updates in the background",
-                onClick = { 
-                    if (!smartUpdateEnabled && !smartUpdateOnboardingShown) {
-                        showOnboarding = true
-                    } else {
-                        val newValue = !smartUpdateEnabled
-                        scope.launch { 
-                            settingsDataStore.setSmartUpdateEnabled(newValue) 
-                            if (newValue) {
-                                com.gratia.music.updater.UpdateCheckWorker.schedule(context)
-                            } else {
-                                com.gratia.music.updater.UpdateCheckWorker.cancel(context)
-                            }
-                        }
-                    }
-                },
-                trailingContent = {
-                    Switch(
-                        checked = smartUpdateEnabled,
-                        onCheckedChange = { checked ->
-                            if (checked && !smartUpdateOnboardingShown) {
-                                showOnboarding = true
-                            } else {
-                                scope.launch { 
-                                    settingsDataStore.setSmartUpdateEnabled(checked) 
-                                    if (checked) {
-                                        com.gratia.music.updater.UpdateCheckWorker.schedule(context)
-                                    } else {
-                                        com.gratia.music.updater.UpdateCheckWorker.cancel(context)
-                                    }
-                                }
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = GratiaTheme.colors.surface,
-                            checkedTrackColor = GratiaTheme.colors.accent,
-                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
-                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover,
-                            uncheckedBorderColor = androidx.compose.ui.graphics.Color.Transparent
-                        )
-                    )
-                }
-            )
-            AppleListRow(
-                title = "Check for Updates",
-                onClick = { 
-                    scope.launch { GratiaApp.instance.updateManager.checkForUpdate(manualCheck = true) }
-                },
+                subtitle = if (smartUpdateEnabled) "Enabled" else "Disabled",
+                onClick = onNavigateToSmartUpdate,
                 showDivider = false,
                 trailingContent = {
-                    if (updateState is com.gratia.music.updater.UpdateState.Checking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp,
-                            color = GratiaTheme.colors.accent
-                        )
-                    } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (updateState is com.gratia.music.updater.UpdateState.UpdateAvailable || updateState is com.gratia.music.updater.UpdateState.ReadyToInstall) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(GratiaTheme.colors.error)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Check",
+                            contentDescription = "Expand",
                             tint = GratiaTheme.colors.textSecondary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             )
-            
-            if (showOnboarding) {
-                com.gratia.music.ui.components.SmartUpdateOnboardingSheet(
-                    onEnable = {
-                        showOnboarding = false
-                        scope.launch {
-                            settingsDataStore.setSmartUpdateOnboardingShown(true)
-                            settingsDataStore.setSmartUpdateEnabled(true)
-                            com.gratia.music.updater.UpdateCheckWorker.schedule(context)
-                            android.widget.Toast.makeText(context, "Smart Update enabled", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onCancel = {
-                        showOnboarding = false
-                    },
-                    onDismiss = {
-                        showOnboarding = false
-                    }
-                )
-            }
-            
-            if (updateState !is com.gratia.music.updater.UpdateState.Idle) {
-                com.gratia.music.ui.components.UpdatePromptSheet(
-                    state = updateState,
-                    onUpdateNow = { url ->
-                        scope.launch { GratiaApp.instance.updateManager.downloadUpdate(url) }
-                    },
-                    onLater = {
-                        GratiaApp.instance.updateManager.resetState()
-                    },
-                    onInstall = { file ->
-                        GratiaApp.instance.updateManager.installUpdate(file)
-                    },
-                    onDismiss = {
-                        if (updateState !is com.gratia.music.updater.UpdateState.Downloading) {
-                            GratiaApp.instance.updateManager.resetState()
-                        }
-                    }
-                )
-            }
             
             Spacer(Modifier.height(24.dp))
         }

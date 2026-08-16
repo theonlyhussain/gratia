@@ -63,7 +63,12 @@ class UpdateManager(private val context: Context) {
                     val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
 
                     if (isNewerVersion(tagName, currentVersion) && downloadUrl.isNotEmpty()) {
-                        _state.value = UpdateState.UpdateAvailable(tagName, body, downloadUrl)
+                        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-${tagName}.apk")
+                        if (apkFile.exists() && verifyApk(apkFile)) {
+                            _state.value = UpdateState.ReadyToInstall(apkFile)
+                        } else {
+                            _state.value = UpdateState.UpdateAvailable(tagName, body, downloadUrl)
+                        }
                     } else {
                         if (manualCheck) _state.value = UpdateState.UpToDate
                         else _state.value = UpdateState.Idle
@@ -83,6 +88,12 @@ class UpdateManager(private val context: Context) {
     suspend fun downloadUpdate(downloadUrl: String) {
         val availableState = _state.value as? UpdateState.UpdateAvailable ?: return
         
+        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-${availableState.version}.apk")
+        if (apkFile.exists() && verifyApk(apkFile)) {
+            _state.value = UpdateState.ReadyToInstall(apkFile)
+            return
+        }
+        
         _state.value = UpdateState.Downloading(0f)
         withContext(Dispatchers.IO) {
             try {
@@ -100,7 +111,6 @@ class UpdateManager(private val context: Context) {
                 }
 
                 val fileLength = connection.contentLength
-                val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-${availableState.version}.apk")
 
                 connection.inputStream.use { input ->
                     FileOutputStream(apkFile).use { output ->

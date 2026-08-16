@@ -38,7 +38,10 @@ fun ArtistDetailScreen(
 ) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
-    val artistSongs = remember(allSongs, artistName) { allSongs.filter { it.artist == artistName }.sortedBy { it.title } }
+    val artistSongs = remember(allSongs, artistName) { 
+        allSongs.filter { com.gratia.music.utils.ArtistParser.parseArtists(it.artist).contains(artistName) }
+            .sortedBy { it.title } 
+    }
     
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()

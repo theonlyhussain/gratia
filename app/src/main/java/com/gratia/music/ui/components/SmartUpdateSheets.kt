@@ -56,7 +56,7 @@ fun SmartUpdateOnboardingSheet(
             )
             Spacer(modifier = Modifier.height(8.dp))
             GratiaText(
-                text = "Keep Gratia up to date with the latest features and bug fixes.",
+                text = "Gratia checks for updates and allows you to download them directly from our official GitHub release. Smart Update needs permission to download these APK update files to your device.",
                 style = GratiaTheme.typography.body,
                 color = GratiaTheme.colors.textSecondary,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -66,7 +66,7 @@ fun SmartUpdateOnboardingSheet(
             OnboardingFeatureRow(
                 icon = Icons.Default.Sync,
                 title = "Background Checks",
-                description = "Gratia checks for new versions in the background once a day."
+                description = "Gratia checks for new versions in the background once a day. When an update is available, you will be notified."
             )
             Spacer(modifier = Modifier.height(24.dp))
             OnboardingFeatureRow(
@@ -78,7 +78,7 @@ fun SmartUpdateOnboardingSheet(
             OnboardingFeatureRow(
                 icon = Icons.Default.PanTool,
                 title = "You Are In Control",
-                description = "Android will always ask for your confirmation before installing any update. You can turn this off anytime."
+                description = "The APK will only be downloaded when you choose to update. Android will always ask for your confirmation before installing."
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -258,6 +258,42 @@ fun UpdatePromptSheet(
                                 )
                             }
                         }
+                        is UpdateState.UpToDate -> {
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(GratiaTheme.colors.success.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = GratiaTheme.colors.success,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                            GratiaText(
+                                text = "You're up to date.",
+                                style = GratiaTheme.typography.title.copy(fontSize = 28.sp),
+                                color = GratiaTheme.colors.textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            GratiaText(
+                                text = "You are running the latest version of Gratia.",
+                                style = GratiaTheme.typography.body,
+                                color = GratiaTheme.colors.textSecondary
+                            )
+                            Spacer(modifier = Modifier.height(48.dp))
+                            GratiaButton(
+                                text = "Okay",
+                                onClick = onDismiss,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                            )
+                        }
                         is UpdateState.Downloading -> {
                             val progress = currentState.progress
                             Box(
@@ -293,6 +329,19 @@ fun UpdatePromptSheet(
                                 }
                             }
                             Spacer(modifier = Modifier.height(40.dp))
+                            
+                            val progressPercent = (progress * 100).toInt()
+                            val filledBars = (progress * 20).toInt()
+                            val emptyBars = 20 - filledBars
+                            val textProgressBar = "[${"█".repeat(filledBars)}${"░".repeat(emptyBars)}] $progressPercent%"
+                            
+                            GratiaText(
+                                text = textProgressBar,
+                                style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                                color = GratiaTheme.colors.accent
+                            )
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
                             GratiaText(
                                 text = "Downloading Update...",
                                 style = GratiaTheme.typography.title,

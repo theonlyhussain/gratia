@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -166,6 +167,10 @@ fun ExpandedPlayer(
     var showBiographySheet by remember { mutableStateOf(false) }
     var showCreditsSheet by remember { mutableStateOf(false) }
     var selectedBioArtist by remember { mutableStateOf("") }
+    
+    // --- Multiple Artists state ---
+    var showMultipleArtistSelector by remember { mutableStateOf(false) }
+    var multipleArtistsList by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // --- Content mode state ---
     var contentMode by remember { mutableStateOf(PlayerContentMode.Normal) }
@@ -222,10 +227,10 @@ fun ExpandedPlayer(
 
     val isAnyOverlayOpen = showBiographySheet || showCreditsSheet || showSongMenu ||
             showLyricsEditor || showDeviceSelector || showAddToPlaylist ||
-            showDeleteConfirm || showSongInfo
+            showDeleteConfirm || showSongInfo || showMultipleArtistSelector
 
-    // Intercept back button for ALL overlays + content modes
-    androidx.activity.compose.BackHandler(enabled = isAnyOverlayOpen || contentMode != PlayerContentMode.Normal) {
+    // Intercept back button for ALL overlays + content modes + normal closing
+    androidx.activity.compose.BackHandler(enabled = true) {
         when {
             showBiographySheet -> showBiographySheet = false
             showCreditsSheet -> showCreditsSheet = false
@@ -235,9 +240,11 @@ fun ExpandedPlayer(
             showAddToPlaylist -> showAddToPlaylist = false
             showDeleteConfirm -> showDeleteConfirm = false
             showSongInfo -> showSongInfo = false
+            showMultipleArtistSelector -> showMultipleArtistSelector = false
             contentMode != PlayerContentMode.Normal -> {
                 contentMode = PlayerContentMode.Normal
             }
+            else -> onDismiss()
         }
     }
 
@@ -305,9 +312,60 @@ fun ExpandedPlayer(
         label = "headerAlpha"
     )
 
+    // Nested scroll connection for smooth swipe-to-dismiss
+    val nestedScrollConnection = remember(isAnyOverlayOpen, contentMode) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: androidx.compose.ui.geometry.Offset,
+                source: NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                if (isAnyOverlayOpen) return androidx.compose.ui.geometry.Offset.Zero
+
+                if (dismissOffsetY.value > 0f && available.y < 0) {
+                    val newOffset = (dismissOffsetY.value + available.y).coerceAtLeast(0f)
+                    val consumed = dismissOffsetY.value - newOffset
+                    scope.launch { dismissOffsetY.snapTo(newOffset) }
+                    return androidx.compose.ui.geometry.Offset(0f, -consumed)
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                if (isAnyOverlayOpen) return androidx.compose.ui.geometry.Offset.Zero
+
+                if (available.y > 0) {
+                    val newOffset = (dismissOffsetY.value + available.y).coerceAtLeast(0f)
+                    scope.launch { dismissOffsetY.snapTo(newOffset) }
+                    return androidx.compose.ui.geometry.Offset(0f, available.y)
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                if (dismissOffsetY.value > 150f || available.y > 1000f) {
+                    onDismiss()
+                    dismissOffsetY.snapTo(0f)
+                    return available
+                } else if (dismissOffsetY.value > 0f) {
+                    dismissOffsetY.animateTo(
+                        targetValue = 0f,
+                        animationSpec = motion.springStiff()
+                    )
+                    return available
+                }
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
             .graphicsLayer {
                 translationY = dismissOffsetY.value
                 alpha = dismissAlpha
@@ -341,44 +399,7 @@ fun ExpandedPlayer(
         val tp = transitionProgress.value // shorthand
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(isAnyOverlayOpen, contentMode) {
-                    if (isAnyOverlayOpen) return@pointerInput
-                    if (contentMode != PlayerContentMode.Normal) return@pointerInput
-
-                    detectVerticalDragGestures(
-                        onDragEnd = {
-                            scope.launch {
-                                if (dismissOffsetY.value > 300f) {
-                                    onDismiss()
-                                    dismissOffsetY.snapTo(0f)
-                                } else {
-                                    dismissOffsetY.animateTo(
-                                        targetValue = 0f,
-                                        animationSpec = motion.springStiff()
-                                    )
-                                }
-                            }
-                        },
-                        onDragCancel = {
-                            scope.launch {
-                                dismissOffsetY.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = motion.springStiff()
-                                )
-                            }
-                        },
-                        onVerticalDrag = { _, dragAmount ->
-                            scope.launch {
-                                if (dragAmount > 0 || dismissOffsetY.value > 0) {
-                                    val newValue = (dismissOffsetY.value + dragAmount).coerceAtLeast(0f)
-                                    dismissOffsetY.snapTo(newValue)
-                                }
-                            }
-                        }
-                    )
-                }
+            modifier = Modifier.fillMaxSize()
         ) {
             // ===== NORMAL MODE (transitionProgress ≈ 0f) =====
             if (tp < 0.01f && contentMode == PlayerContentMode.Normal) {
@@ -414,8 +435,14 @@ fun ExpandedPlayer(
                     onMoreClick = { showSongMenu = true },
                     onClickTitle = { showSongInfo = true },
                     onClickArtist = {
-                        onDismiss()
-                        onNavigateToArtist(song.artist)
+                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                        if (parsed.size > 1) {
+                            multipleArtistsList = parsed
+                            showMultipleArtistSelector = true
+                        } else {
+                            onDismiss()
+                            onNavigateToArtist(song.artist)
+                        }
                     },
                     onClickAlbum = {
                         if (!song.album.isNullOrBlank()) {
@@ -434,8 +461,14 @@ fun ExpandedPlayer(
                         contentMode = PlayerContentMode.Queue
                     },
                     onArtistClick = { artistName ->
-                        onDismiss()
-                        onNavigateToArtist(artistName)
+                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(artistName)
+                        if (parsed.size > 1) {
+                            multipleArtistsList = parsed
+                            showMultipleArtistSelector = true
+                        } else {
+                            onDismiss()
+                            onNavigateToArtist(artistName)
+                        }
                     },
                     onSeeMoreArtist = { artistName ->
                         selectedBioArtist = artistName
@@ -680,6 +713,18 @@ fun ExpandedPlayer(
             )
         }
 
+        if (showMultipleArtistSelector) {
+            com.gratia.music.ui.components.MultipleArtistSelectorSheet(
+                artists = multipleArtistsList,
+                onArtistClick = { artistName ->
+                    showMultipleArtistSelector = false
+                    onDismiss() // Dismiss expanded player
+                    onNavigateToArtist(artistName) // Navigate to artist
+                },
+                onDismissRequest = { showMultipleArtistSelector = false }
+            )
+        }
+
         // --- Lyrics Editor Sheet (opened directly from three-dot menu) ---
         if (showLyricsEditor) {
             LyricsEditorSheet(
@@ -863,7 +908,7 @@ private fun NormalModeContent(
                 artistInfos = artistInfos,
                 onArtistClick = onArtistClick,
                 onSeeMoreClick = onSeeMoreArtist,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
+                modifier = Modifier.padding(vertical = 16.dp)
             )
         }
 
