@@ -68,13 +68,9 @@ fun SyncedLyricsView(
         }
     }
 
-    // derivedStateOf ensures this only recalculates when the actual line index changes,
-    // NOT on every playback timer tick. This is the key performance optimization.
-    val currentLineIndex by remember {
-        derivedStateOf {
-            parsedLyrics.indexOfLast { it.startMs <= adjustedPlaybackTime }
-        }
-    }
+    // Calculate the active line index. We don't use derivedStateOf here because
+    // adjustedPlaybackTime is a raw Long, not a State, so it wouldn't trigger updates.
+    val currentLineIndex = parsedLyrics.indexOfLast { it.startMs <= adjustedPlaybackTime }
 
     // Auto-scroll to the active line with a smooth animation
     LaunchedEffect(currentLineIndex) {
