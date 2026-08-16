@@ -175,6 +175,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun removeFromQueue(songId: String) = playerManager.removeFromQueue(songId)
     fun moveInQueue(from: Int, to: Int) = playerManager.moveInQueue(from, to)
+    
+    fun updateUpcomingQueue(newUpcomingQueue: List<SongEntity>, startIndex: Int) {
+        playerManager.updateUpcomingQueue(newUpcomingQueue, startIndex)
+    }
     fun playFromQueue(index: Int) = playerManager.playFromQueue(index)
     fun clearQueue() = playerManager.clearQueue()
     

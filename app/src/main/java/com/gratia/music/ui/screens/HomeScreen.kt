@@ -58,6 +58,7 @@ fun HomeScreen(
     val mostPlayedRaw by songRepo.getMostPlayed(10).collectAsState(initial = emptyList())
     val favoriteSongsRaw by songRepo.getFavorites().collectAsState(initial = emptyList())
     val recentlyPlayedRaw by songRepo.getRecentlyPlayed(10).collectAsState(initial = emptyList())
+    val discoverySongsRaw by songRepo.getDiscoverySongs(10).collectAsState(initial = emptyList())
     val lastAddedRaw by songRepo.getLastAdded(10).collectAsState(initial = emptyList())
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
@@ -66,18 +67,22 @@ fun HomeScreen(
     val mostPlayed = remember(mostPlayedRaw) { mostPlayedRaw }
     val favoriteSongs = remember(favoriteSongsRaw) { favoriteSongsRaw }
     val recentlyPlayed = remember(recentlyPlayedRaw) { recentlyPlayedRaw }
+    val discoverySongs = remember(discoverySongsRaw) { discoverySongsRaw }
     val lastAdded = remember(lastAddedRaw) { lastAddedRaw }
 
-    // Determine Top Artist for Recommendation
-    val recommendedArtist = remember(mostPlayedRaw, recentlyPlayedRaw) {
-        val allSongs = mostPlayedRaw + recentlyPlayedRaw
-        val artistCounts = allSongs.groupingBy { it.artist }.eachCount()
-        artistCounts.maxByOrNull { it.value }?.key
+    // Determine Top Song for Recommendation
+    var recommendedSong by remember { mutableStateOf<SongEntity?>(null) }
+    LaunchedEffect(allSongs) {
+        if (allSongs.isNotEmpty()) {
+            recommendedSong = GratiaApp.instance.recommendationManager.getRecommendedSong(allSongs)
+        }
     }
     
+    val recommendedArtist = recommendedSong?.artist
+    
     val recommendedArtistSongs by produceState<List<SongEntity>>(initialValue = emptyList(), key1 = recommendedArtist) {
-        if (recommendedArtist != null) {
-            value = songRepo.getSongsByArtistDirect(recommendedArtist)
+        if (recommendedArtist != null && recommendedArtist != "<unknown>") {
+            value = songRepo.getSongsByArtistDirect(recommendedArtist!!)
         }
     }
     
@@ -272,6 +277,22 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(recentlyPlayed) { song ->
+                        RecentCard(
+                            song = song,
+                            onClick = { playerViewModel.playSong(song, allSongs) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        } else if (discoverySongs.isNotEmpty()) {
+            item {
+                AppleSectionHeader(title = "Discover")
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(discoverySongs) { song ->
                         RecentCard(
                             song = song,
                             onClick = { playerViewModel.playSong(song, allSongs) }

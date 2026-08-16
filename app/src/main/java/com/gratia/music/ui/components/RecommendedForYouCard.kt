@@ -82,7 +82,7 @@ fun RecommendedForYouCard(
                         },
                         modifier = Modifier
                             .size(180.dp)
-                            .clip(PixelatedCircleShape(gridSize = 20))
+                            .clip(CircleShape)
                     )
                 } else {
                     val fallbackPath = songs.firstOrNull { it.coverArtPath != null }?.coverArtPath
@@ -92,14 +92,14 @@ fun RecommendedForYouCard(
                             title = artistName,
                             size = 180.dp,
                             cornerRadius = 90.dp,
-                            modifier = Modifier.clip(PixelatedCircleShape(gridSize = 20))
+                            modifier = Modifier.clip(CircleShape)
                         )
                     } else {
-                        // Fallback to a plain grey pixelated circle if no image and no cover
+                        // Fallback to a plain grey circle if no image and no cover
                         Box(
                             modifier = Modifier
                                 .size(180.dp)
-                                .clip(PixelatedCircleShape(gridSize = 20))
+                                .clip(CircleShape)
                                 .background(GratiaTheme.colors.surfaceHover)
                         )
                     }

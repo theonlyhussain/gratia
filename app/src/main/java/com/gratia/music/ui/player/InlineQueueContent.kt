@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
@@ -89,18 +90,32 @@ fun InlineQueueContent(
         if (idx >= 0) idx + 1 else 0
     } else 0
 
+    var upcomingLocal by remember { mutableStateOf(emptyList<SongEntity>()) }
+    
     val reorderableState = rememberReorderableLazyListState(
         listState = listState,
         onMove = { from, to ->
-            val fromAdjusted = (from.index - 1) + upcomingStartIndex
-            val toAdjusted = (to.index - 1) + upcomingStartIndex
-            if (fromAdjusted >= upcomingStartIndex && toAdjusted >= upcomingStartIndex &&
-                fromAdjusted < queue.size && toAdjusted < queue.size
-            ) {
-                playerViewModel.moveInQueue(fromAdjusted, toAdjusted)
+            val fromIndex = from.index - 1
+            val toIndex = to.index - 1
+            if (fromIndex in upcomingLocal.indices && toIndex in upcomingLocal.indices) {
+                upcomingLocal = upcomingLocal.toMutableList().apply {
+                    add(toIndex, removeAt(fromIndex))
+                }
             }
+        },
+        onDragEnd = { _, _ ->
+            playerViewModel.updateUpcomingQueue(upcomingLocal, upcomingStartIndex)
         }
     )
+
+    val isDragging = reorderableState.draggingItemKey != null
+    LaunchedEffect(queue, upcomingStartIndex, isDragging) {
+        if (!isDragging) {
+            upcomingLocal = if (upcomingStartIndex < queue.size) {
+                queue.subList(upcomingStartIndex, queue.size)
+            } else emptyList()
+        }
+    }
 
     LazyColumn(
         state = reorderableState.listState,
@@ -177,30 +192,59 @@ fun InlineQueueContent(
             }
         }
 
-        if (queue.isNotEmpty()) {
-            val upcoming = if (upcomingStartIndex < queue.size) {
-                queue.subList(upcomingStartIndex, queue.size)
-            } else emptyList()
-
+        if (upcomingLocal.isNotEmpty()) {
             itemsIndexed(
-                upcoming,
-                key = { index, song -> "iq_${song.id}_$index" }
+                upcomingLocal,
+                key = { _, song -> "iq_${song.id}" }
             ) { index, song ->
-                ReorderableItem(reorderableState, key = "iq_${song.id}_$index") { isDragging ->
-                    InlineQueueRow(
-                        song = song,
-                        onPlay = {
-                            onInteraction()
-                            playerViewModel.playFromQueue(upcomingStartIndex + index)
-                        },
-                        modifier = Modifier
-                            .animateItem()
-                            .background(
-                                if (isDragging) Color.White.copy(alpha = 0.08f)
-                                else Color.Transparent
-                            )
-                            .detectReorderAfterLongPress(reorderableState)
+                ReorderableItem(reorderableState, key = "iq_${song.id}") { isDragging ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { dismissValue ->
+                            if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
+                                playerViewModel.removeFromQueue(song.id)
+                                true
+                            } else false
+                        }
                     )
+                    
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        modifier = Modifier.animateItem(),
+                        backgroundContent = {
+                            val color by animateColorAsState(
+                                targetValue = if (dismissState.targetValue != SwipeToDismissBoxValue.Settled) Color.Red.copy(alpha = 0.8f) else Color.Transparent,
+                                label = "dismissColor"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(color),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Remove from Queue",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    ) {
+                        InlineQueueRow(
+                            song = song,
+                            onPlay = {
+                                onInteraction()
+                                // Find real index in the actual queue since they might tap while dragging or immediately after
+                                val realIndex = playerViewModel.queue.value.indexOfFirst { it.id == song.id }
+                                if (realIndex >= 0) playerViewModel.playFromQueue(realIndex)
+                            },
+                            modifier = Modifier
+                                .background(
+                                    if (isDragging) Color.White.copy(alpha = 0.08f)
+                                    else Color.Transparent
+                                ),
+                            dragModifier = Modifier.detectReorderAfterLongPress(reorderableState)
+                        )
+                    }
                 }
             }
         }
@@ -300,6 +344,7 @@ private fun InlineQueueRow(
     song: SongEntity,
     onPlay: () -> Unit,
     modifier: Modifier = Modifier,
+    dragModifier: Modifier = Modifier,
     showDragHandle: Boolean = true
 ) {
     val hapticFeedback = LocalHapticFeedback.current
@@ -346,12 +391,18 @@ private fun InlineQueueRow(
         }
 
         if (showDragHandle) {
-            Icon(
-                Icons.Default.DragHandle,
-                contentDescription = "Reorder",
-                tint = Color.White.copy(alpha = 0.4f),
-                modifier = Modifier.size(20.dp)
-            )
+            Box(
+                modifier = dragModifier
+                    .size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.DragHandle,
+                    contentDescription = "Reorder",
+                    tint = Color.White.copy(alpha = 0.4f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         } else {
             Spacer(Modifier.width(20.dp))
         }

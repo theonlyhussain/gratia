@@ -25,6 +25,9 @@ class SongRepository(private val songDao: SongDao) {
     fun getRecentlyPlayed(limit: Int = 20): Flow<List<SongEntity>> =
         songDao.getRecentlyPlayed(limit)
 
+    fun getDiscoverySongs(limit: Int = 20): Flow<List<SongEntity>> =
+        songDao.getDiscoverySongs(limit)
+
     fun getMostPlayed(limit: Int = 20): Flow<List<SongEntity>> =
         songDao.getMostPlayed(limit)
 

@@ -467,6 +467,10 @@ class PlayerManager(private val context: Context) {
             }
             if (playImmediately) {
                 controller.play()
+                // Instantly log it to Recent Played history
+                scope.launch(Dispatchers.IO) {
+                    GratiaApp.instance.database.songDao().updateLastPlayedAt(song.id, System.currentTimeMillis())
+                }
             }
             Log.d(TAG, "playSongInternal: commands sent to controller")
             saveStateToDataStore()
@@ -684,6 +688,17 @@ class PlayerManager(private val context: Context) {
         _queue.value = q
         updatePreloadManager()
         Log.d(TAG, "moveInQueue: $from -> $to")
+    }
+    
+    /** Update the upcoming portion of the queue completely (used after drag completes) */
+    fun updateUpcomingQueue(newUpcomingQueue: List<SongEntity>, startIndex: Int) {
+        val currentQueue = _queue.value
+        if (startIndex < 0 || startIndex > currentQueue.size) return
+        
+        val newQueue = currentQueue.subList(0, startIndex) + newUpcomingQueue
+        _queue.value = newQueue
+        updatePreloadManager()
+        Log.d(TAG, "updateUpcomingQueue: updated from index $startIndex")
     }
 
     /** Play a specific song from the queue by index. */

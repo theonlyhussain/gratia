@@ -29,6 +29,9 @@ class GratiaApp : Application() {
     lateinit var updateManager: com.gratia.music.updater.UpdateManager
         private set
 
+    lateinit var recommendationManager: com.gratia.music.data.repository.RecommendationManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -42,6 +45,8 @@ class GratiaApp : Application() {
         
         val lyricsRepo = com.gratia.music.data.repository.LyricsRepository(database.lyricsDao())
         lyricsManager = com.gratia.music.lyrics.LyricsManager(playerManager, lyricsRepo)
+        
+        recommendationManager = com.gratia.music.data.repository.RecommendationManager(database.songDao(), database.listeningEventDao())
 
         val eqRepo = EqualizerRepository(this)
         equalizerManager = EqualizerManager(eqRepo)

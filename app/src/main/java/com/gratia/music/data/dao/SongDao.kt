@@ -28,7 +28,7 @@ interface SongDao {
     @Query("SELECT COUNT(*) FROM songs WHERE isFavorite = 1")
     fun getFavoritesCount(): Flow<Int>
 
-    @Query("SELECT * FROM songs ORDER BY lastPlayedAt DESC LIMIT :limit")
+    @Query("SELECT * FROM songs WHERE lastPlayedAt IS NOT NULL ORDER BY lastPlayedAt DESC LIMIT :limit")
     fun getRecentlyPlayed(limit: Int = 20): Flow<List<SongEntity>>
 
     @Query("SELECT * FROM songs WHERE playCount > 0 ORDER BY playCount DESC LIMIT :limit")
@@ -39,6 +39,19 @@ interface SongDao {
 
     @Query("SELECT DISTINCT artist FROM songs WHERE lastPlayedAt IS NOT NULL ORDER BY lastPlayedAt DESC LIMIT :limit")
     fun getRecentArtists(limit: Int = 10): Flow<List<String>>
+
+    @Query("""
+        SELECT * FROM songs 
+        ORDER BY 
+            CASE 
+                WHEN title IS NOT NULL AND title != '' AND artist IS NOT NULL AND artist != '' AND artist != '<unknown>' THEN 0 
+                WHEN title IS NOT NULL AND title != '' OR artist IS NOT NULL AND artist != '' THEN 1 
+                ELSE 2 
+            END ASC, 
+            RANDOM() 
+        LIMIT :limit
+    """)
+    fun getDiscoverySongs(limit: Int = 20): Flow<List<SongEntity>>
 
     @Query("""
         SELECT * FROM songs WHERE 
@@ -88,6 +101,9 @@ interface SongDao {
 
     @Query("UPDATE songs SET playCount = playCount + 1, lastPlayedAt = :now WHERE id = :id")
     suspend fun incrementPlayCount(id: String, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE songs SET lastPlayedAt = :now WHERE id = :id")
+    suspend fun updateLastPlayedAt(id: String, now: Long = System.currentTimeMillis())
 
     @Query("UPDATE songs SET totalListenTime = totalListenTime + :timeMs WHERE id = :id")
     suspend fun incrementListenTime(id: String, timeMs: Long)
