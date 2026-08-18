@@ -3,6 +3,7 @@
 # 🎵 Gratia
 
 **The Local-First Android Music Player**
+**NOTE - THE PROJECT HAS BEEN UPDATED THAT MEANS IT'S AHAED OF THE CURRENT APK, THE APP IS STILL BEHIND WHILE THE FILES HAVE BEEM UPDATED AND FIXED BUGS**
 
 A modern, meticulously crafted music player focused on fluid playback, stunning UI, ad-free listening experience.
 
