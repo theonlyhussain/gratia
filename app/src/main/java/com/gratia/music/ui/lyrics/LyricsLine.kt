@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gratia.music.lyrics.LyricLine
 
 /**
@@ -67,40 +68,66 @@ fun LyricsLine(
     // Word-synced content
     // Using graphicsLayer for alpha/scale to avoid layout invalidation on every frame.
     // The clickable modifier wraps the entire line so tapping seeks to this line's start.
-    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-    FlowRow(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
                 this.alpha = opacity
                 this.scaleX = scale
                 this.scaleY = scale
-                // Keep transform origin at center-left for natural scaling
                 this.transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
             }
             .clickable(enabled = onSeek != null) { onSeek?.invoke(line.startMs) }
-            .padding(bottom = 32.dp),
-        horizontalArrangement = Arrangement.Start
+            .padding(bottom = 32.dp)
     ) {
-        line.words.forEachIndexed { wordIndex, word ->
-            val durationMs = if (wordIndex < line.words.size - 1) {
-                line.words[wordIndex + 1].startMs - word.startMs
-            } else if (nextLineStartMs != null) {
-                nextLineStartMs - word.startMs
-            } else {
-                500L
-            }
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start
+        ) {
+            line.words.forEachIndexed { wordIndex, word ->
+                val durationMs = if (wordIndex < line.words.size - 1) {
+                    line.words[wordIndex + 1].startMs - word.startMs
+                } else if (nextLineStartMs != null) {
+                    nextLineStartMs - word.startMs
+                } else {
+                    500L
+                }
 
-            AnimatedWord(
-                word = word,
-                durationMs = durationMs.toInt(),
-                currentPositionProvider = currentPositionProvider
+                AnimatedWord(
+                    word = word,
+                    durationMs = durationMs.toInt(),
+                    currentPositionProvider = currentPositionProvider
+                )
+
+                // Space between words
+                if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
+                    Spacer(modifier = Modifier.width(7.dp))
+                }
+            }
+        }
+
+        if (!line.romanization.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            androidx.compose.material3.Text(
+                text = line.romanization!!,
+                fontFamily = com.gratia.music.ui.theme.Inter,
+                fontSize = 18.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                lineHeight = 24.sp
             )
+        }
 
-            // Space between words
-            if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
-                Spacer(modifier = Modifier.width(7.dp))
-            }
+        if (!line.translation.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            androidx.compose.material3.Text(
+                text = line.translation!!,
+                fontFamily = com.gratia.music.ui.theme.Inter,
+                fontSize = 16.sp,
+                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f),
+                lineHeight = 22.sp
+            )
         }
     }
 }

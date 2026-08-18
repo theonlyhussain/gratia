@@ -221,10 +221,14 @@ fun InlineQueueContent(
                                     .background(color),
                                 contentAlignment = Alignment.Center
                             ) {
+                                val iconColor by animateColorAsState(
+                                    targetValue = if (dismissState.targetValue != SwipeToDismissBoxValue.Settled) Color.White else Color.Transparent,
+                                    label = "dismissIconColor"
+                                )
                                 Icon(
                                     Icons.Default.Delete,
                                     contentDescription = "Remove from Queue",
-                                    tint = Color.White
+                                    tint = iconColor
                                 )
                             }
                         }

@@ -88,12 +88,25 @@ object LrcParser {
             val allTextLines = mutableListOf(block.content)
             allTextLines.addAll(block.supplemental)
 
-            val (mainText, translation, romanization) = separateTranslation(allTextLines)
+            val (mainTextRaw, translationRaw, romanization) = separateTranslation(allTextLines)
+            
+            // Handle inline translation via '^'
+            val caretParts = mainTextRaw.split('^', limit = 2)
+            val mainText = caretParts[0].trim()
+            val inlineTranslation = caretParts.getOrNull(1)?.trim()
+            
+            var translation = translationRaw
+            if (!inlineTranslation.isNullOrBlank()) {
+                translation = appendUnique(translation, inlineTranslation)
+            }
+
             val (voiceTag, cleanedText) = extractVoiceTag(mainText)
 
-            // Parse word-level timestamps if present
+            // Parse word-level timestamps if present, only from the main text part
+            // block.content might have '^', so we extract only the part before '^' for word timestamps
+            val contentBeforeCaret = block.content.split('^', limit = 2)[0]
             val words = if (hasWordTimestamps) {
-                parseWordTimestamps(block.content, block.timestamps.first())
+                parseWordTimestamps(contentBeforeCaret, block.timestamps.first())
             } else {
                 emptyList()
             }
