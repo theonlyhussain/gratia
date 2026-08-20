@@ -11,7 +11,7 @@ import com.gratia.music.data.model.LyricsEntity
 interface LyricsDao {
 
     @Query("SELECT * FROM lyrics WHERE songId = :songId")
-    suspend fun getLyricsForSong(songId: String): LyricsEntity?
+    suspend fun getLyricsForSong(songId: String): List<LyricsEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLyrics(lyrics: LyricsEntity)
@@ -21,4 +21,7 @@ interface LyricsDao {
 
     @Query("DELETE FROM lyrics WHERE songId = :songId")
     suspend fun deleteLyricsForSong(songId: String)
+
+    @androidx.room.Delete
+    suspend fun delete(lyrics: LyricsEntity)
 }

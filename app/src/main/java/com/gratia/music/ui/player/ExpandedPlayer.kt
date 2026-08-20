@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -159,6 +160,16 @@ fun ExpandedPlayer(
 
     // --- Lyrics editor state ---
     var showLyricsEditor by remember { mutableStateOf(false) }
+    var allLyricsList by remember { mutableStateOf<List<com.gratia.music.data.model.LyricsEntity>>(emptyList()) }
+
+    LaunchedEffect(showLyricsEditor, currentLyrics) {
+        if (showLyricsEditor) {
+            allLyricsList = playerViewModel.getAllLyricsForCurrentSong()
+        }
+    }
+
+    // --- Estimated Timings state ---
+    var enableEstimatedTimings by remember { mutableStateOf(false) }
 
     // --- Device selector state ---
     var showDeviceSelector by remember { mutableStateOf(false) }
@@ -289,9 +300,9 @@ fun ExpandedPlayer(
 
     // --- Parse lyrics for the SyncedLyricsView ---
     val lyricsRaw = currentLyrics?.text ?: ""
-    val parsedLines = remember(lyricsRaw) {
+    val parsedLines = remember(lyricsRaw, enableEstimatedTimings) {
         if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
-            LrcParser.parse(lyricsRaw)
+            LrcParser.parse(lyricsRaw, enableEstimatedTimings)
         } else emptyList()
     }
 
@@ -527,6 +538,8 @@ fun ExpandedPlayer(
                     parsedLines = parsedLines,
                     queueListState = queueListState,
                     audioFormat = playerViewModel.audioFormat.collectAsState().value,
+                    enableEstimatedTimings = enableEstimatedTimings,
+                    onToggleEstimatedTimings = { enableEstimatedTimings = !enableEstimatedTimings },
                     onUserInteraction = { onUserInteraction() },
                     onSeek = { newProgress ->
                         onUserInteraction()
@@ -729,11 +742,19 @@ fun ExpandedPlayer(
         if (showLyricsEditor) {
             LyricsEditorSheet(
                 song = song,
-                initialLyrics = lyricsRaw,
+                allLyrics = allLyricsList,
                 currentTimeMs = visualTimeState.longValue,
                 onDismiss = { showLyricsEditor = false },
-                onSave = { newLyrics, isSynced ->
-                    playerViewModel.saveManualLyrics(newLyrics, isSynced)
+                onSave = { newLyrics, isSynced, isWordLevel ->
+                    playerViewModel.saveManualLyrics(newLyrics, isSynced, isWordLevel, isActive = true)
+                    showLyricsEditor = false
+                },
+                onDelete = { provider ->
+                    playerViewModel.deleteLyrics(provider)
+                    showLyricsEditor = false
+                },
+                onSetActive = { provider ->
+                    playerViewModel.setActiveLyrics(provider)
                     showLyricsEditor = false
                 }
             )
@@ -967,6 +988,8 @@ private fun ContentModeLayout(
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
     queueListState: androidx.compose.foundation.lazy.LazyListState,
     audioFormat: com.gratia.music.player.AudioFormatInfo?,
+    enableEstimatedTimings: Boolean,
+    onToggleEstimatedTimings: () -> Unit,
     onUserInteraction: () -> Unit,
     onSeek: (Float) -> Unit,
     onSeekLyrics: (Long) -> Unit,
@@ -1035,8 +1058,12 @@ private fun ContentModeLayout(
                         LyricsContentArea(
                             lyricsRaw = lyricsRaw,
                             parsedLines = parsedLines,
+                            currentLyrics = currentLyrics,
                             visualTimeProvider = visualTimeProvider,
                             syncOffset = syncOffset,
+                            enableEstimatedTimings = enableEstimatedTimings,
+                            onToggleEstimatedTimings = onToggleEstimatedTimings,
+                            isFullscreenContent = isFullscreenContent,
                             onSeek = onSeekLyrics,
                             onInteraction = onUserInteraction
                         )
@@ -1119,8 +1146,12 @@ private fun ContentModeLayout(
 private fun LyricsContentArea(
     lyricsRaw: String,
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
+    currentLyrics: com.gratia.music.data.model.LyricsEntity?,
     visualTimeProvider: () -> Long,
     syncOffset: Long,
+    enableEstimatedTimings: Boolean,
+    onToggleEstimatedTimings: () -> Unit,
+    isFullscreenContent: Boolean,
     onSeek: (Long) -> Unit,
     onInteraction: () -> Unit
 ) {
@@ -1155,6 +1186,37 @@ private fun LyricsContentArea(
                 syncOffset = syncOffset,
                 modifier = Modifier.fillMaxSize()
             )
+            
+            // Estimated timing toggle button overlay
+            if (currentLyrics?.isSynced == true && currentLyrics.isWordLevel == false) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isFullscreenContent,
+                    enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
+                    exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300)),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 16.dp, bottom = 16.dp)
+                ) {
+                    androidx.compose.material3.FilledTonalIconToggleButton(
+                        checked = enableEstimatedTimings,
+                        onCheckedChange = { onToggleEstimatedTimings() },
+                        modifier = Modifier.size(36.dp),
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconToggleButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.15f),
+                            checkedContainerColor = GratiaTheme.colors.accent,
+                            contentColor = Color.White.copy(alpha = 0.6f),
+                            checkedContentColor = Color.White
+                        )
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Timer,
+                            contentDescription = "Toggle Word-by-Word Timings",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
         } else {
             // No synced lyrics — show a clean empty state
             Box(

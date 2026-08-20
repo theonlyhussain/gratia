@@ -61,35 +61,98 @@ enum class LyricsEditorFormat {
 @Composable
 fun LyricsEditorSheet(
     song: SongEntity,
-    initialLyrics: String,
+    allLyrics: List<com.gratia.music.data.model.LyricsEntity>,
     currentTimeMs: Long,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean) -> Unit
+    onSave: (String, Boolean, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
+    onSetActive: (String) -> Unit
 ) {
-    // Detect initial mode from content
-    val initialSynced = remember(initialLyrics) {
-        initialLyrics.contains(Regex("\\[\\d{2}:\\d{2}"))
+    val automaticLyrics = remember(allLyrics) { allLyrics.find { it.provider == "automatic" } }
+    val manualLyrics = remember(allLyrics) { allLyrics.find { it.provider == "manual" } }
+
+    val activeProvider = remember(allLyrics) {
+        if (manualLyrics?.isActiveOverride == true) "manual" else "automatic"
     }
-    val initialEnhanced = remember(initialLyrics) {
-        initialLyrics.contains(Regex("<\\d{2}:\\d{2}"))
+
+    // Determine the format of existing lyrics
+    fun getFormat(lyrics: com.gratia.music.data.model.LyricsEntity?): LyricsEditorFormat? {
+        if (lyrics == null) return null
+        return when {
+            lyrics.isWordLevel -> LyricsEditorFormat.Enhanced
+            lyrics.isSynced -> LyricsEditorFormat.Synced
+            else -> LyricsEditorFormat.Plain
+        }
     }
+
+    val manualFormat = getFormat(manualLyrics)
+    val autoFormat = getFormat(automaticLyrics)
+
     var editorMode by remember {
         mutableStateOf(
             when {
-                initialEnhanced -> LyricsEditorFormat.Enhanced
-                initialSynced -> LyricsEditorFormat.Synced
+                manualFormat != null -> manualFormat
+                autoFormat != null -> autoFormat
                 else -> LyricsEditorFormat.Plain
             }
         )
     }
-    var textFieldValue by remember {
-        mutableStateOf(TextFieldValue(text = initialLyrics))
+
+    var plainText by remember(allLyrics) {
+        mutableStateOf(
+            TextFieldValue(
+                text = when (LyricsEditorFormat.Plain) {
+                    manualFormat -> manualLyrics?.text ?: ""
+                    autoFormat -> automaticLyrics?.text ?: ""
+                    else -> ""
+                }
+            )
+        )
     }
+    
+    var syncedText by remember(allLyrics) {
+        mutableStateOf(
+            TextFieldValue(
+                text = when (LyricsEditorFormat.Synced) {
+                    manualFormat -> manualLyrics?.text ?: ""
+                    autoFormat -> automaticLyrics?.text ?: ""
+                    else -> ""
+                }
+            )
+        )
+    }
+    
+    var enhancedText by remember(allLyrics) {
+        mutableStateOf(
+            TextFieldValue(
+                text = when (LyricsEditorFormat.Enhanced) {
+                    manualFormat -> manualLyrics?.text ?: ""
+                    autoFormat -> automaticLyrics?.text ?: ""
+                    else -> ""
+                }
+            )
+        )
+    }
+
+    val currentTextFieldValue = when (editorMode) {
+        LyricsEditorFormat.Plain -> plainText
+        LyricsEditorFormat.Synced -> syncedText
+        LyricsEditorFormat.Enhanced -> enhancedText
+    }
+
+    val onCurrentTextChanged: (TextFieldValue) -> Unit = { newValue ->
+        when (editorMode) {
+            LyricsEditorFormat.Plain -> plainText = newValue
+            LyricsEditorFormat.Synced -> syncedText = newValue
+            LyricsEditorFormat.Enhanced -> enhancedText = newValue
+        }
+    }
+
     val focusRequester = remember { FocusRequester() }
     val verticalScrollState = rememberScrollState()
 
     // Request focus after composition
-    LaunchedEffect(Unit) {
+    LaunchedEffect(editorMode) {
         focusRequester.requestFocus()
     }
 
@@ -136,7 +199,13 @@ fun LyricsEditorSheet(
                 Spacer(Modifier.weight(1f))
 
                 IconButton(
-                    onClick = { onSave(textFieldValue.text, editorMode != LyricsEditorFormat.Plain) }
+                    onClick = { 
+                        onSave(
+                            currentTextFieldValue.text, 
+                            editorMode != LyricsEditorFormat.Plain, 
+                            editorMode == LyricsEditorFormat.Enhanced
+                        ) 
+                    }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Save,
@@ -216,16 +285,17 @@ fun LyricsEditorSheet(
             Spacer(Modifier.height(GratiaTheme.spacing.mediumSmall))
 
             // ── Lyrics Status Banner ──────────────────────────────
-            val statusMessage = remember(initialEnhanced, initialSynced, initialLyrics) {
-                when {
-                    initialEnhanced -> "Enhanced word-by-word lyrics available."
-                    initialSynced -> "Enhanced word-by-word lyrics unavailable. The player is using estimated timings."
-                    initialLyrics.isNotBlank() -> "Synced lyrics unavailable. You can sync them manually."
-                    else -> "No lyrics found. Add your own below."
-                }
+            val isViewingManual = manualFormat == editorMode
+            val isViewingAuto = autoFormat == editorMode
+            
+            val statusMessage = when {
+                isViewingManual -> "You are viewing your own manual lyrics. App automatic lyrics are overridden."
+                isViewingAuto -> "You are viewing App lyrics. Any edits saved will be stored as your own manual lyrics."
+                else -> "No lyrics found for this format. Add your own below."
             }
-            val statusIcon = if (initialEnhanced) Icons.Default.CheckCircle else Icons.Default.Info
-            val statusColor = if (initialEnhanced) Color(0xFF4CAF50) else GratiaTheme.colors.textSecondary
+            
+            val statusIcon = if (isViewingManual) Icons.Default.CheckCircle else Icons.Default.Info
+            val statusColor = if (isViewingManual) Color(0xFF4CAF50) else GratiaTheme.colors.textSecondary
 
             Surface(
                 modifier = Modifier
@@ -253,8 +323,19 @@ fun LyricsEditorSheet(
                         fontFamily = Inter,
                         fontSize = 12.sp,
                         color = GratiaTheme.colors.textSecondary,
-                        lineHeight = 16.sp
+                        lineHeight = 16.sp,
+                        modifier = Modifier.weight(1f)
                     )
+                    if (isViewingManual || (activeProvider == "manual" && manualFormat != null)) {
+                        Spacer(Modifier.width(GratiaTheme.spacing.small))
+                        TextButton(
+                            onClick = { onDelete("manual") },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            modifier = Modifier.height(24.dp)
+                        ) {
+                            Text("Delete Manual", fontSize = 11.sp, color = GratiaTheme.colors.error)
+                        }
+                    }
                 }
             }
 
@@ -280,7 +361,7 @@ fun LyricsEditorSheet(
                         label = "gutterAnim"
                     ) { showGutter ->
                         if (showGutter) {
-                            val lineCount = textFieldValue.text.lines().size.coerceAtLeast(1)
+                            val lineCount = currentTextFieldValue.text.lines().size.coerceAtLeast(1)
                             Column(
                                 modifier = Modifier
                                     .width(40.dp)
@@ -310,8 +391,8 @@ fun LyricsEditorSheet(
 
                     // Main text field
                     BasicTextField(
-                        value = textFieldValue,
-                        onValueChange = { textFieldValue = it },
+                        value = currentTextFieldValue,
+                        onValueChange = onCurrentTextChanged,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
@@ -334,7 +415,7 @@ fun LyricsEditorSheet(
                         cursorBrush = SolidColor(GratiaTheme.colors.accent),
                         decorationBox = { innerTextField ->
                             Box {
-                                if (textFieldValue.text.isEmpty()) {
+                                if (currentTextFieldValue.text.isEmpty()) {
                                     Text(
                                         text = if (editorMode == LyricsEditorFormat.Enhanced)
                                             "[00:00.00] <00:00.00> Paste or type enhanced lyrics…"
@@ -368,7 +449,7 @@ fun LyricsEditorSheet(
                 // Clear button (Icon only to save space)
                 FilledIconButton(
                     onClick = {
-                        textFieldValue = TextFieldValue("")
+                        onCurrentTextChanged(TextFieldValue(""))
                     },
                     modifier = Modifier.size(40.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -400,16 +481,16 @@ fun LyricsEditorSheet(
                         if (editorMode == LyricsEditorFormat.Enhanced) {
                             FilledTonalButton(
                                 onClick = {
-                                    val cursor = textFieldValue.selection.start
-                                    val currentText = textFieldValue.text
+                                    val cursor = currentTextFieldValue.selection.start
+                                    val currentText = currentTextFieldValue.text
                                     val tag = "$enhancedTimeTag "
                                     val newText = currentText.substring(0, cursor) +
                                             tag +
                                             currentText.substring(cursor)
-                                    textFieldValue = TextFieldValue(
+                                    onCurrentTextChanged(TextFieldValue(
                                         text = newText,
                                         selection = TextRange(cursor + tag.length)
-                                    )
+                                    ))
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.filledTonalButtonColors(
@@ -435,16 +516,16 @@ fun LyricsEditorSheet(
 
                         FilledTonalButton(
                             onClick = {
-                                val cursor = textFieldValue.selection.start
-                                val currentText = textFieldValue.text
+                                val cursor = currentTextFieldValue.selection.start
+                                val currentText = currentTextFieldValue.text
                                 val tag = "$timeTag "
                                 val newText = currentText.substring(0, cursor) +
                                         tag +
                                         currentText.substring(cursor)
-                                textFieldValue = TextFieldValue(
+                                onCurrentTextChanged(TextFieldValue(
                                     text = newText,
                                     selection = TextRange(cursor + tag.length)
-                                )
+                                ))
                             },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(
@@ -470,16 +551,16 @@ fun LyricsEditorSheet(
                         // Insert Gap button
                         FilledTonalButton(
                             onClick = {
-                                val cursor = textFieldValue.selection.start
-                                val currentText = textFieldValue.text
+                                val cursor = currentTextFieldValue.selection.start
+                                val currentText = currentTextFieldValue.text
                                 val tag = "\n$timeTag \n"
                                 val newText = currentText.substring(0, cursor) +
                                         tag +
                                         currentText.substring(cursor)
-                                textFieldValue = TextFieldValue(
+                                onCurrentTextChanged(TextFieldValue(
                                     text = newText,
                                     selection = TextRange(cursor + tag.length)
-                                )
+                                ))
                             },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.filledTonalButtonColors(

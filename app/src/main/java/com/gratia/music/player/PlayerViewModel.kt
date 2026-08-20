@@ -125,16 +125,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun saveManualLyrics(text: String, isSynced: Boolean) {
-        lyricsManager.saveLyrics(text, isSynced)
+    fun saveManualLyrics(text: String, isSynced: Boolean, isWordLevel: Boolean, isActive: Boolean) {
+        lyricsManager.saveLyrics(text, isSynced, isWordLevel, isActive)
     }
 
     fun updateLyricsOffset(offsetMs: Long) {
         lyricsManager.setOffset(offsetMs)
     }
 
-    fun deleteLyrics() {
-        lyricsManager.deleteLyrics()
+    fun deleteLyrics(provider: String? = null) {
+        lyricsManager.deleteLyrics(provider)
+    }
+
+    suspend fun getAllLyricsForCurrentSong(): List<com.gratia.music.data.model.LyricsEntity> {
+        return lyricsManager.getAllLyricsForCurrentSong()
+    }
+
+    fun setActiveLyrics(provider: String) {
+        lyricsManager.setActiveLyrics(provider)
     }
 
     fun playSong(song: SongEntity, songQueue: List<SongEntity>) {

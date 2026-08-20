@@ -32,7 +32,7 @@ object LrcParser {
      * Supports multi-line lyrics where untimestamped lines following a timestamped
      * line are treated as translations/romanizations.
      */
-    fun parse(input: String): List<LyricLine> {
+    fun parse(input: String, generateEstimatedTimings: Boolean = false): List<LyricLine> {
         if (input.isBlank()) return emptyList()
 
         val rawLines = input.lines()
@@ -130,10 +130,10 @@ object LrcParser {
         return sorted.mapIndexed { i, line ->
             val nextStart = if (i < sorted.size - 1) sorted[i + 1].startMs else null
             
-            // Generate faked word timings if missing, to guarantee fluid Apple-style animations
+            // Generate faked word timings if requested and missing
             var lineWords = line.words
             val lineDuration = (nextStart ?: (line.startMs + 4000L)) - line.startMs
-            if (lineWords.isEmpty() && line.text.isNotBlank() && lineDuration > 0) {
+            if (generateEstimatedTimings && lineWords.isEmpty() && line.text.isNotBlank() && lineDuration > 0) {
                 val wordsList = line.text.split(Regex("\\s+")).filter { it.isNotBlank() }
                 if (wordsList.isNotEmpty()) {
                     val totalChars = wordsList.sumOf { it.length }

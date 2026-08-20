@@ -8,9 +8,9 @@ import androidx.room.PrimaryKey
  * Separated from SongEntity to allow independent updates, manual overrides,
  * and different providers (e.g. LRCLIB, manual edit).
  */
-@Entity(tableName = "lyrics")
+@Entity(tableName = "lyrics", primaryKeys = ["songId", "provider"])
 data class LyricsEntity(
-    @PrimaryKey val songId: String,
+    val songId: String,
     val text: String,
     val isSynced: Boolean,
     val provider: String, // e.g. "LRCLIB", "manual"
@@ -18,5 +18,6 @@ data class LyricsEntity(
     val isManuallyEdited: Boolean = false,
     val downloadDate: Long = System.currentTimeMillis(),
     val hash: String = "", // Optional hash for future validation
-    val isWordLevel: Boolean = false
+    val isWordLevel: Boolean = false,
+    val isActiveOverride: Boolean = false
 )

@@ -99,20 +99,32 @@ class LyricsManager(
         }
     }
 
-    fun saveLyrics(text: String, isSynced: Boolean) {
+    fun saveLyrics(text: String, isSynced: Boolean, isWordLevel: Boolean, isActive: Boolean) {
         val song = playerManager.currentSong.value ?: return
         scope.launch {
-            lyricsRepository.saveManualLyrics(song.id, text, isSynced)
+            lyricsRepository.saveManualLyrics(song.id, text, isSynced, isWordLevel, isActive)
             fetchLyricsForSong(song, forceRefresh = false)
         }
     }
 
-    fun deleteLyrics() {
+    fun deleteLyrics(provider: String? = null) {
         val song = playerManager.currentSong.value ?: return
         scope.launch {
-            lyricsRepository.deleteLyrics(song.id)
-            _currentLyrics.value = null
-            _error.value = "No lyrics found"
+            lyricsRepository.deleteLyrics(song.id, provider)
+            fetchLyricsForSong(song, forceRefresh = false)
+        }
+    }
+
+    suspend fun getAllLyricsForCurrentSong(): List<LyricsEntity> {
+        val song = playerManager.currentSong.value ?: return emptyList()
+        return lyricsRepository.getAllLyricsForSong(song.id)
+    }
+
+    fun setActiveLyrics(provider: String) {
+        val song = playerManager.currentSong.value ?: return
+        scope.launch {
+            lyricsRepository.setActiveLyrics(song.id, provider)
+            fetchLyricsForSong(song, forceRefresh = false)
         }
     }
 
