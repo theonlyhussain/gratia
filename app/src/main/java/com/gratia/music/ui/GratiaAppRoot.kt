@@ -330,7 +330,19 @@ fun GratiaAppRoot() {
                     SettingsScreen(
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateToSmartUpdate = { navController.navigate("smartUpdate") },
-                        onNavigateToEqualizer = { navController.navigate("equalizer") }
+                        onNavigateToEqualizer = { navController.navigate("equalizer") },
+                        onNavigateToAppearance = { navController.navigate("settings/appearance") },
+                        onNavigateToLibrary = { navController.navigate("settings/library") }
+                    )
+                }
+                composable("settings/appearance") {
+                    SettingsAppearanceScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable("settings/library") {
+                    SettingsLibraryScreen(
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable("smartUpdate") {
