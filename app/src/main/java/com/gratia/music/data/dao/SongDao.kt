@@ -48,7 +48,8 @@ interface SongDao {
                 WHEN title IS NOT NULL AND title != '' OR artist IS NOT NULL AND artist != '' THEN 1 
                 ELSE 2 
             END ASC, 
-            RANDOM() 
+            playCount ASC,
+            id ASC
         LIMIT :limit
     """)
     fun getDiscoverySongs(limit: Int = 20): Flow<List<SongEntity>>

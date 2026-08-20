@@ -31,11 +31,13 @@ fun BrowseScreen(playerViewModel: PlayerViewModel) {
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
     val discoverSongs = remember(allSongs) {
-        if (allSongs.isNotEmpty()) allSongs.shuffled().take(10) else emptyList()
+        if (allSongs.isNotEmpty()) {
+            allSongs.sortedWith(compareBy({ it.playCount }, { it.id })).take(10)
+        } else emptyList()
     }
 
     val featuredAlbums = remember(allSongs) {
-        allSongs.filter { it.album != null }.distinctBy { it.album }.shuffled().take(5)
+        allSongs.filter { it.album != null }.distinctBy { it.album }.sortedBy { it.id }.take(5)
     }
 
     if (allSongs.isEmpty()) {
