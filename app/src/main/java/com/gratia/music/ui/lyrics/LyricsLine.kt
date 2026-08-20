@@ -56,8 +56,9 @@ fun LyricsLine(
     )
 
     // Handle instrumental gap logic
-    val isInstrumental = line.words.isEmpty() ||
-            (line.words.size == 1 && line.words[0].text.trim().isEmpty())
+    // A line is ONLY instrumental if it actually contains no sung text.
+    val isInstrumental = line.text.trim().isEmpty() &&
+            (line.words.isEmpty() || (line.words.size == 1 && line.words[0].text.trim().isEmpty()))
 
     if (isInstrumental) {
         val duration = (nextLineStartMs ?: (line.startMs + 2000)) - line.startMs
@@ -85,25 +86,35 @@ fun LyricsLine(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start
         ) {
-            line.words.forEachIndexed { wordIndex, word ->
-                val durationMs = if (wordIndex < line.words.size - 1) {
-                    line.words[wordIndex + 1].startMs - word.startMs
-                } else if (nextLineStartMs != null) {
-                    nextLineStartMs - word.startMs
-                } else {
-                    500L
-                }
+            if (line.words.isNotEmpty()) {
+                line.words.forEachIndexed { wordIndex, word ->
+                    val durationMs = if (wordIndex < line.words.size - 1) {
+                        line.words[wordIndex + 1].startMs - word.startMs
+                    } else if (nextLineStartMs != null) {
+                        nextLineStartMs - word.startMs
+                    } else {
+                        500L
+                    }
 
-                AnimatedWord(
-                    word = word,
-                    durationMs = durationMs.toInt(),
-                    currentPositionProvider = currentPositionProvider
+                    AnimatedWord(
+                        word = word,
+                        durationMs = durationMs.toInt(),
+                        currentPositionProvider = currentPositionProvider
+                    )
+
+                    // Space between words
+                    if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
+                        Spacer(modifier = Modifier.width(7.dp))
+                    }
+                }
+            } else {
+                androidx.compose.material3.Text(
+                    text = line.text,
+                    fontSize = 28.sp,
+                    fontWeight = if (isActiveLine) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    lineHeight = 36.sp
                 )
-
-                // Space between words
-                if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
-                    Spacer(modifier = Modifier.width(7.dp))
-                }
             }
         }
 
