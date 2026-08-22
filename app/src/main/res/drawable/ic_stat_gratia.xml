@@ -3,7 +3,17 @@
     android:height="24dp"
     android:viewportWidth="24.0"
     android:viewportHeight="24.0">
+    <!--
+        Gratia notification icon — monochrome music note silhouette.
+        
+        Faithfully reproduces the Gratia launcher icon's distinctive music note:
+        a single eighth note with a slightly curved thick stem, a bold rounded
+        flag sweeping right, and a large oval note head.
+        
+        White fill (#FFFFFF) on transparent background, following Android's
+        notification-icon conventions (the system tints this automatically).
+    -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M12,2A10,10 0,1 0,22 12A10,10 0,0 0,12 2ZM10.5,16.5A2.5,2.5 0,1 1,13 14L13,7H17V9H15V14.5A2.5,2.5 0,0 1,10.5 16.5Z" />
+        android:pathData="M14.2,2.5 L14.2,13.2 C13.6,12.5 12.5,12.0 11.2,12.0 C8.9,12.0 7.0,13.6 7.0,15.5 C7.0,17.4 8.9,19.0 11.2,19.0 C13.5,19.0 15.4,17.4 15.4,15.5 L15.4,6.8 L19.5,5.0 L19.5,2.5 Z"/>
 </vector>

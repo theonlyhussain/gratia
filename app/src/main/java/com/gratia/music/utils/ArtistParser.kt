@@ -25,4 +25,12 @@ object ArtistParser {
             .filter { it.isNotEmpty() && it.lowercase() != "unknown" }
             .distinct()
     }
+
+    /**
+     * Determines the primary artist of a song.
+     */
+    fun getPrimaryArtist(song: com.gratia.music.data.model.SongEntity): String {
+        val parsed = parseArtists(song.artist)
+        return parsed.firstOrNull() ?: song.artist
+    }
 }

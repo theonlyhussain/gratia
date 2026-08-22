@@ -92,12 +92,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             _artistInfos.value = infoMap.toMap() // Update state incrementally
                         }
                     } else {
-                        val artists = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
-                        artists.forEach { artistName ->
-                            val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(artistName)
-                            infoMap[artistName] = info
-                            _artistInfos.value = infoMap.toMap() // Update state incrementally
-                        }
+                        val primaryArtist = com.gratia.music.utils.ArtistParser.getPrimaryArtist(song)
+                        val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(primaryArtist)
+                        infoMap[primaryArtist] = info
+                        _artistInfos.value = infoMap.toMap()
                     }
                 } else {
                     _artistInfos.value = emptyMap()

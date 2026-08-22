@@ -92,18 +92,6 @@ fun AboutTheArtistCard(
                     )
                 }
 
-                // Gradient Overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)),
-                                startY = Float.POSITIVE_INFINITY / 2f
-                            )
-                        )
-                )
-
                 // Info Section
                 Column(
                     modifier = Modifier
@@ -120,7 +108,14 @@ fun AboutTheArtistCard(
                             fontFamily = SpaceGrotesk,
                             fontWeight = FontWeight.Bold,
                             fontSize = 28.sp,
-                            color = Color.White
+                            color = Color.White,
+                            style = androidx.compose.ui.text.TextStyle(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color.Black.copy(alpha = 0.5f),
+                                    offset = androidx.compose.ui.geometry.Offset(0f, 4f),
+                                    blurRadius = 12f
+                                )
+                            )
                         )
                         if (info?.isVerified == true) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
@@ -148,7 +143,14 @@ fun AboutTheArtistCard(
                             fontFamily = Inter,
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.8f)
+                            color = Color.White.copy(alpha = 0.9f),
+                            style = androidx.compose.ui.text.TextStyle(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color.Black.copy(alpha = 0.6f),
+                                    offset = androidx.compose.ui.geometry.Offset(0f, 2f),
+                                    blurRadius = 8f
+                                )
+                            )
                         )
                         
                         // Bio snippit removed to fit horizontal card style and rely on clicking to see more.
