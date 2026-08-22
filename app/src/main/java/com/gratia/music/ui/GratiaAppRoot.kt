@@ -51,7 +51,7 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.components.liquidGlass
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
-    data object Home : Screen("home", "Home", Icons.Outlined.PlayCircleOutline, Icons.Filled.PlayCircle)
+    data object Home : Screen("home", "Home", Icons.Outlined.Home, Icons.Filled.Home)
     data object Browse : Screen("browse", "Browse", Icons.Outlined.Explore, Icons.Filled.Explore)
     data object Library : Screen("library", "Library", Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic)
     data object Search : Screen("search", "Search", Icons.Outlined.Search, Icons.Filled.Search)
@@ -140,91 +140,23 @@ fun GratiaAppRoot() {
                         MiniPlayer(playerViewModel = playerViewModel)
                     }
 
-                    // the industry standard Style Bottom Navigation
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(GratiaTheme.colors.surface.copy(alpha = 0.85f))
-                            .border(
-                                width = 0.5.dp,
-                                color = GratiaTheme.colors.textSecondary.copy(alpha = 0.2f),
-                                shape = androidx.compose.ui.graphics.RectangleShape
-                            )
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                    ) {
-                        val navIndex = bottomNavItems.indexOfFirst { screen ->
-                            currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                        }.coerceAtLeast(0)
+                    val navIndex = bottomNavItems.indexOfFirst { screen ->
+                        currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                    }.coerceAtLeast(0)
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            bottomNavItems.forEachIndexed { index, screen ->
-                                val selected = index == navIndex
-                                val interactionSource = remember { MutableInteractionSource() }
-                                val isPressed by interactionSource.collectIsPressedAsState()
-                                val scale by androidx.compose.animation.core.animateFloatAsState(
-                                    targetValue = if (isPressed) 0.85f else 1.0f,
-                                    animationSpec = androidx.compose.animation.core.spring(
-                                        dampingRatio = 0.5f,
-                                        stiffness = 600f
-                                    ),
-                                    label = "navScale"
-                                )
-                                Column(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .scale(scale)
-                                        .clickable(
-                                            interactionSource = interactionSource,
-                                            indication = null, // Apple has no ripple
-                                            onClick = {
-                                                navController.navigate(screen.route) {
-                                                    popUpTo(navController.graph.findStartDestination().id) {
-                                                        saveState = true
-                                                    }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            }
-                                        ),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    val iconTint by androidx.compose.animation.animateColorAsState(
-                                        targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
-                                        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
-                                        label = "iconTint"
-                                    )
-                                    val textTint by androidx.compose.animation.animateColorAsState(
-                                        targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.textSecondary,
-                                        animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
-                                        label = "textTint"
-                                    )
-                                    Icon(
-                                        imageVector = if (selected) screen.selectedIcon else screen.icon,
-                                        contentDescription = screen.label,
-                                        modifier = Modifier.size(26.dp),
-                                        tint = iconTint
-                                    )
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = screen.label,
-                                        fontSize = 10.sp,
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Default,
-                                        fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Medium else androidx.compose.ui.text.font.FontWeight.Normal,
-                                        color = textTint,
-                                        maxLines = 1
-                                    )
+                    com.gratia.music.ui.components.GratiaNavigationBar(
+                        items = bottomNavItems,
+                        selectedIndex = navIndex,
+                        onItemSelected = { screen ->
+                            navController.navigate(screen.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
                                 }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         }
-                    }
+                    )
                 }
             }
         ) { innerPadding ->

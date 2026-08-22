@@ -72,7 +72,7 @@ fun HomeScreen(
 
     // Determine Top Song for Recommendation
     var recommendedSong by remember { mutableStateOf<SongEntity?>(null) }
-    LaunchedEffect(allSongs) {
+    LaunchedEffect(allSongs.size / 50, mostPlayed, recentlyPlayed) {
         if (allSongs.isNotEmpty()) {
             recommendedSong = GratiaApp.instance.recommendationManager.getRecommendedSong(allSongs)
         }

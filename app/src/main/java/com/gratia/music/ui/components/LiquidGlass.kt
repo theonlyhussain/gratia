@@ -18,18 +18,25 @@ import androidx.compose.ui.unit.dp
  */
 fun Modifier.liquidGlass(
     shape: Shape = RoundedCornerShape(16.dp),
-    backgroundColor: Color = Color.White.copy(alpha = 0.05f),
-    borderColorStart: Color = Color.White.copy(alpha = 0.15f),
-    borderColorEnd: Color = Color.White.copy(alpha = 0.02f),
+    backgroundColor: Color? = null,
+    borderColorStart: Color? = null,
+    borderColorEnd: Color? = null,
     borderWidth: Dp = 1.dp
 ): Modifier = composed {
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val baseColor = if (isDark) Color.White else Color.Black
+    
+    val finalBgColor = backgroundColor ?: baseColor.copy(alpha = if (isDark) 0.05f else 0.08f)
+    val finalBorderStart = borderColorStart ?: baseColor.copy(alpha = if (isDark) 0.15f else 0.20f)
+    val finalBorderEnd = borderColorEnd ?: baseColor.copy(alpha = if (isDark) 0.02f else 0.05f)
+
     this
         .clip(shape)
-        .background(backgroundColor)
+        .background(finalBgColor)
         .border(
             width = borderWidth,
             brush = Brush.linearGradient(
-                colors = listOf(borderColorStart, borderColorEnd)
+                colors = listOf(finalBorderStart, finalBorderEnd)
             ),
             shape = shape
         )

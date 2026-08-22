@@ -429,7 +429,6 @@ fun ExpandedPlayer(
                     trackCredits = trackCredits,
                     audioFormat = playerViewModel.audioFormat.collectAsState().value,
                     screenHeight = screenHeight,
-                    peekOffsetX = peekOffsetX.value,
                     onSeek = { newProgress ->
                         playerViewModel.seekTo((newProgress * durationMs).toLong())
                     },
@@ -486,34 +485,6 @@ fun ExpandedPlayer(
                         showBiographySheet = true
                     },
                     onShowAllCredits = { showCreditsSheet = true },
-                    onHorizontalDrag = { delta ->
-                        scope.launch { peekOffsetX.snapTo(peekOffsetX.value + delta) }
-                        peekVelocity = delta
-                    },
-                    onHorizontalDragEnd = {
-                        scope.launch {
-                            val threshold = screenWidthPx * 0.3f
-                            val fastSwipe = abs(peekVelocity) > 8f
-                            when {
-                                peekOffsetX.value < -threshold || (peekOffsetX.value < -50f && fastSwipe && peekVelocity < 0) -> {
-                                    // Swiped left → next song
-                                    peekOffsetX.animateTo(-screenWidthPx, animationSpec = tween(200))
-                                    playerViewModel.nextSong()
-                                    peekOffsetX.snapTo(0f)
-                                }
-                                peekOffsetX.value > threshold || (peekOffsetX.value > 50f && fastSwipe && peekVelocity > 0) -> {
-                                    // Swiped right → previous song
-                                    peekOffsetX.animateTo(screenWidthPx, animationSpec = tween(200))
-                                    playerViewModel.prevSong()
-                                    peekOffsetX.snapTo(0f)
-                                }
-                                else -> {
-                                    // Spring back
-                                    peekOffsetX.animateTo(0f, animationSpec = motion.springStiff())
-                                }
-                            }
-                        }
-                    },
                     playerViewModel = playerViewModel
                 )
             }
@@ -802,7 +773,6 @@ private fun NormalModeContent(
     trackCredits: List<com.gratia.music.data.repository.ContributorInfo>,
     audioFormat: com.gratia.music.player.AudioFormatInfo?,
     screenHeight: androidx.compose.ui.unit.Dp,
-    peekOffsetX: Float,
     onSeek: (Float) -> Unit,
     onDragStart: () -> Unit,
     onDragEnd: () -> Unit,
@@ -820,8 +790,6 @@ private fun NormalModeContent(
     onArtistClick: (String) -> Unit,
     onSeeMoreArtist: (String) -> Unit,
     onShowAllCredits: () -> Unit,
-    onHorizontalDrag: (Float) -> Unit,
-    onHorizontalDragEnd: () -> Unit,
     playerViewModel: PlayerViewModel
 ) {
     val scrollState = rememberScrollState()
@@ -837,36 +805,79 @@ private fun NormalModeContent(
                 .fillMaxWidth()
                 .height(screenHeight)
         ) {
-            // --- Hero Artwork area with horizontal peek gesture ---
+            // --- Hero Artwork area with HorizontalPager ---
+            val queue by playerViewModel.queue.collectAsState()
+            val currentIndex = remember(queue, song.id) {
+                queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+            }
+            
+            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+                initialPage = currentIndex,
+                pageCount = { queue.size.coerceAtLeast(1) }
+            )
+
+            // Sync Player -> Pager (when song changes externally)
+            LaunchedEffect(currentIndex, queue.size) {
+                if (currentIndex != pagerState.currentPage && currentIndex in queue.indices) {
+                    pagerState.animateScrollToPage(
+                        page = currentIndex,
+                        animationSpec = tween(300)
+                    )
+                }
+            }
+
+            // Sync Pager -> Player (when user commits a swipe)
+            LaunchedEffect(pagerState) {
+                snapshotFlow { Pair(pagerState.currentPage, pagerState.isScrollInProgress) }
+                    .collect { (page, isScrolling) ->
+                        if (!isScrolling) {
+                            val actualCurrentIndex = queue.indexOfFirst { it.id == song.id }
+                            if (actualCurrentIndex != -1 && page != actualCurrentIndex && page in queue.indices) {
+                                playerViewModel.playFromQueue(page)
+                            }
+                        }
+                    }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = { onHorizontalDragEnd() },
-                            onDragCancel = { onHorizontalDragEnd() },
-                            onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
-                                onHorizontalDrag(dragAmount)
+            ) {
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 32.dp),
+                    pageSpacing = 16.dp
+                ) { page ->
+                    val pageSong = queue.getOrNull(page) ?: song
+                    val isCurrentPage = page == pagerState.currentPage
+                    
+                    val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                    val scale by animateFloatAsState(
+                        targetValue = if (isCurrentPage) 1.0f else 0.85f - (kotlin.math.abs(pageOffset) * 0.05f).coerceAtMost(0.15f),
+                        animationSpec = GratiaTheme.motion.springStandard(),
+                        label = "pagerScale"
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
                             }
+                    ) {
+                        Spacer(Modifier.statusBarsPadding())
+                        ArtworkView(
+                            coverArtPath = pageSong.coverArtPath,
+                            title = pageSong.title,
+                            artist = pageSong.artist,
+                            isPlaying = isCurrentPage && isPlaying,
+                            glowColor = if (isCurrentPage) coverColors.dominant else androidx.compose.ui.graphics.Color.Transparent,
+                            isDragging = isDragging
                         )
                     }
-            ) {
-                Column(
-                    modifier = Modifier.graphicsLayer {
-                        translationX = peekOffsetX
-                    }
-                ) {
-                    Spacer(Modifier.statusBarsPadding())
-                    ArtworkView(
-                        coverArtPath = song.coverArtPath,
-                        title = song.title,
-                        artist = song.artist,
-                        isPlaying = isPlaying,
-                        glowColor = coverColors.dominant,
-                        isDragging = isDragging
-                    )
                 }
             }
 

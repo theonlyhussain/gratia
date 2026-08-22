@@ -21,7 +21,10 @@ class RecommendationManager(
 
         // We only want to consider songs that the user has interacted with or are fully known metadata
         val candidates = allSongs.filter { it.playCount > 0 || (it.artist != "<unknown>" && it.artist.isNotBlank()) }
-        if (candidates.isEmpty()) return@withContext allSongs.randomOrNull()
+        if (candidates.isEmpty()) {
+            val dayStr = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toString()
+            return@withContext allSongs.maxByOrNull { (dayStr + it.id).hashCode() }
+        }
 
         var bestScore = -Float.MAX_VALUE
         var bestSong: SongEntity? = null
@@ -49,8 +52,10 @@ class RecommendationManager(
                 artistScores[song.artist] ?: 0f
             } else 0f
             
-            // Exploration: small random boost to prevent being permanently stuck
-            val randomExplorationBoost = (Math.random() * 5.0).toFloat()
+            // Exploration: small deterministic boost to prevent being permanently stuck
+            val dayStr = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toString()
+            val seed = (dayStr + song.id).hashCode()
+            val randomExplorationBoost = (kotlin.math.abs(seed) % 50) / 10f
             
             val finalScore = rawScore + (artistAffinity * 0.2f) + randomExplorationBoost
             
@@ -60,7 +65,11 @@ class RecommendationManager(
             }
         }
 
-        return@withContext bestSong ?: allSongs.randomOrNull()
+        if (bestSong == null) {
+            val dayStr = (System.currentTimeMillis() / (1000L * 60 * 60 * 24)).toString()
+            return@withContext allSongs.maxByOrNull { (dayStr + it.id).hashCode() }
+        }
+        return@withContext bestSong
     }
 
     private fun calculateScore(song: SongEntity, now: Long): Float {
