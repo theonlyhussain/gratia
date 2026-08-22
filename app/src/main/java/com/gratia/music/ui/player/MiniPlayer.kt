@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -142,14 +143,14 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     }
                 )
             },
-        shape = GratiaTheme.shapes.extraLarge,
-        backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.92f),
+        shape = androidx.compose.foundation.shape.CircleShape,
+        backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.95f),
         glowColor = coverColors.dominant,
-        elevation = 8.dp, // GDL standard? GratiaTheme.elevation.low? Let's use 8dp as base
+        elevation = 12.dp,
         borderColorStart = if (GratiaTheme.colors.isDark) {
-            Color.White.copy(alpha = 0.08f)
+            Color.White.copy(alpha = 0.1f)
         } else {
-            Color.White.copy(alpha = 0.4f)
+            Color.Black.copy(alpha = 0.05f)
         },
         borderColorEnd = Color.Transparent
     ) {
@@ -168,8 +169,8 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                         coverArtPath = song.coverArtPath,
                         title = song.title,
                         artist = song.artist,
-                        size = GratiaTheme.spacing.heroSmall, // ~48dp
-                        cornerRadius = 10.dp, // Or GratiaTheme.shapes.small equivalent
+                        size = 44.dp,
+                        cornerRadius = 22.dp, // Circle
                         fontSize = 12.sp
                     )
                     
@@ -216,30 +217,35 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     )
                 }
 
-                // Play/Pause — fast 120ms crossfade for 120Hz responsiveness
+                // Play/Pause - Redesigned Circular Button
                 Box(
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(GratiaTheme.colors.textPrimary.copy(alpha = 0.05f), androidx.compose.foundation.shape.CircleShape)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = androidx.compose.foundation.LocalIndication.current,
+                            onClick = {
+                                haptics.light(view)
+                                playerViewModel.togglePlay()
+                            }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     AnimatedContent(
                         targetState = isPlaying,
                         transitionSpec = {
-                            (fadeIn(animationSpec = tween(120)) + 
-                             scaleIn(animationSpec = tween(120), initialScale = 0.85f)) togetherWith
-                            (fadeOut(animationSpec = tween(100)) + 
-                             scaleOut(animationSpec = tween(100), targetScale = 0.85f))
+                            (scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f)) + fadeIn(tween(150))) togetherWith
+                            (scaleOut(animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f)) + fadeOut(tween(150)))
                         },
                         label = "miniPlayPause"
                     ) { playing ->
-                        GratiaIconButton(
-                            icon = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        androidx.compose.material3.Icon(
+                            imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (playing) "Pause" else "Play",
-                            onClick = {
-                                haptics.light(view)
-                                playerViewModel.togglePlay()
-                            },
                             tint = GratiaTheme.colors.textPrimary,
-                            size = GratiaTheme.icons.normal
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }

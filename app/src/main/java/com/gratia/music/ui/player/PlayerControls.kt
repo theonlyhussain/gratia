@@ -24,9 +24,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -72,7 +73,7 @@ fun PlayerControls(
     ) {
         // Previous
         PlayerButton(
-            icon = Icons.Default.SkipPrevious,
+            icon = Icons.Rounded.FastRewind,
             onClick = onPrevious,
             contentDescription = "Previous",
             size = GratiaTheme.spacing.heroMedium, // 56dp
@@ -94,7 +95,7 @@ fun PlayerControls(
 
         // Next
         PlayerButton(
-            icon = Icons.Default.SkipNext,
+            icon = Icons.Rounded.FastForward,
             onClick = onNext,
             contentDescription = "Next",
             size = GratiaTheme.spacing.heroMedium,
@@ -156,7 +157,7 @@ private fun PlayPauseButton(
             label = "playPauseIcon"
         ) { playing ->
             GratiaIcon(
-                imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                 contentDescription = if (playing) "Pause" else "Play",
                 tint = Color.White,
                 size = 48.dp

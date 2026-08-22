@@ -847,8 +847,8 @@ private fun NormalModeContent(
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 32.dp),
-                    pageSpacing = 16.dp
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    pageSpacing = 12.dp
                 ) { page ->
                     val pageSong = queue.getOrNull(page) ?: song
                     val isCurrentPage = page == pagerState.currentPage
