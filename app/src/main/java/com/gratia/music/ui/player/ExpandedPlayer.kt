@@ -180,7 +180,8 @@ fun ExpandedPlayer(
     var selectedBioArtist by remember { mutableStateOf("") }
     
     // --- Multiple Artists state ---
-    // Removed (direct navigation to primary artist)
+    var showMultipleArtistSelector by remember { mutableStateOf(false) }
+    var multipleArtistsList by remember { mutableStateOf<List<String>>(emptyList()) }
 
     // --- Content mode state ---
     var contentMode by remember { mutableStateOf(PlayerContentMode.Normal) }
@@ -237,7 +238,7 @@ fun ExpandedPlayer(
 
     val isAnyOverlayOpen = showBiographySheet || showCreditsSheet || showSongMenu ||
             showLyricsEditor || showDeviceSelector || showAddToPlaylist ||
-            showDeleteConfirm || showSongInfo
+            showDeleteConfirm || showSongInfo || showMultipleArtistSelector
 
     // Intercept back button for ALL overlays + content modes + normal closing
     androidx.activity.compose.BackHandler(enabled = true) {
@@ -250,7 +251,7 @@ fun ExpandedPlayer(
             showAddToPlaylist -> showAddToPlaylist = false
             showDeleteConfirm -> showDeleteConfirm = false
             showSongInfo -> showSongInfo = false
-            // removed showMultipleArtistSelector
+            showMultipleArtistSelector -> showMultipleArtistSelector = false
             contentMode != PlayerContentMode.Normal -> {
                 contentMode = PlayerContentMode.Normal
             }
@@ -444,9 +445,14 @@ fun ExpandedPlayer(
                     onMoreClick = { showSongMenu = true },
                     onClickTitle = { showSongInfo = true },
                     onClickArtist = {
-                        val primaryArtist = com.gratia.music.utils.ArtistParser.getPrimaryArtist(song)
-                        onDismiss()
-                        onNavigateToArtist(primaryArtist)
+                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                        if (parsed.size > 1) {
+                            multipleArtistsList = parsed
+                            showMultipleArtistSelector = true
+                        } else {
+                            onDismiss()
+                            onNavigateToArtist(parsed.firstOrNull() ?: song.artist)
+                        }
                     },
                     onClickAlbum = {
                         if (!song.album.isNullOrBlank()) {
@@ -465,10 +471,8 @@ fun ExpandedPlayer(
                         contentMode = PlayerContentMode.Queue
                     },
                     onArtistClick = { artistName ->
-                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(artistName)
-                        val primary = parsed.firstOrNull() ?: artistName
                         onDismiss()
-                        onNavigateToArtist(primary)
+                        onNavigateToArtist(artistName)
                     },
                     onSeeMoreArtist = { artistName ->
                         selectedBioArtist = artistName
@@ -591,8 +595,15 @@ fun ExpandedPlayer(
                     }
                 },
                 onGoToArtist = {
-                    onDismiss()
-                    onNavigateToArtist(song.artist)
+                    val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                    if (parsed.size > 1) {
+                        showSongMenu = false
+                        multipleArtistsList = parsed
+                        showMultipleArtistSelector = true
+                    } else {
+                        onDismiss()
+                        onNavigateToArtist(parsed.firstOrNull() ?: song.artist)
+                    }
                 },
                 hasLyrics = currentLyrics != null,
                 onEditLyrics = {
@@ -679,15 +690,18 @@ fun ExpandedPlayer(
             )
         }
 
-        if (showDeviceSelector) {
-            com.gratia.music.ui.components.DeviceSelectorSheet(
-                songTitle = song.title,
-                artistName = song.artist,
-                onDismissRequest = { showDeviceSelector = false }
+        // --- Multiple Artist Selector ---
+        if (showMultipleArtistSelector) {
+            com.gratia.music.ui.components.MultipleArtistSelectorSheet(
+                artists = multipleArtistsList,
+                onArtistClick = { artistName ->
+                    showMultipleArtistSelector = false
+                    onDismiss()
+                    onNavigateToArtist(artistName)
+                },
+                onDismissRequest = { showMultipleArtistSelector = false }
             )
         }
-
-        // --- Multiple Artist Selector (Removed) ---
 
         // --- Lyrics Editor Sheet (opened directly from three-dot menu) ---
         if (showLyricsEditor) {

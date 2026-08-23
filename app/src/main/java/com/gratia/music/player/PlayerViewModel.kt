@@ -79,23 +79,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (song != null) {
                     _artistInfos.value = emptyMap() // Clear old ones
                     _trackCredits.value = emptyList() // Clear old credits
-                    
+
+                    val artists = com.gratia.music.utils.ArtistParser.parseArtists(song.artist).ifEmpty { listOf(song.artist) }
+                    val infoMap = LinkedHashMap<String, com.gratia.music.data.repository.ArtistInfo?>()
+                    artists.forEach { artistName ->
+                        infoMap[artistName] = null
+                    }
+                    _artistInfos.value = LinkedHashMap(infoMap)
+
                     val contributors = com.gratia.music.data.repository.ArtistInfoRepository.getTrackContributors(song.title, song.artist)
                     _trackCredits.value = contributors
 
-                    val infoMap = mutableMapOf<String, com.gratia.music.data.repository.ArtistInfo?>()
-
-                    if (contributors.isNotEmpty()) {
-                        contributors.forEach { contributor ->
-                            val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(contributor.name)
-                            infoMap[contributor.name] = info
-                            _artistInfos.value = infoMap.toMap() // Update state incrementally
-                        }
-                    } else {
-                        val primaryArtist = com.gratia.music.utils.ArtistParser.getPrimaryArtist(song)
-                        val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(primaryArtist)
-                        infoMap[primaryArtist] = info
-                        _artistInfos.value = infoMap.toMap()
+                    artists.forEach { artistName ->
+                        val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(artistName)
+                        infoMap[artistName] = info
+                        _artistInfos.value = LinkedHashMap(infoMap) // Update state incrementally preserving order
                     }
                 } else {
                     _artistInfos.value = emptyMap()

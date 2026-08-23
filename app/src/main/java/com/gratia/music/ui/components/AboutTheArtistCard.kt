@@ -100,6 +100,7 @@ fun AboutTheArtistCard(
                         .padding(24.dp)
                 ) {
                     Row(
+                        modifier = Modifier.clickable { onArtistClick(artistName) },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {

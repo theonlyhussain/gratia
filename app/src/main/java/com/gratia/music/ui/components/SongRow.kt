@@ -55,6 +55,8 @@ fun SongRow(
     var showInfo by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showMultipleArtistSelector by remember { mutableStateOf(false) }
+    var multipleArtistsList by remember { mutableStateOf<List<String>>(emptyList()) }
 
     val navController = com.gratia.music.ui.LocalNavController.current
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -146,7 +148,15 @@ fun SongRow(
                     style = GratiaTheme.typography.caption,
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
-                    modifier = Modifier.clickable { navController.navigate("artist/${android.net.Uri.encode(song.artist)}") }
+                    modifier = Modifier.clickable {
+                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                        if (parsed.size > 1) {
+                            multipleArtistsList = parsed
+                            showMultipleArtistSelector = true
+                        } else {
+                            navController.navigate("artist/${android.net.Uri.encode(parsed.firstOrNull() ?: song.artist)}")
+                        }
+                    }
                 )
             }
             // Badge (e.g., "Lyrics match")
@@ -217,7 +227,16 @@ fun SongRow(
             onGoToAlbum = { 
                 if (!song.album.isNullOrBlank()) navController.navigate("album/${android.net.Uri.encode(song.album)}")
             },
-            onGoToArtist = { navController.navigate("artist/${android.net.Uri.encode(song.artist)}") },
+            onGoToArtist = {
+                val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                if (parsed.size > 1) {
+                    showMenu = false
+                    multipleArtistsList = parsed
+                    showMultipleArtistSelector = true
+                } else {
+                    navController.navigate("artist/${android.net.Uri.encode(parsed.firstOrNull() ?: song.artist)}")
+                }
+            },
             onEditLyrics = {
                 navController.navigate("fullLyrics/${song.id}")
             },
@@ -299,6 +318,17 @@ fun SongRow(
                 }
             },
             containerColor = GratiaTheme.colors.surface
+        )
+    }
+
+    if (showMultipleArtistSelector) {
+        MultipleArtistSelectorSheet(
+            artists = multipleArtistsList,
+            onArtistClick = { artistName ->
+                showMultipleArtistSelector = false
+                navController.navigate("artist/${android.net.Uri.encode(artistName)}")
+            },
+            onDismissRequest = { showMultipleArtistSelector = false }
         )
     }
 }
