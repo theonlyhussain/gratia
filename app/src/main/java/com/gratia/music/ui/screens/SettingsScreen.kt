@@ -131,7 +131,7 @@ private fun SettingsSectionCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(GratiaTheme.colors.surface),
         content = content
     )

@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,7 @@ import com.gratia.music.data.SettingsDataStore
 import com.gratia.music.data.ThemeOption
 import com.gratia.music.ui.components.AppleLargeTitleHeader
 import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.clickableWithScale
 import com.gratia.music.ui.theme.GratiaTheme
 import kotlinx.coroutines.launch
 
@@ -93,26 +95,22 @@ fun SettingsAppearanceScreen(
                     onClick = { scope.launch { settingsDataStore.setThemeOption(ThemeOption.DARK) } }
                 )
 
-                // OLED toggle — visible whenever dark mode is actually active
-                AnimatedVisibility(
-                    visible = isDarkActive,
-                    enter = expandVertically(),
-                    exit = shrinkVertically()
-                ) {
-                    Column {
-                        AppearanceDivider()
-                        Row(
+                // OLED toggle
+                Column {
+                    AppearanceDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = isDarkActive) {
+                                scope.launch { settingsDataStore.setOledThemeEnabled(!oledThemeEnabled) }
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                            .graphicsLayer { alpha = if (isDarkActive) 1f else 0.5f },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    scope.launch { settingsDataStore.setOledThemeEnabled(!oledThemeEnabled) }
-                                }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
+                                .size(32.dp)
                                     .clip(RoundedCornerShape(7.dp))
                                     .background(Color.Black)
                                     .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(7.dp)),
@@ -155,7 +153,6 @@ fun SettingsAppearanceScreen(
                         }
                     }
                 }
-            }
             Spacer(Modifier.height(20.dp))
         }
 
@@ -237,7 +234,7 @@ private fun AppearanceSectionCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(GratiaTheme.colors.surface),
         content = content
     )
@@ -254,7 +251,7 @@ private fun ThemeRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickableWithScale(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
