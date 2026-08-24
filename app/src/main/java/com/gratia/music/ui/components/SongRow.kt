@@ -117,9 +117,7 @@ fun SongRow(
         Spacer(Modifier.width(12.dp))
 
         // Cover art image
-        Box(modifier = Modifier
-            .clickable { playerViewModel.setExpandedPlayerOpen(true) }
-        ) {
+        Box {
             CoverArtImage(
                 coverArtPath = song.coverArtPath,
                 title = song.title,

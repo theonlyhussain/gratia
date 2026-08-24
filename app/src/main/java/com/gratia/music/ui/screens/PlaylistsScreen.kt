@@ -43,6 +43,7 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
+            .statusBarsPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             GratiaText(

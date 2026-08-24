@@ -32,6 +32,7 @@ fun GenreDetailScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
+            .statusBarsPadding()
     ) {
         AppleLargeTitleHeader(
             title = genre,

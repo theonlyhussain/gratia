@@ -37,10 +37,11 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
     val view = androidx.compose.ui.platform.LocalView.current
     val haptics = GratiaTheme.haptics
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
+            .statusBarsPadding()
     ) {
         if (favorites.isEmpty()) {
             EmptyStateView(

@@ -176,9 +176,38 @@ fun GratiaTheme(
         LocalGratiaIcons provides GratiaIcons(),
         LocalGratiaHaptics provides GratiaHaptics()
     ) {
-        // We still provide MaterialTheme for standard components that rely on it (like Dialogs)
+        // Inject GratiaColors into the standard MaterialTheme so native M3 components (like FAB, Switch, Slider) 
+        // automatically inherit the dynamic global accent and background colors without manual overrides.
+        val m3ColorScheme = if (isDark) {
+            androidx.compose.material3.darkColorScheme(
+                primary = animatedColors.accent,
+                primaryContainer = animatedColors.accentGlow,
+                onPrimary = androidx.compose.ui.graphics.Color.White,
+                background = animatedColors.background,
+                surface = animatedColors.surface,
+                onBackground = animatedColors.textPrimary,
+                onSurface = animatedColors.textPrimary,
+                onSurfaceVariant = animatedColors.textSecondary,
+                surfaceVariant = animatedColors.surfaceHover,
+                error = animatedColors.error
+            )
+        } else {
+            androidx.compose.material3.lightColorScheme(
+                primary = animatedColors.accent,
+                primaryContainer = animatedColors.accentGlow,
+                onPrimary = androidx.compose.ui.graphics.Color.White,
+                background = animatedColors.background,
+                surface = animatedColors.surface,
+                onBackground = animatedColors.textPrimary,
+                onSurface = animatedColors.textPrimary,
+                onSurfaceVariant = animatedColors.textSecondary,
+                surfaceVariant = animatedColors.surfaceHover,
+                error = animatedColors.error
+            )
+        }
+
         MaterialTheme(
-            colorScheme = if (isDark) androidx.compose.material3.darkColorScheme() else androidx.compose.material3.lightColorScheme(),
+            colorScheme = m3ColorScheme,
             content = content
         )
     }

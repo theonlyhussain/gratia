@@ -4,8 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,36 +13,35 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.ArtistRepository
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
-import com.gratia.music.ui.components.*
+import com.gratia.music.ui.components.GratiaText
 import com.gratia.music.ui.theme.GratiaTheme
-import kotlinx.coroutines.Dispatchers
+import com.gratia.music.ui.theme.ScallopedStarShape
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,83 +52,38 @@ fun ArtistDetailScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
+    
     val artistRepo = remember { ArtistRepository(GratiaApp.instance.database.artistDao()) }
-
-    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
-    val artistSongs = remember(allSongs, artistName) {
-        allSongs.filter { com.gratia.music.utils.ArtistParser.parseArtists(it.artist).contains(artistName) }
-            .sortedBy { it.title }
-    }
-
-    // Group songs by album
-    data class AlbumGroup(
-        val albumName: String,
-        val year: String?,
-        val coverArtPath: String?,
-        val songs: List<SongEntity>
-    )
-
-    val albumGroups = remember(artistSongs) {
-        artistSongs.groupBy { it.album ?: "Singles" }
-            .map { (albumName, songs) ->
-                AlbumGroup(
-                    albumName = albumName,
-                    year = songs.firstOrNull()?.releaseDate?.take(4),
-                    coverArtPath = songs.firstOrNull()?.coverArtPath,
-                    songs = songs.sortedBy { it.trackNumber ?: 0 }
-                )
-            }
-            .sortedBy { it.albumName }
-    }
-
-    // Track which albums are expanded
-    val expandedAlbums = remember { mutableStateMapOf<String, Boolean>() }
-
-    val currentSong by playerViewModel.currentSong.collectAsState()
-    val isPlaying by playerViewModel.isPlaying.collectAsState()
-
+    val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
+    
     val artistEntity by artistRepo.getArtistFlow(artistName).collectAsState(initial = null)
+    
+    var artistSongs by remember { mutableStateOf<List<SongEntity>>(emptyList()) }
+    LaunchedEffect(artistName) {
+        songRepo.getAllSongs().collect { allSongs ->
+            artistSongs = allSongs.filter { it.artist.contains(artistName, ignoreCase = true) }
+        }
+    }
 
-    // Resolve display image: Custom local path overrides Deezer URL
-    val displayImagePath = artistEntity?.localPicturePath ?: artistEntity?.pictureUrl
+    // Determine the image to use (custom overrides default)
+    val displayImage = artistEntity?.localPicturePath ?: artistEntity?.pictureUrl
 
-    var isEditing by remember { mutableStateOf(false) }
     var showEditSheet by remember { mutableStateOf(false) }
-
+    
     val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        scope.launch {
-            withContext(Dispatchers.IO) {
-                val timestamp = System.currentTimeMillis()
-                val file = File(context.filesDir, "artist_img_${artistName}_$timestamp.jpg")
-                try {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        file.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    }
-                    val currentDbImage = artistEntity?.localPicturePath
-                    if (currentDbImage != null && File(currentDbImage).exists()) {
-                        File(currentDbImage).delete()
-                    }
-                    artistRepo.updateCustomImage(artistName, file.absolutePath)
-                } catch (_: Exception) {}
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                artistRepo.updateCustomImage(artistName, uri.toString())
             }
         }
         showEditSheet = false
-        isEditing = false
     }
 
-    // Bottom sheet for editing artist photo
     if (showEditSheet) {
         ModalBottomSheet(
-            onDismissRequest = {
-                showEditSheet = false
-                isEditing = false
-            },
+            onDismissRequest = { showEditSheet = false },
             containerColor = GratiaTheme.colors.surface,
             dragHandle = { BottomSheetDefaults.DragHandle(color = GratiaTheme.colors.textSecondary) }
         ) {
@@ -149,16 +102,15 @@ fun ArtistDetailScreen(
 
                 ListItem(
                     headlineContent = { Text("Change Photo", color = GratiaTheme.colors.textPrimary) },
-                    modifier = Modifier.clickable { photoPicker.launch(arrayOf("image/*")) },
+                    modifier = Modifier.clickable { photoPicker.launch("image/*") },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
 
                 ListItem(
-                    headlineContent = { Text("Fetch Artist Image", color = GratiaTheme.colors.textPrimary) },
+                    headlineContent = { Text("Reset to default", color = GratiaTheme.colors.error) },
                     modifier = Modifier.clickable {
                         scope.launch { artistRepo.resetToDefaultImage(artistName) }
                         showEditSheet = false
-                        isEditing = false
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
@@ -171,258 +123,286 @@ fun ArtistDetailScreen(
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
     ) {
+        // Background Blur
+        if (displayImage != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(displayImage)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp)
+                    .blur(60.dp)
+            )
+            // Gradient overlay to blend blur into background
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(400.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                GratiaTheme.colors.background.copy(alpha = 0.3f),
+                                GratiaTheme.colors.background.copy(alpha = 0.8f),
+                                GratiaTheme.colors.background
+                            )
+                        )
+                    )
+            )
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
         ) {
-            // ── HERO IMAGE HEADER ──
             item {
-                Box(
+                Spacer(Modifier.statusBarsPadding())
+                
+                // Top Bar
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Full-bleed artist image
-                    if (displayImagePath != null) {
-                        val model = if (displayImagePath.startsWith("/")) File(displayImagePath) else displayImagePath
-                        coil.compose.AsyncImage(
-                            model = model,
-                            contentDescription = artistName,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        // Fallback: gradient placeholder with initials
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            GratiaTheme.colors.accent.copy(alpha = 0.4f),
-                                            GratiaTheme.colors.surfaceHover
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = artistName.take(2).uppercase(),
-                                style = GratiaTheme.typography.display.copy(fontSize = 72.sp),
-                                color = Color.White.copy(alpha = 0.5f)
-                            )
-                        }
-                    }
-
-                    // Scrim gradient at bottom for text readability
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.6f)
-                                    )
-                                )
-                            )
-                    )
-
-                    // Back button (top-left)
-                    GratiaIconButton(
-                        icon = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                    IconButton(
                         onClick = onBack,
                         modifier = Modifier
-                            .statusBarsPadding()
-                            .padding(start = 16.dp, top = 8.dp)
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.3f))
-                            .align(Alignment.TopStart),
-                        tint = Color.White
-                    )
-
-                    // Edit button (top-right)
-                    GratiaEditAffordance(
-                        isEditing = isEditing,
-                        onToggle = {
-                            isEditing = !isEditing
-                            if (isEditing) {
-                                showEditSheet = true
-                            }
-                        },
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .padding(end = 16.dp, top = 8.dp)
-                            .align(Alignment.TopEnd)
-                    )
-
-                    // Artist name + song count overlaid at bottom-left
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(start = 20.dp, bottom = 16.dp)
+                            .background(Color.White.copy(alpha = 0.2f))
                     ) {
-                        Text(
-                            text = artistName,
-                            style = GratiaTheme.typography.largeTitle.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 32.sp
-                            ),
-                            color = Color.White
-                        )
-                        Text(
-                            text = "${artistSongs.size} Songs",
-                            style = GratiaTheme.typography.caption,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
-
-                    // Shuffle button at bottom-right
                     IconButton(
-                        onClick = {
-                            if (artistSongs.isNotEmpty()) {
-                                val shuffled = artistSongs.shuffled()
-                                playerViewModel.playSong(shuffled.first(), shuffled)
-                            }
-                        },
+                        onClick = { showEditSheet = true },
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 12.dp)
-                            .size(52.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(GratiaTheme.colors.accent.copy(alpha = 0.85f))
+                            .background(Color.White.copy(alpha = 0.2f))
                     ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = "Shuffle Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
-                        )
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                     }
                 }
             }
 
-            // ── ALBUM GROUPS ──
-            albumGroups.forEach { albumGroup ->
-                val isExpanded = expandedAlbums[albumGroup.albumName] ?: false
-
-                // Album header row
-                item(key = "album_header_${albumGroup.albumName}") {
-                    Row(
+            // ── HERO ──
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // Circular Hero Image
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(displayImage)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Artist Image",
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                expandedAlbums[albumGroup.albumName] = !isExpanded
-                            }
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                            .size(240.dp)
+                            .clip(CircleShape)
+                            .background(GratiaTheme.colors.surfaceHover)
+                    )
+
+                    Spacer(Modifier.height(32.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Album cover art
-                        CoverArtImage(
-                            coverArtPath = albumGroup.coverArtPath,
-                            title = albumGroup.albumName,
-                            size = 56.dp,
-                            cornerRadius = 8.dp
-                        )
-
-                        Spacer(Modifier.width(16.dp))
-
-                        // Album title + meta
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = albumGroup.albumName,
-                                style = GratiaTheme.typography.section,
+                                text = artistName,
+                                style = MaterialTheme.typography.headlineLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 36.sp
+                                ),
                                 color = GratiaTheme.colors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            val meta = buildString {
-                                albumGroup.year?.let { append("$it · ") }
-                                append("${albumGroup.songs.size} Song${if (albumGroup.songs.size != 1) "s" else ""}")
-                            }
+                            Spacer(Modifier.height(4.dp))
                             Text(
-                                text = meta,
-                                style = GratiaTheme.typography.caption,
+                                text = "${artistSongs.size} Songs",
+                                style = MaterialTheme.typography.titleMedium,
                                 color = GratiaTheme.colors.textSecondary
                             )
                         }
 
-                        // Play album button
-                        IconButton(
-                            onClick = {
-                                playerViewModel.playSong(albumGroup.songs.first(), albumGroup.songs)
-                            },
-                            modifier = Modifier.size(40.dp)
+                        // M3 Scalloped Star FAB
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(ScallopedStarShape())
+                                .background(MaterialTheme.colorScheme.primaryContainer) // Uses the injected global accent glow
+                                .clickable {
+                                    if (artistSongs.isNotEmpty()) {
+                                        val shuffled = artistSongs.shuffled()
+                                        playerViewModel.playSong(shuffled.first(), shuffled)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = "Play ${albumGroup.albumName}",
-                                tint = GratiaTheme.colors.textSecondary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        // Expand/collapse chevron
-                        IconButton(
-                            onClick = { expandedAlbums[albumGroup.albumName] = !isExpanded },
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (isExpanded) "Collapse" else "Expand",
-                                tint = GratiaTheme.colors.textSecondary,
-                                modifier = Modifier.size(24.dp)
+                                Icons.Default.Shuffle, 
+                                contentDescription = "Shuffle",
+                                tint = MaterialTheme.colorScheme.primary, // The solid accent color
+                                modifier = Modifier.size(32.dp)
                             )
                         }
                     }
+                    
+                    Spacer(Modifier.height(32.dp))
                 }
+            }
 
-                // Songs in this album (shown when expanded)
-                if (isExpanded) {
-                    items(
-                        items = albumGroup.songs,
-                        key = { song -> song.id }
-                    ) { song ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { playerViewModel.playSong(song, albumGroup.songs) }
-                                .padding(start = 92.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+            // ── SONGS ──
+            // Group songs by album
+            val albums = artistSongs.groupBy { it.album ?: "Singles" }
+            
+            albums.forEach { (albumName, songs) ->
+                item {
+                    ArtistAlbumGroup(
+                        albumName = albumName,
+                        songs = songs,
+                        playerViewModel = playerViewModel
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistAlbumGroup(
+    albumName: String,
+    songs: List<SongEntity>,
+    playerViewModel: PlayerViewModel
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "chevron")
+    val context = LocalContext.current
+    
+    val currentSong by playerViewModel.currentSong.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(GratiaTheme.colors.surface)
+            .padding(8.dp)
+    ) {
+        // Album Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { expanded = !expanded }
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(songs.firstOrNull()?.coverArtPath)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Album Cover",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GratiaTheme.colors.surfaceHover)
+            )
+            
+            Spacer(Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = albumName,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = GratiaTheme.colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${songs.size} Song${if (songs.size > 1) "s" else ""}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = GratiaTheme.colors.textSecondary
+                )
+            }
+            
+            IconButton(
+                onClick = { playerViewModel.playSong(songs.first(), songs) },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.primary)
+            }
+            
+            Icon(
+                Icons.Default.ExpandMore,
+                contentDescription = "Expand",
+                tint = GratiaTheme.colors.textSecondary,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .graphicsLayer { rotationZ = rotation }
+            )
+        }
+
+        // Songs list
+        AnimatedVisibility(visible = expanded) {
+            Column(modifier = Modifier.padding(top = 8.dp)) {
+                songs.forEach { song ->
+                    val isPlaying = currentSong?.id == song.id
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp, horizontal = 8.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isPlaying) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                            .clickable { playerViewModel.playSong(song, songs) }
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = song.title,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                                color = if (isPlaying) MaterialTheme.colorScheme.primary else GratiaTheme.colors.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (song.artist != albumName) {
                                 Text(
-                                    text = song.title,
-                                    style = GratiaTheme.typography.body,
-                                    color = if (currentSong?.id == song.id) GratiaTheme.colors.accent
-                                            else GratiaTheme.colors.textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = artistName,
-                                    style = GratiaTheme.typography.caption,
-                                    color = GratiaTheme.colors.textSecondary,
+                                    text = song.artist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else GratiaTheme.colors.textSecondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-
-                            IconButton(
-                                onClick = { /* show song menu */ },
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.MoreVert,
-                                    contentDescription = "More",
-                                    tint = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                        }
+                        
+                        IconButton(onClick = { /* TODO More Actions */ }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "More",
+                                tint = if (isPlaying) MaterialTheme.colorScheme.primary else GratiaTheme.colors.textSecondary
+                            )
                         }
                     }
                 }

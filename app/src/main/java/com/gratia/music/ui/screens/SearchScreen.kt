@@ -87,6 +87,7 @@ fun SearchScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
+            .statusBarsPadding()
     ) {
         AppleLargeTitleHeader(title = "Search")
 

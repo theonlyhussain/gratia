@@ -67,6 +67,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _trackCredits = MutableStateFlow<List<com.gratia.music.data.repository.ContributorInfo>>(emptyList())
     val trackCredits: StateFlow<List<com.gratia.music.data.repository.ContributorInfo>> = _trackCredits.asStateFlow()
 
+    private var artistObserverJob: kotlinx.coroutines.Job? = null
+
     init {
         viewModelScope.launch {
             songRepository.getFavorites().collectLatest { favs ->
@@ -76,6 +78,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         
         viewModelScope.launch {
             currentSong.collectLatest { song ->
+                artistObserverJob?.cancel()
                 if (song != null) {
                     _artistInfos.value = emptyMap() // Clear old ones
                     _trackCredits.value = emptyList() // Clear old credits
@@ -87,13 +90,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     _artistInfos.value = LinkedHashMap(infoMap)
 
+                    // Fetch base API info
                     val contributors = com.gratia.music.data.repository.ArtistInfoRepository.getTrackContributors(song.title, song.artist)
                     _trackCredits.value = contributors
 
                     artists.forEach { artistName ->
                         val info = com.gratia.music.data.repository.ArtistInfoRepository.getArtistInfo(artistName)
                         infoMap[artistName] = info
-                        _artistInfos.value = LinkedHashMap(infoMap) // Update state incrementally preserving order
+                        _artistInfos.value = LinkedHashMap(infoMap) 
+                    }
+
+                    // Reactively observe local ArtistEntity for custom image overrides
+                    artistObserverJob = viewModelScope.launch {
+                        val artistDao = GratiaApp.instance.database.artistDao()
+                        artists.forEach { artistName ->
+                            launch {
+                                artistDao.getArtistByNameFlow(artistName).collectLatest { entity ->
+                                    if (entity != null) {
+                                        // Update ArtistInfos
+                                        val currentInfo = infoMap[artistName]
+                                        val overriddenImageUrl = entity.localPicturePath ?: entity.pictureUrl ?: currentInfo?.pictureUrl
+                                        
+                                        if (currentInfo != null) {
+                                            infoMap[artistName] = currentInfo.copy(pictureUrl = overriddenImageUrl)
+                                            _artistInfos.value = LinkedHashMap(infoMap)
+                                        } else {
+                                            // Fallback if API failed but we have local data
+                                            infoMap[artistName] = com.gratia.music.data.repository.ArtistInfo(
+                                                name = artistName,
+                                                pictureUrl = overriddenImageUrl,
+                                                fanCount = 0,
+                                                isVerified = false,
+                                                biography = null
+                                            )
+                                            _artistInfos.value = LinkedHashMap(infoMap)
+                                        }
+
+                                        // Update Credits
+                                        val updatedCredits = _trackCredits.value.map { credit ->
+                                            if (credit.name.equals(artistName, ignoreCase = true)) {
+                                                credit.copy(pictureUrl = overriddenImageUrl)
+                                            } else {
+                                                credit
+                                            }
+                                        }
+                                        _trackCredits.value = updatedCredits
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else {
                     _artistInfos.value = emptyMap()

@@ -135,7 +135,8 @@ fun HomeScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(GratiaTheme.colors.background),
+            .background(GratiaTheme.colors.background)
+            .statusBarsPadding(),
         contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
     ) {
         item {

@@ -177,6 +177,9 @@ fun PlaylistDetailScreen(
             }
     ) {
         LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
             contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
         ) {
             item {

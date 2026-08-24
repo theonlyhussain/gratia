@@ -128,12 +128,20 @@ fun GratiaAppRoot() {
                         }
                     },
                     bottomBar = {
+                var lastNavIndex by remember { mutableStateOf(0) }
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
-                val navIndex = bottomNavItems.indexOfFirst { screen ->
+                val hierarchyMatch = bottomNavItems.indexOfFirst { screen ->
                     currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                }.coerceAtLeast(0)
+                }
+                
+                val navIndex = if (hierarchyMatch != -1) {
+                    lastNavIndex = hierarchyMatch
+                    hierarchyMatch
+                } else {
+                    lastNavIndex
+                }
 
                 com.gratia.music.ui.components.GratiaNavigationBar(
                     items = bottomNavItems,
@@ -198,17 +206,19 @@ fun GratiaAppRoot() {
                             onNavigateToGenre = { navController.navigate("genre/${android.net.Uri.encode(it)}") }
                         )
                     }
-                    composable(
-                        "genre/{genreName}",
-                        arguments = listOf(navArgument("genreName") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val genre = backStackEntry.arguments?.getString("genreName") ?: return@composable
-                        GenreDetailScreen(
-                            genre = genre,
-                            playerViewModel = playerViewModel,
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
+                }
+                
+                // Global Search Destinations
+                composable(
+                    "genre/{genreName}",
+                    arguments = listOf(navArgument("genreName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val genre = backStackEntry.arguments?.getString("genreName") ?: return@composable
+                    GenreDetailScreen(
+                        genre = genre,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
                 }
                 navigation(startDestination = "library_main", route = Screen.Library.route) {
                     composable("library_main") {
@@ -219,56 +229,58 @@ fun GratiaAppRoot() {
                             onNavigateToFolder = { navController.navigate("folder/${android.net.Uri.encode(it)}") }
                         )
                     }
-                    composable("favorites") { // Favorites is still accessible from Home and Library
-                        FavoritesScreen(playerViewModel = playerViewModel)
-                    }
-                    composable("playlists") {
-                        PlaylistsScreen(onNavigateToPlaylist = { navController.navigate("playlist/$it") })
-                    }
-                    composable(
-                        "album/{albumName}",
-                        arguments = listOf(navArgument("albumName") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val name = backStackEntry.arguments?.getString("albumName") ?: ""
-                        AlbumDetailScreen(
-                            albumName = name,
-                            playerViewModel = playerViewModel,
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
-                    composable(
-                        "artist/{artistName}",
-                        arguments = listOf(navArgument("artistName") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val name = backStackEntry.arguments?.getString("artistName") ?: ""
-                        ArtistDetailScreen(
-                            artistName = name,
-                            playerViewModel = playerViewModel,
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
-                    composable(
-                        "folder/{folderName}",
-                        arguments = listOf(navArgument("folderName") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val name = backStackEntry.arguments?.getString("folderName") ?: ""
-                        FolderDetailScreen(
-                            folderName = name,
-                            playerViewModel = playerViewModel,
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
-                    composable(
-                        "playlist/{playlistId}",
-                        arguments = listOf(navArgument("playlistId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val id = backStackEntry.arguments?.getString("playlistId") ?: ""
-                        PlaylistDetailScreen(
-                            playlistId = id,
-                            playerViewModel = playerViewModel,
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
+                }
+
+                // Global Library Destinations
+                composable("favorites") { // Favorites is still accessible from Home and Library
+                    FavoritesScreen(playerViewModel = playerViewModel)
+                }
+                composable("playlists") {
+                    PlaylistsScreen(onNavigateToPlaylist = { navController.navigate("playlist/$it") })
+                }
+                composable(
+                    "album/{albumName}",
+                    arguments = listOf(navArgument("albumName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("albumName") ?: ""
+                    AlbumDetailScreen(
+                        albumName = name,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    "artist/{artistName}",
+                    arguments = listOf(navArgument("artistName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("artistName") ?: ""
+                    ArtistDetailScreen(
+                        artistName = name,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    "folder/{folderName}",
+                    arguments = listOf(navArgument("folderName") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val name = backStackEntry.arguments?.getString("folderName") ?: ""
+                    FolderDetailScreen(
+                        folderName = name,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    "playlist/{playlistId}",
+                    arguments = listOf(navArgument("playlistId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val id = backStackEntry.arguments?.getString("playlistId") ?: ""
+                    PlaylistDetailScreen(
+                        playlistId = id,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
                 }
                 composable("upload") {
                     UploadScreen(onNavigateBack = { navController.popBackStack() })

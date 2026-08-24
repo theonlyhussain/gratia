@@ -92,6 +92,23 @@ fun AboutTheArtistCard(
                     )
                 }
 
+                // Localized gradient overlay for text readability
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(alpha = 0.5f),
+                                    Color.Black.copy(alpha = 0.8f)
+                                )
+                            )
+                        )
+                )
+
                 // Info Section
                 Column(
                     modifier = Modifier
