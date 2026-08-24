@@ -205,39 +205,13 @@ fun ProfileScreen(
             }
             
             // Edit Toggle
-            IconButton(
-                onClick = { 
+            com.gratia.music.ui.components.GratiaEditAffordance(
+                isEditing = isEditing,
+                onToggle = { 
                     isEditing = !isEditing 
-                    // Automatically exit editing if saved
-                    if (!isEditing && !hasChanges) {
-                        // Just exiting edit mode
-                    }
                 },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.3f))
-            ) {
-                AnimatedContent(
-                    targetState = isEditing, 
-                    label = "EditIcon",
-                    transitionSpec = {
-                        (scaleIn(initialScale = 0.5f, animationSpec = spring(stiffness = 300f)) + 
-                         fadeIn(animationSpec = androidx.compose.animation.core.tween(200))).togetherWith(
-                            scaleOut(targetScale = 0.5f, animationSpec = spring(stiffness = 300f)) + 
-                            fadeOut(animationSpec = androidx.compose.animation.core.tween(200))
-                        )
-                    }
-                ) { editing ->
-                    if (editing) {
-                        Icon(Icons.Default.Close, contentDescription = "Close Edit", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
-                    } else {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit Profile", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
         }
 
         // Avatar overlapping banner

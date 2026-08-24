@@ -522,14 +522,15 @@ fun LibrarySubView(
 
 @Composable
 fun ArtistRowImage(artistName: String, fallbackPath: String?, size: androidx.compose.ui.unit.Dp) {
-    var fetchedUrl by remember(artistName) { mutableStateOf<String?>(null) }
-    LaunchedEffect(artistName) {
-        fetchedUrl = com.gratia.music.data.network.ArtistImageFetcher.getArtistPictureUrl(artistName)
-    }
+    val artistRepo = remember { com.gratia.music.data.repository.ArtistRepository(com.gratia.music.GratiaApp.instance.database.artistDao()) }
+    val artistEntity by artistRepo.getArtistFlow(artistName).collectAsState(initial = null)
+    
+    val displayImagePath = artistEntity?.localPicturePath ?: artistEntity?.pictureUrl
 
-    if (fetchedUrl != null) {
+    if (displayImagePath != null) {
+        val model = if (displayImagePath.startsWith("/")) java.io.File(displayImagePath) else displayImagePath
         coil.compose.SubcomposeAsyncImage(
-            model = fetchedUrl,
+            model = model,
             contentDescription = artistName,
             modifier = Modifier.size(size).clip(androidx.compose.foundation.shape.CircleShape),
             contentScale = androidx.compose.ui.layout.ContentScale.Crop,

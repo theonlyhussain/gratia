@@ -35,8 +35,8 @@ data class GratiaSpacing(
     val heroMedium: Dp = 56.dp,
     /** 64dp - Intentional luxury whitespace */
     val hero: Dp = 64.dp,
-    /** 80dp */
-    val heroLarge: Dp = 80.dp,
+    /** 180dp - Enough space to clear both the MiniPlayer and the bottom navigation pill */
+    val heroLarge: Dp = 180.dp,
     /** 96dp */
     val heroExtraLarge: Dp = 96.dp
 )

@@ -131,41 +131,31 @@ fun GratiaAppRoot() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentDestination = navBackStackEntry?.destination
 
-                Column {
-                    // Mini Player — sits above bottom nav
-                    AnimatedVisibility(
-                        visible = currentSong != null && !expandedPlayerOpen,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-                    ) {
-                        MiniPlayer(playerViewModel = playerViewModel)
-                    }
+                val navIndex = bottomNavItems.indexOfFirst { screen ->
+                    currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                }.coerceAtLeast(0)
 
-                    val navIndex = bottomNavItems.indexOfFirst { screen ->
-                        currentDestination?.hierarchy?.any { it.route == screen.route } == true
-                    }.coerceAtLeast(0)
-
-                    com.gratia.music.ui.components.GratiaNavigationBar(
-                        items = bottomNavItems,
-                        selectedIndex = navIndex,
-                        onItemSelected = { screen ->
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
+                com.gratia.music.ui.components.GratiaNavigationBar(
+                    items = bottomNavItems,
+                    selectedIndex = navIndex,
+                    onItemSelected = { screen ->
+                        navController.navigate(screen.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
                             }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                    )
-                }
+                    }
+                )
             }
         ) { innerPadding ->
             val motion = GratiaTheme.motion
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.padding(innerPadding),
+            Box(modifier = Modifier.fillMaxSize()) {
+                NavHost(
+                    navController = navController,
+                    startDestination = Screen.Home.route,
+                    modifier = Modifier.fillMaxSize(), // Draw edge-to-edge behind the navbar
                 enterTransition = {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
@@ -349,6 +339,19 @@ fun GratiaAppRoot() {
                     )
                 }
             }
+
+            // Floating Mini Player Overlay
+            AnimatedVisibility(
+                visible = currentSong != null && !expandedPlayerOpen,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = innerPadding.calculateBottomPadding())
+            ) {
+                MiniPlayer(playerViewModel = playerViewModel)
+            }
+        }
         }
 
 

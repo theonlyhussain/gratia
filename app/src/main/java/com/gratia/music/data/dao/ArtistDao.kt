@@ -19,6 +19,9 @@ interface ArtistDao {
     @Query("SELECT * FROM artists WHERE name = :name LIMIT 1")
     suspend fun getArtistByName(name: String): ArtistEntity?
 
+    @Query("SELECT * FROM artists WHERE name = :name LIMIT 1")
+    fun getArtistByNameFlow(name: String): Flow<ArtistEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertArtist(artist: ArtistEntity)
 
