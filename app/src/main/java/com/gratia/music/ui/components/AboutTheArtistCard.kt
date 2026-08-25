@@ -32,6 +32,15 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import java.text.NumberFormat
 import java.util.Locale
+import com.gratia.music.GratiaApp
+import com.gratia.music.data.SettingsDataStore
+import kotlinx.coroutines.launch
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -48,6 +57,13 @@ fun AboutTheArtistCard(
         initialPage = 0,
         pageCount = { artistList.size }
     )
+
+    val context = LocalContext.current
+    val settingsDataStore = remember { SettingsDataStore(context) }
+    val onlineDataEnabled by settingsDataStore.onlineDataEnabledFlow.collectAsState(initial = true)
+
+    var showEditDialog by remember { mutableStateOf<String?>(null) }
+    var editBioText by remember { mutableStateOf("") }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -117,7 +133,6 @@ fun AboutTheArtistCard(
                         .padding(24.dp)
                 ) {
                     Row(
-                        modifier = Modifier.clickable { onArtistClick(artistName) },
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -135,7 +150,7 @@ fun AboutTheArtistCard(
                                 )
                             )
                         )
-                        if (info?.isVerified == true) {
+                        if (info?.isVerified == true && onlineDataEnabled) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(24.dp)) {
                                 Icon(
                                     imageVector = VerifiedRosette,
@@ -171,11 +186,69 @@ fun AboutTheArtistCard(
                             )
                         )
                         
-                        // Bio snippit removed to fit horizontal card style and rely on clicking to see more.
+                        if (!onlineDataEnabled) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = info.biography ?: "No biography available.",
+                                    fontFamily = Inter,
+                                    fontSize = 12.sp,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { 
+                                    editBioText = info.biography ?: ""
+                                    showEditDialog = artistName 
+                                }) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Biography", tint = Color.White)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+
+    // Edit Biography Dialog
+    if (showEditDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = null },
+            title = { Text("Edit Local Biography", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            text = {
+                TextField(
+                    value = editBioText,
+                    onValueChange = { editBioText = it },
+                    placeholder = { Text("Enter a local biography override...", fontFamily = Inter) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 250.dp)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val artist = showEditDialog!!
+                    val newBio = editBioText.trim().takeIf { it.isNotEmpty() }
+                    
+                    // We dispatch a coroutine to save the biography and then reload the UI
+                    // using the GratiaApp context since this composable might get destroyed
+                    val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                    appScope.launch {
+                        com.gratia.music.data.repository.ArtistInfoRepository.updateLocalBiography(artist, newBio)
+                        // Trigger a re-composition or reload by invoking a global refresh if possible,
+                        // For now we just save it. The next time the player is opened, it will load.
+                    }
+                    showEditDialog = null
+                }) {
+                    Text("Save", color = GratiaTheme.colors.accent, fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = null }) {
+                    Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = Inter)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
     }
 }
 

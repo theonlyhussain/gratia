@@ -60,6 +60,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector,
 
 val bottomNavItems = listOf(Screen.Home, Screen.Browse, Screen.Library, Screen.Search)
 
+val LocalBottomPadding = compositionLocalOf { 0.dp }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GratiaAppRoot() {
@@ -147,23 +149,39 @@ fun GratiaAppRoot() {
                     items = bottomNavItems,
                     selectedIndex = navIndex,
                     onItemSelected = { screen ->
-                        navController.navigate(screen.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
+                        if (screen.route == Screen.Home.route) {
+                            // Clear backstack cleanly when navigating to Home
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Home.route) {
+                                    inclusive = false
+                                }
+                                launchSingleTop = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
+                        } else {
+                            navController.navigate(screen.route) {
+                                popUpTo(Screen.Home.route) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     }
                 )
             }
         ) { innerPadding ->
             val motion = GratiaTheme.motion
-            Box(modifier = Modifier.fillMaxSize()) {
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Home.route,
-                    modifier = Modifier.fillMaxSize(), // Draw edge-to-edge behind the navbar
+            
+            // Calculate total dynamic bottom inset
+            val miniPlayerHeight = if (currentSong != null && !expandedPlayerOpen) 80.dp else 0.dp
+            val totalBottomPadding = innerPadding.calculateBottomPadding() + miniPlayerHeight
+
+            CompositionLocalProvider(LocalBottomPadding provides totalBottomPadding) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Home.route,
+                        modifier = Modifier.fillMaxSize(), // Draw edge-to-edge behind the navbar
                 enterTransition = {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
@@ -366,6 +384,7 @@ fun GratiaAppRoot() {
                     .padding(bottom = innerPadding.calculateBottomPadding())
             ) {
                 MiniPlayer(playerViewModel = playerViewModel)
+            }
             }
         }
         }

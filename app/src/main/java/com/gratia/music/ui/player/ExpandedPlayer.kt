@@ -136,6 +136,7 @@ fun ExpandedPlayer(
     val snackbarHostState = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val song = currentSong ?: return
 
@@ -170,9 +171,6 @@ fun ExpandedPlayer(
 
     // --- Estimated Timings state ---
     var enableEstimatedTimings by remember { mutableStateOf(false) }
-
-    // --- Device selector state ---
-    var showDeviceSelector by remember { mutableStateOf(false) }
 
     // --- Credits and Bio state ---
     var showBiographySheet by remember { mutableStateOf(false) }
@@ -237,7 +235,7 @@ fun ExpandedPlayer(
     }
 
     val isAnyOverlayOpen = showBiographySheet || showCreditsSheet || showSongMenu ||
-            showLyricsEditor || showDeviceSelector || showAddToPlaylist ||
+            showLyricsEditor || showAddToPlaylist ||
             showDeleteConfirm || showSongInfo || showMultipleArtistSelector
 
     // Intercept back button for ALL overlays + content modes + normal closing
@@ -247,7 +245,6 @@ fun ExpandedPlayer(
             showCreditsSheet -> showCreditsSheet = false
             showSongMenu -> showSongMenu = false
             showLyricsEditor -> showLyricsEditor = false
-            showDeviceSelector -> showDeviceSelector = false
             showAddToPlaylist -> showAddToPlaylist = false
             showDeleteConfirm -> showDeleteConfirm = false
             showSongInfo -> showSongInfo = false
@@ -466,7 +463,16 @@ fun ExpandedPlayer(
                             contentMode = PlayerContentMode.Lyrics
                         }
                     },
-                    onOpenDeviceSelector = { showDeviceSelector = true },
+                    onOpenDeviceSelector = {
+                        try {
+                            val intent = android.content.Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+                            intent.putExtra("com.android.settings.panel.extra.PACKAGE_NAME", context.packageName)
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    },
                     onOpenQueue = {
                         contentMode = PlayerContentMode.Queue
                     },
@@ -553,7 +559,14 @@ fun ExpandedPlayer(
                     },
                     onOpenDeviceSelector = {
                         onUserInteraction()
-                        showDeviceSelector = true
+                        try {
+                            val intent = android.content.Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+                            intent.putExtra("com.android.settings.panel.extra.PACKAGE_NAME", context.packageName)
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     },
                     onOpenQueue = {
                         onUserInteraction()

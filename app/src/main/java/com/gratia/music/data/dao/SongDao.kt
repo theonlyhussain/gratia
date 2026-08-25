@@ -112,6 +112,9 @@ interface SongDao {
     @Query("SELECT COUNT(*) FROM songs")
     fun getSongCount(): Flow<Int>
 
+    @Query("UPDATE songs SET playCount = 0, totalListenTime = 0, lastPlayedAt = NULL")
+    suspend fun clearAllStats()
+
     @Query("UPDATE songs SET coverArtPath = :path, coverSource = :source, updatedAt = :now WHERE id = :id")
     suspend fun updateCoverArt(id: String, path: String, source: String, now: Long = System.currentTimeMillis())
 

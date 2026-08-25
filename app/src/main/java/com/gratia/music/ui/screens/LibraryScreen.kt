@@ -105,12 +105,14 @@ fun LibraryRootView(
     onNavigateToFolders: () -> Unit,
     onNavigateToAlbum: (String) -> Unit
 ) {
+    val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
             .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
+        contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge)
     ) {
         item {
             AppleLargeTitleHeader(title = "Library")
@@ -327,8 +329,9 @@ fun LibrarySubView(
                             description = "Like some songs to see them here."
                         )
                     } else {
+                        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
                         LazyColumn(
-                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small),
+                            contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
                         ) {
                             itemsIndexed(
@@ -359,8 +362,9 @@ fun LibrarySubView(
                             description = "Add music to begin listening."
                         )
                     } else {
+                        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
                         LazyColumn(
-                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small),
+                            contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
                         ) {
                             itemsIndexed(
@@ -392,8 +396,9 @@ fun LibrarySubView(
                             description = "Albums will appear here automatically."
                         )
                     } else {
+                        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
                         LazyColumn(
-                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
+                            contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                         ) {
                             items(albums) { album ->
@@ -420,8 +425,9 @@ fun LibrarySubView(
                             description = "Artists will appear here automatically."
                         )
                     } else {
+                        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
                         LazyColumn(
-                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
+                            contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                         ) {
                             items(artists) { artist ->
@@ -446,8 +452,9 @@ fun LibrarySubView(
                             description = "Your music folders will appear here."
                         )
                     } else {
+                        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
                         LazyColumn(
-                            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
+                            contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                         ) {
                             items(folders) { folder ->

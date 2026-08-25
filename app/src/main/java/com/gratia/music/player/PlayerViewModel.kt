@@ -8,6 +8,7 @@ import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.data.model.LyricsEntity
 import com.gratia.music.data.repository.LyricsRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,6 +47,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _expandedPlayerOpen = MutableStateFlow(false)
     val expandedPlayerOpen: StateFlow<Boolean> = _expandedPlayerOpen.asStateFlow()
+
+    private val _dailyMixSongs = MutableStateFlow<List<SongEntity>>(emptyList())
+    val dailyMixSongs: StateFlow<List<SongEntity>> = _dailyMixSongs.asStateFlow()
+    private var isDailyMixActive = false
 
     private val _lyricsOverlayOpen = MutableStateFlow(false)
     val lyricsOverlayOpen: StateFlow<Boolean> = _lyricsOverlayOpen.asStateFlow()
@@ -158,6 +163,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+        
+        // Combine into one large flow for queue auto-extension
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(currentSong, queue) { song, q -> Pair(song, q) }
+                .collectLatest { (song, q) ->
+                    if (song != null && isDailyMixActive && q.isNotEmpty()) {
+                        val currentIndex = q.indexOfFirst { it.id == song.id }
+                        if (currentIndex >= q.size - 3) {
+                            // Extend the daily mix
+                            val allSongs = songRepository.getAllSongsOnce()
+                            val excludeIds = q.map { it.id }.toSet()
+                            val moreSongs = GratiaApp.instance.recommendationManager.getDailyMix(allSongs, limit = 10, excludeIds = excludeIds)
+                            if (moreSongs.isNotEmpty()) {
+                                val newQueue = q + moreSongs
+                                playerManager.updateUpcomingQueue(newQueue, currentIndex)
+                            }
+                        }
+                    }
+                }
+        }
+        
+        // Generate initial daily mix
+        viewModelScope.launch(Dispatchers.IO) {
+            val allSongs = songRepository.getAllSongsOnce()
+            _dailyMixSongs.value = GratiaApp.instance.recommendationManager.getDailyMix(allSongs, limit = 20)
+        }
     }
 
     fun refreshLyrics(force: Boolean = true) {
@@ -187,7 +218,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playSong(song: SongEntity, songQueue: List<SongEntity>) {
+        isDailyMixActive = false // Reset daily mix state for normal playback
         playerManager.playSong(song, songQueue)
+        viewModelScope.launch {
+            songRepository.incrementPlayCount(song.id)
+        }
+    }
+
+    fun playDailyMix(song: SongEntity, mixQueue: List<SongEntity>) {
+        isDailyMixActive = true
+        playerManager.playSong(song, mixQueue)
         viewModelScope.launch {
             songRepository.incrementPlayCount(song.id)
         }

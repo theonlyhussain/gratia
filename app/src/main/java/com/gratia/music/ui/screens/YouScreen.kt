@@ -80,7 +80,9 @@ fun YouScreen(
     // Settings state
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
+    val onlineDataEnabled by settingsDataStore.onlineDataEnabledFlow.collectAsState(initial = true)
     val updateState by GratiaApp.instance.updateManager.state.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
     // Profile state
     val profileFlow by profileDao.getProfile().collectAsState(initial = null)
@@ -90,6 +92,8 @@ fun YouScreen(
     var hasChanges by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
     var saveSuccess by remember { mutableStateOf(false) }
+    
+    var showOnlineDataWarning by remember { mutableStateOf(false) }
 
     val versionName = remember {
         try {
@@ -160,12 +164,15 @@ fun YouScreen(
         }
     }
 
+    val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
             .verticalScroll(rememberScrollState())
-            .statusBarsPadding(),
+            .statusBarsPadding()
+            .padding(bottom = bottomInset + 32.dp),
     ) {
         AppleLargeTitleHeader(
             title = "You",
@@ -429,10 +436,53 @@ fun YouScreen(
         SectionCard {
             SettingsRow(icon = Icons.Default.PrivacyTip, iconBg = Color(0xFF8E8E93), title = "Privacy", subtitle = "All data stays on your device", onClick = {}, showChevron = false)
             SettingsDivider()
+            SettingsRow(
+                icon = Icons.Default.CloudQueue, 
+                iconBg = Color(0xFF32ADE6), 
+                title = "Online Data", 
+                subtitle = if (onlineDataEnabled) "Enabled (APIs active)" else "Disabled (Local only)", 
+                onClick = { 
+                    if (onlineDataEnabled) {
+                        showOnlineDataWarning = true
+                    } else {
+                        coroutineScope.launch { settingsDataStore.setOnlineDataEnabled(true) } 
+                    }
+                }, 
+                showChevron = false
+            )
+            SettingsDivider()
             SettingsRow(icon = Icons.Default.Info, iconBg = Color(0xFF007AFF), title = "About Gratia", subtitle = "Version $versionName", onClick = onNavigateToAbout, showChevron = true)
         }
         
         Spacer(Modifier.height(56.dp))
+    }
+
+    if (showOnlineDataWarning) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showOnlineDataWarning = false },
+            title = { androidx.compose.material3.Text("Disable Online Data?", fontFamily = com.gratia.music.ui.theme.SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            text = { 
+                androidx.compose.material3.Text(
+                    "Are you sure you want to disable Online Data? Gratia will no longer fetch missing artist images, biographies, or lyrics from the internet. You will only see what is already stored locally on your device.",
+                    fontFamily = com.gratia.music.ui.theme.Inter,
+                    color = GratiaTheme.colors.textSecondary
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    coroutineScope.launch { settingsDataStore.setOnlineDataEnabled(false) }
+                    showOnlineDataWarning = false
+                }) {
+                    androidx.compose.material3.Text("Disable", color = Color(0xFFFF3B30), fontFamily = com.gratia.music.ui.theme.Inter, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showOnlineDataWarning = false }) {
+                    androidx.compose.material3.Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = com.gratia.music.ui.theme.Inter)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
     }
 }
 

@@ -34,7 +34,7 @@ interface ListeningEventDao {
         SELECT s.artist, SUM(e.listenedSeconds) as totalSeconds
         FROM listening_events e
         INNER JOIN songs s ON e.songId = s.id
-        WHERE e.timestamp >= :startTimestamp AND e.timestamp <= :endTimestamp AND (e.eventType = 'play' OR e.eventType = 'complete')
+        WHERE e.timestamp >= :startTimestamp AND e.timestamp <= :endTimestamp AND e.listenedSeconds > 0
         GROUP BY s.artist
         ORDER BY totalSeconds DESC
         LIMIT :limit
@@ -45,7 +45,7 @@ interface ListeningEventDao {
         SELECT s.id as songId, s.title, s.artist, SUM(e.listenedSeconds) as totalSeconds
         FROM listening_events e
         INNER JOIN songs s ON e.songId = s.id
-        WHERE e.timestamp >= :startTimestamp AND e.timestamp <= :endTimestamp AND (e.eventType = 'play' OR e.eventType = 'complete')
+        WHERE e.timestamp >= :startTimestamp AND e.timestamp <= :endTimestamp AND e.listenedSeconds > 0
         GROUP BY s.id
         ORDER BY totalSeconds DESC
         LIMIT :limit
@@ -55,7 +55,7 @@ interface ListeningEventDao {
     @Query("""
         SELECT SUM(listenedSeconds)
         FROM listening_events
-        WHERE timestamp >= :startTimestamp AND timestamp <= :endTimestamp AND (eventType = 'play' OR eventType = 'complete')
+        WHERE timestamp >= :startTimestamp AND timestamp <= :endTimestamp AND listenedSeconds > 0
     """)
     suspend fun getTotalListeningSeconds(startTimestamp: Long, endTimestamp: Long): Long?
 }

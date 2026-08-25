@@ -170,7 +170,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                         title = song.title,
                         artist = song.artist,
                         size = 44.dp,
-                        cornerRadius = 22.dp, // Circle
+                        cornerRadius = 8.dp, // Rounded square
                         fontSize = 12.sp
                     )
                     

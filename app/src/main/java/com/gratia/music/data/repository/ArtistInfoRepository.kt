@@ -3,11 +3,15 @@ package com.gratia.music.data.repository
 import android.util.Log
 import com.gratia.music.data.network.WikipediaFetcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import com.gratia.music.GratiaApp
+import com.gratia.music.data.SettingsDataStore
 
 data class ArtistInfo(
     val name: String,
@@ -29,6 +33,36 @@ object ArtistInfoRepository {
 
     suspend fun getArtistInfo(artistName: String): ArtistInfo? = withContext(Dispatchers.IO) {
         if (artistName.isBlank() || artistName == "<unknown>") return@withContext null
+
+        val context = GratiaApp.instance.applicationContext
+        val cacheDir = File(context.filesDir, "artist_info_cache")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        
+        val safeName = artistName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+        val cacheFile = File(cacheDir, "$safeName.json")
+        
+        var cachedInfo: ArtistInfo? = null
+        if (cacheFile.exists()) {
+            try {
+                val json = JSONObject(cacheFile.readText())
+                cachedInfo = ArtistInfo(
+                    name = json.optString("name", artistName),
+                    pictureUrl = if (json.has("pictureUrl") && !json.isNull("pictureUrl")) json.getString("pictureUrl") else null,
+                    fanCount = json.optInt("fanCount", 0),
+                    isVerified = json.optBoolean("isVerified", false),
+                    biography = if (json.has("biography") && !json.isNull("biography")) json.getString("biography") else null
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to parse cache: ${e.message}")
+            }
+        }
+
+        val settings = SettingsDataStore(context)
+        val onlineEnabled = settings.onlineDataEnabledFlow.first()
+        
+        if (!onlineEnabled) {
+            return@withContext cachedInfo
+        }
 
         try {
             val encodedQuery = URLEncoder.encode(artistName, "UTF-8")
@@ -61,19 +95,33 @@ object ArtistInfoRepository {
                     // Fetch biography from Wikipedia
                     val biography = WikipediaFetcher.getArtistBiography(name)
 
-                    return@withContext ArtistInfo(
+                    val info = ArtistInfo(
                         name = name,
                         pictureUrl = pictureXl,
                         fanCount = nbFan,
                         isVerified = isVerified,
                         biography = biography
                     )
+                    
+                    try {
+                        val json = JSONObject().apply {
+                            put("name", info.name)
+                            put("pictureUrl", info.pictureUrl)
+                            put("fanCount", info.fanCount)
+                            put("isVerified", info.isVerified)
+                            put("biography", info.biography)
+                        }
+                        cacheFile.writeText(json.toString())
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to save cache: ${e.message}")
+                    }
+                    return@withContext info
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch artist info: ${e.message}")
         }
-        return@withContext null
+        return@withContext cachedInfo
     }
 
     suspend fun getTrackContributors(title: String, artist: String): List<ContributorInfo> = withContext(Dispatchers.IO) {
@@ -135,5 +183,27 @@ object ArtistInfoRepository {
             Log.e(TAG, "Failed to fetch track contributors: ${e.message}")
         }
         return@withContext contributors
+    }
+
+    suspend fun updateLocalBiography(artistName: String, biography: String?) = withContext(Dispatchers.IO) {
+        val context = GratiaApp.instance.applicationContext
+        val cacheDir = File(context.filesDir, "artist_info_cache")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        
+        val safeName = artistName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+        val cacheFile = File(cacheDir, "$safeName.json")
+        
+        val json = if (cacheFile.exists()) {
+            try { JSONObject(cacheFile.readText()) } catch (e: Exception) { JSONObject() }
+        } else JSONObject()
+        
+        json.put("name", artistName)
+        if (biography == null) {
+            json.put("biography", JSONObject.NULL)
+        } else {
+            json.put("biography", biography)
+        }
+        
+        cacheFile.writeText(json.toString())
     }
 }

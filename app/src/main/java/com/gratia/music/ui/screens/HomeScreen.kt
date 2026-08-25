@@ -70,28 +70,7 @@ fun HomeScreen(
     val lastAdded = remember(lastAddedRaw) { lastAddedRaw }
 
     // Determine Top Song for Recommendation
-    var recommendedSong by remember { mutableStateOf<SongEntity?>(null) }
-    LaunchedEffect(allSongs.size / 50, mostPlayed, recentlyPlayed) {
-        if (allSongs.isNotEmpty()) {
-            recommendedSong = GratiaApp.instance.recommendationManager.getRecommendedSong(allSongs)
-        }
-    }
-    
-    val recommendedArtist = recommendedSong?.artist
-    
-    val recommendedArtistSongs by produceState<List<SongEntity>>(initialValue = emptyList(), key1 = recommendedArtist) {
-        if (recommendedArtist != null && recommendedArtist != "<unknown>") {
-            value = songRepo.getSongsByArtistDirect(recommendedArtist!!)
-        }
-    }
-    
-    var artistImageUrl by remember { mutableStateOf<String?>(null) }
-    
-    LaunchedEffect(recommendedArtist) {
-        if (recommendedArtist != null) {
-            artistImageUrl = ArtistImageFetcher.getArtistPictureUrl(recommendedArtist)
-        }
-    }
+    val dailyMixSongs by playerViewModel.dailyMixSongs.collectAsState()
 
     val context = LocalContext.current
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
@@ -131,12 +110,14 @@ fun HomeScreen(
         }
     }
 
+    val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
             .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
+        contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge)
     ) {
         item {
             AppleLargeTitleHeader(
@@ -202,18 +183,18 @@ fun HomeScreen(
         }
 
         // Recommended For You Card
-        if (recommendedArtist != null && recommendedArtistSongs.isNotEmpty()) {
+        if (dailyMixSongs.isNotEmpty()) {
             item {
                 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                     androidx.compose.material3.Text(
-                        text = "Recommended For You",
+                        text = "Daily Mix",
                         fontFamily = com.gratia.music.ui.theme.SpaceGrotesk,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
                         color = GratiaTheme.colors.textPrimary
                     )
                     androidx.compose.material3.Text(
-                        text = "Based on your listening history",
+                        text = "A personalized mix of your favorites and discoveries",
                         fontFamily = com.gratia.music.ui.theme.Inter,
                         fontSize = 14.sp,
                         color = GratiaTheme.colors.textSecondary
@@ -221,12 +202,12 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     RecommendedForYouCard(
-                        artistName = recommendedArtist,
-                        artistImageUrl = artistImageUrl,
-                        songs = recommendedArtistSongs,
+                        artistName = "Daily Mix",
+                        artistImageUrl = null, // We'll rely on the collage inside the card
+                        songs = dailyMixSongs,
                         onPlay = {
-                            if (recommendedArtistSongs.isNotEmpty()) {
-                                playerViewModel.playSong(recommendedArtistSongs.first(), allSongs)
+                            if (dailyMixSongs.isNotEmpty()) {
+                                playerViewModel.playDailyMix(dailyMixSongs.first(), dailyMixSongs)
                             }
                         }
                     )

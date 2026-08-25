@@ -7,7 +7,10 @@ import com.gratia.music.lyrics.LRCLIBProvider
 import com.gratia.music.lyrics.LyricallyProvider
 import com.gratia.music.lyrics.LyricsProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import com.gratia.music.GratiaApp
+import com.gratia.music.data.SettingsDataStore
 
 class LyricsRepository(
     private val lyricsDao: LyricsDao
@@ -27,6 +30,13 @@ class LyricsRepository(
 
         // If force refresh, don't overwrite if manually edited and selected
         if (forceRefresh && activeLyrics?.provider == "manual") {
+            return@withContext activeLyrics
+        }
+
+        val settings = SettingsDataStore(GratiaApp.instance.applicationContext)
+        val onlineEnabled = settings.onlineDataEnabledFlow.first()
+        
+        if (!onlineEnabled) {
             return@withContext activeLyrics
         }
 

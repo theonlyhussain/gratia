@@ -56,6 +56,8 @@ fun BrowseScreen(playerViewModel: PlayerViewModel) {
         return
     }
 
+    val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
         modifier = Modifier
@@ -64,7 +66,7 @@ fun BrowseScreen(playerViewModel: PlayerViewModel) {
         contentPadding = PaddingValues(
             start = 24.dp, 
             end = 24.dp, 
-            bottom = GratiaTheme.spacing.heroLarge
+            bottom = bottomInset + GratiaTheme.spacing.heroLarge
         ),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)

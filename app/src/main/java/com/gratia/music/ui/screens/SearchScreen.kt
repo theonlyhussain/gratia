@@ -181,9 +181,10 @@ fun SearchScreen(
                     )
                 }
             } else {
+                val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(bottom = 120.dp)
+                    contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge)
                 ) {
                     if (searchHistory.isNotEmpty()) {
                         item {
@@ -278,8 +279,9 @@ fun SearchScreen(
             }
         } else {
             // Results
+            val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
             LazyColumn(
-                contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp)
+                contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = 8.dp)
             ) {
                 itemsIndexed(displayResults.distinctBy { it.id }, key = { _, s -> s.id }) { index, song ->
                     SongRow(

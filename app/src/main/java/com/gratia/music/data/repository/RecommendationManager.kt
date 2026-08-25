@@ -12,6 +12,65 @@ class RecommendationManager(
     private val songDao: SongDao,
     private val listeningEventDao: ListeningEventDao
 ) {
+    suspend fun getDailyMix(allSongs: List<SongEntity>, limit: Int = 20, excludeIds: Set<String> = emptySet()): List<SongEntity> = withContext(Dispatchers.IO) {
+        if (allSongs.isEmpty()) return@withContext emptyList()
+
+        val now = System.currentTimeMillis()
+        val candidates = allSongs.filter { it.id !in excludeIds }
+        if (candidates.isEmpty()) return@withContext emptyList()
+
+        val artistScores = mutableMapOf<String, Float>()
+        
+        val scoredSongs = candidates.map { song ->
+            val score = calculateScore(song, now)
+            val artist = song.artist
+            if (artist.isNotBlank() && artist != "<unknown>") {
+                artistScores[artist] = (artistScores[artist] ?: 0f) + max(0f, score)
+            }
+            song to score
+        }
+
+        // Apply artist affinity and exploration, then sort
+        val mixedScores = scoredSongs.map { (song, rawScore) ->
+            val artistAffinity = if (song.artist.isNotBlank() && song.artist != "<unknown>") {
+                artistScores[song.artist] ?: 0f
+            } else 0f
+            
+            // Random exploration boost
+            val seed = (Math.random() * 100).toInt()
+            val randomExplorationBoost = seed / 2f
+            
+            val finalScore = rawScore + (artistAffinity * 0.1f) + randomExplorationBoost
+            song to finalScore
+        }.sortedByDescending { it.second }
+
+        // Enforce diversity: max 3 songs per artist in the generated mix
+        val result = mutableListOf<SongEntity>()
+        val artistCounts = mutableMapOf<String, Int>()
+        
+        for ((song, _) in mixedScores) {
+            val artist = song.artist
+            val count = artistCounts[artist] ?: 0
+            if (count < 3) {
+                result.add(song)
+                artistCounts[artist] = count + 1
+            }
+            if (result.size >= limit) break
+        }
+        
+        // If we still need more songs, just take the best remaining ones
+        if (result.size < limit) {
+            for ((song, _) in mixedScores) {
+                if (song !in result) {
+                    result.add(song)
+                    if (result.size >= limit) break
+                }
+            }
+        }
+        
+        result.shuffle() // Shuffle so it feels like a mix rather than an ordered top list
+        return@withContext result
+    }
     /**
      * Calculates the best recommended song based on the user's actual listening behavior.
      * Uses a multi-signal scoring model.

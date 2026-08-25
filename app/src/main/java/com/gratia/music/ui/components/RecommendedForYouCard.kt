@@ -82,24 +82,37 @@ fun RecommendedForYouCard(
                         },
                         modifier = Modifier
                             .size(180.dp)
-                            .clip(CircleShape)
+                            .clip(RoundedCornerShape(32.dp))
                     )
                 } else {
-                    val fallbackPath = songs.firstOrNull { it.coverArtPath != null }?.coverArtPath
-                    if (fallbackPath != null) {
+                    val distinctCovers = songs.mapNotNull { it.coverArtPath }.distinct().take(4)
+                    if (distinctCovers.size >= 4) {
+                        Column(
+                            modifier = Modifier.size(180.dp).clip(RoundedCornerShape(32.dp))
+                        ) {
+                            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                CoverArtImage(coverArtPath = distinctCovers[0], title = "", size = 90.dp, cornerRadius = 0.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+                                CoverArtImage(coverArtPath = distinctCovers[1], title = "", size = 90.dp, cornerRadius = 0.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+                            }
+                            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                CoverArtImage(coverArtPath = distinctCovers[2], title = "", size = 90.dp, cornerRadius = 0.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+                                CoverArtImage(coverArtPath = distinctCovers[3], title = "", size = 90.dp, cornerRadius = 0.dp, modifier = Modifier.weight(1f).fillMaxHeight())
+                            }
+                        }
+                    } else if (distinctCovers.isNotEmpty()) {
                         CoverArtImage(
-                            coverArtPath = fallbackPath,
+                            coverArtPath = distinctCovers.first(),
                             title = artistName,
                             size = 180.dp,
-                            cornerRadius = 90.dp,
-                            modifier = Modifier.clip(CircleShape)
+                            cornerRadius = 32.dp,
+                            modifier = Modifier.clip(RoundedCornerShape(32.dp))
                         )
                     } else {
-                        // Fallback to a plain grey circle if no image and no cover
+                        // Fallback to a plain grey rounded square if no image and no cover
                         Box(
                             modifier = Modifier
                                 .size(180.dp)
-                                .clip(CircleShape)
+                                .clip(RoundedCornerShape(32.dp))
                                 .background(GratiaTheme.colors.surfaceHover)
                         )
                     }
@@ -118,7 +131,7 @@ fun RecommendedForYouCard(
                 Box(
                     modifier = Modifier.width(100.dp).height(40.dp)
                 ) {
-                    val displaySongs = songs.take(4)
+                    val displaySongs = if (artistImageUrl == null) songs.drop(4).take(4) else songs.take(4)
                     displaySongs.forEachIndexed { index, song ->
                         val offset = (index * 20).dp
                         CoverArtImage(

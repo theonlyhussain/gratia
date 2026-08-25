@@ -140,6 +140,19 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    private val ONLINE_DATA_ENABLED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("online_data_enabled")
+
+    val onlineDataEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[ONLINE_DATA_ENABLED_KEY] ?: true // default to true
+        }
+
+    suspend fun setOnlineDataEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ONLINE_DATA_ENABLED_KEY] = enabled
+        }
+    }
+
     private val SEARCH_HISTORY_KEY = stringSetPreferencesKey("search_history")
 
     val searchHistoryFlow: Flow<Set<String>> = context.dataStore.data

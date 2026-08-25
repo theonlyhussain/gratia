@@ -2,6 +2,7 @@ package com.gratia.music.ui.screens
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -80,12 +81,14 @@ fun ListeningHistoryScreen(
         }
     }
 
+    val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
             .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
+        contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge)
     ) {
         item {
             AppleLargeTitleHeader(
@@ -132,7 +135,7 @@ fun ListeningHistoryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No listening data yet", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GratiaTheme.colors.textPrimary)
+                        Text("Not enough history to show", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GratiaTheme.colors.textPrimary)
                         Spacer(Modifier.height(8.dp))
                         Text("Start listening to build your listening statistics.", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textSecondary, textAlign = TextAlign.Center)
                     }
@@ -145,6 +148,7 @@ fun ListeningHistoryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
+                        .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))
                         .background(GratiaTheme.colors.surface)
                         .padding(24.dp),
@@ -222,6 +226,7 @@ fun ListeningHistoryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
+                            .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(16.dp))
                             .clip(RoundedCornerShape(16.dp))
                             .background(GratiaTheme.colors.surface)
                             .padding(vertical = 8.dp)
@@ -301,6 +306,7 @@ fun ListeningHistoryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
+                            .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(16.dp))
                             .clip(RoundedCornerShape(16.dp))
                             .background(GratiaTheme.colors.surface)
                             .padding(vertical = 8.dp)
@@ -433,6 +439,7 @@ fun ListeningHistoryScreen(
 fun SummaryCard(title: String, value: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
+            .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
             .background(GratiaTheme.colors.surface)
             .padding(16.dp),
