@@ -463,16 +463,6 @@ fun ExpandedPlayer(
                             contentMode = PlayerContentMode.Lyrics
                         }
                     },
-                    onOpenDeviceSelector = {
-                        try {
-                            val intent = android.content.Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
-                            intent.putExtra("com.android.settings.panel.extra.PACKAGE_NAME", context.packageName)
-                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
-                    },
                     onOpenQueue = {
                         contentMode = PlayerContentMode.Queue
                     },
@@ -555,17 +545,6 @@ fun ExpandedPlayer(
                             contentMode = PlayerContentMode.Normal
                         } else if (currentLyrics != null) {
                             contentMode = PlayerContentMode.Lyrics
-                        }
-                    },
-                    onOpenDeviceSelector = {
-                        onUserInteraction()
-                        try {
-                            val intent = android.content.Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
-                            intent.putExtra("com.android.settings.panel.extra.PACKAGE_NAME", context.packageName)
-                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
                         }
                     },
                     onOpenQueue = {
@@ -792,7 +771,6 @@ private fun NormalModeContent(
     onClickArtist: () -> Unit,
     onClickAlbum: () -> Unit,
     onOpenLyrics: () -> Unit,
-    onOpenDeviceSelector: () -> Unit,
     onOpenQueue: () -> Unit,
     onArtistClick: (String) -> Unit,
     onSeeMoreArtist: (String) -> Unit,
@@ -932,7 +910,6 @@ private fun NormalModeContent(
             SecondaryActionRow(
                 hasLyrics = currentLyrics != null,
                 onOpenLyrics = onOpenLyrics,
-                onOpenDeviceSelector = onOpenDeviceSelector,
                 onOpenQueue = onOpenQueue,
                 isLyricsActive = false,
                 isQueueActive = false
@@ -1019,7 +996,6 @@ private fun ContentModeLayout(
     onToggleFavorite: () -> Unit,
     onMoreClick: () -> Unit,
     onOpenLyrics: () -> Unit,
-    onOpenDeviceSelector: () -> Unit,
     onOpenQueue: () -> Unit,
     syncOffset: Long,
     playerViewModel: PlayerViewModel
@@ -1143,7 +1119,6 @@ private fun ContentModeLayout(
                 SecondaryActionRow(
                     hasLyrics = currentLyrics != null,
                     onOpenLyrics = onOpenLyrics,
-                    onOpenDeviceSelector = onOpenDeviceSelector,
                     onOpenQueue = onOpenQueue,
                     isLyricsActive = contentMode == PlayerContentMode.Lyrics,
                     isQueueActive = contentMode == PlayerContentMode.Queue

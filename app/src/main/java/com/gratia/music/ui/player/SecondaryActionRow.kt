@@ -23,7 +23,6 @@ import com.gratia.music.ui.theme.GratiaTheme
 fun SecondaryActionRow(
     hasLyrics: Boolean = true,
     onOpenLyrics: () -> Unit,
-    onOpenDeviceSelector: () -> Unit,
     onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier,
     isLyricsActive: Boolean = false,
@@ -50,15 +49,8 @@ fun SecondaryActionRow(
             }
         )
 
-        // Device Selector
-        PlayerButton(
-            icon = Icons.Default.Speaker,
-            onClick = onOpenDeviceSelector,
-            contentDescription = "Select Device",
-            size = 48.dp,
-            iconSize = 24.dp,
-            tint = Color.White.copy(alpha = 0.6f)
-        )
+        // Device Selector (MediaRouter)
+        MediaOutputButton()
 
         // Queue
         PlayerButton(
