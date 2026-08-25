@@ -28,7 +28,6 @@ A modern, meticulously crafted music player focused on fluid playback, stunning 
 - 🔄 **Smart In-App Updates**: Built-in non-intrusive update manager that detects, downloads, and installs the latest Gratia releases directly from GitHub.
 - 🔔 **Media3 Notification**: Clean, monochrome silhouette notification with full playback controls and artwork integration.
 - 🔒 **Absolute Privacy**: Complete offline-first architecture with zero analytics and zero telemetry. Your library stays strictly on your device.
-- 🏗️ **Robust Architecture**: Reliable cross-graph navigation state management and proper handling of edge-to-edge system insets without UI overlaps.
 
 ---
 

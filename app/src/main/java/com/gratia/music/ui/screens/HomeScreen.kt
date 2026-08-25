@@ -51,8 +51,7 @@ fun HomeScreen(
     isDark: Boolean,
     onToggleTheme: () -> Unit,
     onNavigateToUpload: () -> Unit,
-    onNavigateToProfile: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToYou: () -> Unit = {}
 ) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     val mostPlayedRaw by songRepo.getMostPlayed(10).collectAsState(initial = emptyList())
@@ -149,33 +148,7 @@ fun HomeScreen(
                                 .size(36.dp)
                                 .clip(CircleShape)
                                 .background(GratiaTheme.colors.surface)
-                                .bounceClick { onNavigateToSettings() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = GratiaTheme.colors.textSecondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            if (updateState is com.gratia.music.updater.UpdateState.UpdateAvailable || updateState is com.gratia.music.updater.UpdateState.ReadyToInstall) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(4.dp)
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(GratiaTheme.colors.error)
-                                )
-                            }
-                        }
-                        
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(GratiaTheme.colors.surface)
-                                .bounceClick { onNavigateToProfile() },
+                                .bounceClick { onNavigateToYou() },
                             contentAlignment = Alignment.Center
                         ) {
                             if (avatarPath != null) {
@@ -191,6 +164,16 @@ fun HomeScreen(
                                     contentDescription = "Profile",
                                     tint = GratiaTheme.colors.textSecondary,
                                     modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            if (updateState is com.gratia.music.updater.UpdateState.UpdateAvailable || updateState is com.gratia.music.updater.UpdateState.ReadyToInstall) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(4.dp)
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(GratiaTheme.colors.error)
                                 )
                             }
                         }
@@ -338,8 +321,8 @@ fun HomeScreen(
                         icon = Icons.Default.LibraryMusic,
                         headline = "Your Library is Empty",
                         description = "No local music found. Try syncing from settings if you just added files.",
-                        actionLabel = "Go to Settings",
-                        onActionClick = onNavigateToSettings,
+                        actionLabel = "Go to You",
+                        onActionClick = onNavigateToYou,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

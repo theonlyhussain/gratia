@@ -45,4 +45,22 @@ class ListeningEventRepository(private val dao: ListeningEventDao) {
             dao.clearAllHistory()
         }
     }
+
+    suspend fun getTopArtists(startTimestamp: Long, endTimestamp: Long, limit: Int = 5): List<com.gratia.music.data.model.ArtistListenSummary> {
+        return withContext(Dispatchers.IO) {
+            dao.getTopArtists(startTimestamp, endTimestamp, limit)
+        }
+    }
+
+    suspend fun getTopTracks(startTimestamp: Long, endTimestamp: Long, limit: Int = 5): List<com.gratia.music.data.model.TrackListenSummary> {
+        return withContext(Dispatchers.IO) {
+            dao.getTopTracks(startTimestamp, endTimestamp, limit)
+        }
+    }
+
+    suspend fun getTotalListeningSeconds(startTimestamp: Long, endTimestamp: Long): Long {
+        return withContext(Dispatchers.IO) {
+            dao.getTotalListeningSeconds(startTimestamp, endTimestamp) ?: 0L
+        }
+    }
 }

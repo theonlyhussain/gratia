@@ -3,11 +3,10 @@ package com.gratia.music.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.animation.*
 import androidx.compose.animation.core.spring
-import kotlinx.coroutines.delay
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -22,55 +21,66 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.gratia.music.GratiaApp
-import com.gratia.music.data.CoverArtManager
 import com.gratia.music.data.model.UserProfileEntity
-import com.gratia.music.data.repository.ListeningEventRepository
 import com.gratia.music.data.repository.SongRepository
-import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.components.AppleLargeTitleHeader
 import com.gratia.music.ui.components.bounceClick
+import com.gratia.music.ui.components.clickableWithScale
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
-fun ProfileScreen(
+fun YouScreen(
     onNavigateBack: () -> Unit,
     onNavigateToStorage: () -> Unit,
-    onNavigateToAbout: () -> Unit
+    onNavigateToListeningHistory: () -> Unit,
+    onNavigateToAppearance: () -> Unit,
+    onNavigateToEqualizer: () -> Unit,
+    onNavigateToSmartUpdate: () -> Unit,
+    onNavigateToLibrarySettings: () -> Unit,
+    onNavigateToAbout: () -> Unit,
+    onNavigateToSongs: () -> Unit,
+    onNavigateToAlbums: () -> Unit,
+    onNavigateToArtists: () -> Unit,
+    onNavigateToPlaylists: () -> Unit
 ) {
     val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     val profileDao = remember { GratiaApp.instance.database.userProfileDao() }
-    val listeningRepo = remember { ListeningEventRepository(GratiaApp.instance.database.listeningEventDao()) }
-    val songCount by songRepo.getSongCount().collectAsState(initial = 0)
-    val favCount by songRepo.getFavoritesCount().collectAsState(initial = 0)
-    
-    // Additional Stats
-    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
+    
+    val songCount by songRepo.getSongCount().collectAsState(initial = 0)
+    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     val playlists by playlistDao.getAllPlaylists().collectAsState(initial = emptyList())
     
     val albumCount = remember(allSongs) { allSongs.mapNotNull { it.album }.distinct().size }
     val artistCount = remember(allSongs) { allSongs.map { it.artist }.distinct().size }
-    val totalListenTimeMs = remember(allSongs) { allSongs.sumOf { it.totalListenTime ?: 0L } }
-    val listenMinutes = (totalListenTimeMs / (1000 * 60)).toInt()
+
+    // Settings state
+    val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
+    val updateState by GratiaApp.instance.updateManager.state.collectAsState()
 
     // Profile state
     val profileFlow by profileDao.getProfile().collectAsState(initial = null)
@@ -80,10 +90,7 @@ fun ProfileScreen(
     var hasChanges by remember { mutableStateOf(false) }
     var isEditing by remember { mutableStateOf(false) }
     var saveSuccess by remember { mutableStateOf(false) }
-    var showClearHistoryDialog by remember { mutableStateOf(false) }
-    var showThemeDialog by remember { mutableStateOf(false) }
-    val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
-    val currentTheme by settingsDataStore.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
+
     val versionName = remember {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -103,7 +110,6 @@ fun ProfileScreen(
         }
     }
 
-    // Image pickers
     val avatarPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -159,10 +165,10 @@ fun ProfileScreen(
             .fillMaxSize()
             .background(GratiaTheme.colors.background)
             .verticalScroll(rememberScrollState())
+            .statusBarsPadding(),
     ) {
-        // Header
         AppleLargeTitleHeader(
-            title = "Profile",
+            title = "You",
             onBack = onNavigateBack
         )
 
@@ -183,7 +189,6 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                // Gratia gradient fallback banner
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -203,18 +208,14 @@ fun ProfileScreen(
                     }
                 }
             }
-            
-            // Edit Toggle
             com.gratia.music.ui.components.GratiaEditAffordance(
                 isEditing = isEditing,
-                onToggle = { 
-                    isEditing = !isEditing 
-                },
+                onToggle = { isEditing = !isEditing },
                 modifier = Modifier.align(Alignment.TopEnd)
             )
         }
 
-        // Avatar overlapping banner
+        // Avatar
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -250,7 +251,6 @@ fun ProfileScreen(
             }
         }
 
-        // Remove picture/cover options
         AnimatedVisibility(
             visible = isEditing && (avatarPath != null || bannerPath != null),
             modifier = Modifier.offset(y = (-24).dp),
@@ -262,12 +262,7 @@ fun ProfileScreen(
                 horizontalArrangement = Arrangement.Center
             ) {
                 if (avatarPath != null) {
-                    TextButton(
-                        onClick = {
-                            avatarPath = null
-                            hasChanges = true
-                        }
-                    ) {
+                    TextButton(onClick = { avatarPath = null; hasChanges = true }) {
                         Text("Remove Picture", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.error)
                     }
                 }
@@ -275,12 +270,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.width(16.dp))
                 }
                 if (bannerPath != null) {
-                    TextButton(
-                        onClick = {
-                            bannerPath = null
-                            hasChanges = true
-                        }
-                    ) {
+                    TextButton(onClick = { bannerPath = null; hasChanges = true }) {
                         Text("Remove Cover", fontFamily = Inter, fontSize = 12.sp, color = GratiaTheme.colors.error)
                     }
                 }
@@ -296,7 +286,6 @@ fun ProfileScreen(
              Spacer(Modifier.height(24.dp))
         }
 
-        // Display name field
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -333,7 +322,6 @@ fun ProfileScreen(
                 )
             )
 
-            // Save button
             AnimatedVisibility(
                 visible = hasChanges && displayName.isNotBlank(),
                 enter = expandVertically(animationSpec = spring(stiffness = 400f)) + fadeIn(),
@@ -351,7 +339,6 @@ fun ProfileScreen(
                                     updatedAt = System.currentTimeMillis()
                                 )
                                 profileDao.upsertProfile(profile)
-                                // Also save to SharedPrefs for HomeScreen access
                                 context.getSharedPreferences("gratia_profile", android.content.Context.MODE_PRIVATE)
                                     .edit()
                                     .putString("display_name", profile.displayName)
@@ -394,185 +381,171 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // Stats row
-        Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = GratiaTheme.colors.surface,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                StatItem(count = "$songCount", label = "Songs")
-                StatItem(count = "$favCount", label = "Favorites")
-                StatItem(count = "Local", label = "Storage")
-            }
+        // LIBRARY
+        SectionTitle("LIBRARY")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.Storage, iconBg = Color(0xFF8E8E93), title = "Storage", subtitle = "Local Device", onClick = onNavigateToStorage)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.LibraryMusic, iconBg = Color(0xFF5856D6), title = "Songs", subtitle = "$songCount tracks", onClick = onNavigateToSongs)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.Album, iconBg = Color(0xFFFF2D55), title = "Albums", subtitle = "$albumCount albums", onClick = onNavigateToAlbums)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.Person, iconBg = Color(0xFFFF9500), title = "Artists", subtitle = "$artistCount artists", onClick = onNavigateToArtists)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.QueueMusic, iconBg = Color(0xFF34C759), title = "Playlists", subtitle = "${playlists.size} playlists", onClick = onNavigateToPlaylists)
         }
+        Spacer(Modifier.height(20.dp))
 
-        Spacer(Modifier.height(24.dp))
-
-        // Settings sections
-        ProfileSection(title = "LIBRARY") {
-            ProfileItem(icon = Icons.Default.Storage, label = "Storage", detail = "Local Device", onClick = onNavigateToStorage)
-            ProfileItem(icon = Icons.Default.LibraryMusic, label = "Songs", detail = "$songCount tracks")
-            ProfileItem(icon = Icons.Default.Album, label = "Albums", detail = "$albumCount albums")
-            ProfileItem(icon = Icons.Default.Person, label = "Artists", detail = "$artistCount artists")
-            ProfileItem(icon = Icons.Default.QueueMusic, label = "Playlists", detail = "${playlists.size} playlists")
+        // PLAYBACK
+        SectionTitle("PLAYBACK")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.BarChart, iconBg = Color(0xFF007AFF), title = "Listening History", subtitle = "Your listening statistics", onClick = onNavigateToListeningHistory)
         }
+        Spacer(Modifier.height(20.dp))
 
-        ProfileSection(title = "PLAYBACK") {
-            ProfileItem(icon = Icons.Default.Headset, label = "Total Listening Time", detail = "$listenMinutes minutes")
+        // SETTINGS
+        SectionTitle("SETTINGS")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.Palette, iconBg = Color(0xFFFF9500), title = "Appearance", subtitle = "Theme, accent color, OLED", onClick = onNavigateToAppearance)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.GraphicEq, iconBg = Color(0xFFFF2D55), title = "Equalizer", subtitle = "Audio effects & frequencies", onClick = onNavigateToEqualizer)
+            SettingsDivider()
+            SettingsRow(
+                icon = Icons.Default.Update, 
+                iconBg = Color(0xFF34C759), 
+                title = "Smart Update", 
+                subtitle = if (smartUpdateEnabled) "Enabled" else "Disabled", 
+                onClick = onNavigateToSmartUpdate,
+                badge = if (!smartUpdateEnabled) "Recommended" else null,
+                showDot = updateState is com.gratia.music.updater.UpdateState.UpdateAvailable || updateState is com.gratia.music.updater.UpdateState.ReadyToInstall
+            )
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.Sync, iconBg = Color(0xFF5856D6), title = "Library", subtitle = "Local files & sync", onClick = onNavigateToLibrarySettings)
         }
+        Spacer(Modifier.height(20.dp))
 
-        ProfileSection(title = "ABOUT") {
-            ProfileItem(icon = Icons.Default.PrivacyTip, label = "Privacy", detail = "All data stays on your device")
-            ProfileItem(icon = Icons.Default.CalendarMonth, label = "Clear Listening History", detail = "Remove local calendar data", onClick = { showClearHistoryDialog = true })
-            ProfileItem(icon = Icons.Default.Info, label = "About Gratia", detail = "Version $versionName", onClick = onNavigateToAbout)
+        // ABOUT
+        SectionTitle("ABOUT")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.PrivacyTip, iconBg = Color(0xFF8E8E93), title = "Privacy", subtitle = "All data stays on your device", onClick = {}, showChevron = false)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.Info, iconBg = Color(0xFF007AFF), title = "About Gratia", subtitle = "Version $versionName", onClick = onNavigateToAbout, showChevron = true)
         }
-
-        Spacer(Modifier.height(32.dp))
-
-        // Footer
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Gratia", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = GratiaTheme.colors.accent)
-            Text("Your personal music library", fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
-        }
-
+        
         Spacer(Modifier.height(56.dp))
     }
-
-    // Theme Selection Dialog
-    if (showThemeDialog) {
-        AlertDialog(
-            onDismissRequest = { showThemeDialog = false },
-            containerColor = GratiaTheme.colors.surface,
-            title = {
-                Text("Select Theme", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary)
-            },
-            text = {
-                Column {
-                    com.gratia.music.data.ThemeOption.values().forEach { option ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    scope.launch {
-                                        settingsDataStore.setThemeOption(option)
-                                        showThemeDialog = false
-                                    }
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = option == currentTheme,
-                                onClick = {
-                                    scope.launch {
-                                        settingsDataStore.setThemeOption(option)
-                                        showThemeDialog = false
-                                    }
-                                },
-                                colors = RadioButtonDefaults.colors(selectedColor = GratiaTheme.colors.accent)
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                text = option.name.lowercase().replaceFirstChar { it.uppercase() },
-                                fontFamily = Inter,
-                                color = GratiaTheme.colors.textPrimary
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) {
-                    Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = Inter)
-                }
-            }
-        )
-    }
-
-    if (showClearHistoryDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearHistoryDialog = false },
-            title = { Text("Clear listening history?", color = GratiaTheme.colors.textPrimary, fontWeight = FontWeight.Bold) },
-            text = { Text("This removes local listening stats from this device.", color = GratiaTheme.colors.textSecondary) },
-            containerColor = GratiaTheme.colors.surface,
-            confirmButton = {
-                TextButton(onClick = {
-                    scope.launch(Dispatchers.IO) {
-                        listeningRepo.clearHistory()
-                    }
-                    showClearHistoryDialog = false
-                }) {
-                    Text("Clear", color = GratiaTheme.colors.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearHistoryDialog = false }) {
-                    Text("Cancel", color = GratiaTheme.colors.textPrimary)
-                }
-            }
-        )
-    }
-
 }
 
 @Composable
-private fun StatItem(count: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(count, fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GratiaTheme.colors.textPrimary)
-        Text(label, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
-    }
-}
-
-@Composable
-private fun ProfileSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun SectionTitle(title: String) {
     Text(
-        title, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 11.sp,
-        color = GratiaTheme.colors.textSecondary, letterSpacing = 1.sp,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+        title, 
+        fontFamily = Inter, 
+        fontWeight = FontWeight.SemiBold, 
+        fontSize = 11.sp,
+        color = GratiaTheme.colors.textSecondary, 
+        letterSpacing = 1.sp,
+        modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp)
     )
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = GratiaTheme.colors.surface,
-    ) {
-        Column(modifier = Modifier.padding(vertical = 4.dp)) {
-            content()
-        }
-    }
-    Spacer(Modifier.height(16.dp))
 }
 
 @Composable
-private fun ProfileItem(
+private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(GratiaTheme.colors.surface),
+        content = content
+    )
+}
+
+@Composable
+private fun SettingsRow(
     icon: ImageVector,
-    label: String,
-    detail: String? = null,
-    onClick: (() -> Unit)? = null
+    iconBg: Color,
+    title: String,
+    subtitle: String? = null,
+    onClick: () -> Unit,
+    badge: String? = null,
+    showDot: Boolean = false,
+    showChevron: Boolean = true
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.bounceClick(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .clickableWithScale(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(20.dp))
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(iconBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
         Spacer(Modifier.width(14.dp))
+
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textPrimary)
-            if (detail != null) {
-                Text(detail, fontFamily = Inter, fontSize = 11.sp, color = GratiaTheme.colors.textSecondary)
+            GratiaText(
+                text = title,
+                style = GratiaTheme.typography.body,
+                color = GratiaTheme.colors.textPrimary
+            )
+            if (subtitle != null) {
+                GratiaText(
+                    text = subtitle,
+                    style = GratiaTheme.typography.caption,
+                    color = GratiaTheme.colors.textSecondary
+                )
             }
         }
-        if (onClick != null) {
-            Icon(Icons.Default.ChevronRight, null, tint = GratiaTheme.colors.textSecondary, modifier = Modifier.size(18.dp))
+
+        if (badge != null) {
+            GratiaText(
+                text = badge,
+                style = GratiaTheme.typography.caption,
+                color = GratiaTheme.colors.accent
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+
+        if (showDot) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(GratiaTheme.colors.error)
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+
+        if (showChevron) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
+}
+
+@Composable
+private fun SettingsDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 62.dp),
+        thickness = 0.5.dp,
+        color = GratiaTheme.colors.textSecondary.copy(alpha = 0.15f)
+    )
 }

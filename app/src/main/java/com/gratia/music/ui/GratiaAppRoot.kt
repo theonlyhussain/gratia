@@ -195,8 +195,7 @@ fun GratiaAppRoot() {
                             }
                         },
                         onNavigateToUpload = { navController.navigate("upload") },
-                        onNavigateToProfile = { navController.navigate("profile") },
-                        onNavigateToSettings = { navController.navigate("settings") }
+                        onNavigateToYou = { navController.navigate("you") }
                     )
                 }
                 navigation(startDestination = "search_main", route = Screen.Search.route) {
@@ -299,24 +298,29 @@ fun GratiaAppRoot() {
                     )
                 }
 
-                composable("profile") {
-                    ProfileScreen(
+                composable("you") {
+                    YouScreen(
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateToStorage = { navController.navigate("storage") },
-                        onNavigateToAbout = { navController.navigate("about") }
+                        onNavigateToListeningHistory = { navController.navigate("listeningHistory") },
+                        onNavigateToAppearance = { navController.navigate("settings/appearance") },
+                        onNavigateToEqualizer = { navController.navigate("equalizer") },
+                        onNavigateToSmartUpdate = { navController.navigate("smartUpdate") },
+                        onNavigateToLibrarySettings = { navController.navigate("settings/library") },
+                        onNavigateToAbout = { navController.navigate("about") },
+                        onNavigateToSongs = { navController.navigate("library") }, // Note: may need adjustments based on real route
+                        onNavigateToAlbums = { navController.navigate("library") }, // Assuming there's a way to specify the tab, default to library for now
+                        onNavigateToArtists = { navController.navigate("library") },
+                        onNavigateToPlaylists = { navController.navigate("playlists") }
+                    )
+                }
+                composable("listeningHistory") {
+                    ListeningHistoryScreen(
+                        onNavigateBack = { navController.popBackStack() }
                     )
                 }
                 composable("storage") {
                     StorageScreen(onNavigateBack = { navController.popBackStack() })
-                }
-                composable("settings") {
-                    SettingsScreen(
-                        onNavigateBack = { navController.popBackStack() },
-                        onNavigateToSmartUpdate = { navController.navigate("smartUpdate") },
-                        onNavigateToEqualizer = { navController.navigate("equalizer") },
-                        onNavigateToAppearance = { navController.navigate("settings/appearance") },
-                        onNavigateToLibrary = { navController.navigate("settings/library") }
-                    )
                 }
                 composable("settings/appearance") {
                     SettingsAppearanceScreen(

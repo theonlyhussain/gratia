@@ -29,4 +29,33 @@ interface ListeningEventDao {
 
     @Query("DELETE FROM listening_events")
     suspend fun clearAllHistory()
+
+    @Query("""
+        SELECT s.artist, SUM(e.listenedSeconds) as totalSeconds
+        FROM listening_events e
+        INNER JOIN songs s ON e.songId = s.id
+        WHERE e.timestamp >= :startTimestamp AND e.timestamp <= :endTimestamp AND (e.eventType = 'play' OR e.eventType = 'complete')
+        GROUP BY s.artist
+        ORDER BY totalSeconds DESC
+        LIMIT :limit
+    """)
+    suspend fun getTopArtists(startTimestamp: Long, endTimestamp: Long, limit: Int = 5): List<com.gratia.music.data.model.ArtistListenSummary>
+
+    @Query("""
+        SELECT s.id as songId, s.title, s.artist, SUM(e.listenedSeconds) as totalSeconds
+        FROM listening_events e
+        INNER JOIN songs s ON e.songId = s.id
+        WHERE e.timestamp >= :startTimestamp AND e.timestamp <= :endTimestamp AND (e.eventType = 'play' OR e.eventType = 'complete')
+        GROUP BY s.id
+        ORDER BY totalSeconds DESC
+        LIMIT :limit
+    """)
+    suspend fun getTopTracks(startTimestamp: Long, endTimestamp: Long, limit: Int = 5): List<com.gratia.music.data.model.TrackListenSummary>
+
+    @Query("""
+        SELECT SUM(listenedSeconds)
+        FROM listening_events
+        WHERE timestamp >= :startTimestamp AND timestamp <= :endTimestamp AND (eventType = 'play' OR eventType = 'complete')
+    """)
+    suspend fun getTotalListeningSeconds(startTimestamp: Long, endTimestamp: Long): Long?
 }

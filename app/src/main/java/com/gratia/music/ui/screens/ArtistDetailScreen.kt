@@ -244,7 +244,7 @@ fun ArtistDetailScreen(
                             modifier = Modifier
                                 .size(72.dp)
                                 .clip(ScallopedStarShape())
-                                .background(MaterialTheme.colorScheme.primary) // Fix: use primary for full solid global accent
+                                .background(MaterialTheme.colorScheme.primaryContainer) // Uses the injected global accent glow
                                 .clickable {
                                     if (artistSongs.isNotEmpty()) {
                                         val shuffled = artistSongs.shuffled()
