@@ -30,13 +30,14 @@ fun SmartUpdateScreen(
     var showOnboarding by remember { mutableStateOf(false) }
     val updateState by GratiaApp.instance.updateManager.state.collectAsState()
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(GratiaTheme.colors.background)
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(GratiaTheme.colors.background)
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
+        ) {
         item {
             AppleLargeTitleHeader(
                 title = "Smart Update",
@@ -116,56 +117,62 @@ fun SmartUpdateScreen(
                 }
             )
             
-            if (showOnboarding) {
-                com.gratia.music.ui.components.SmartUpdateOnboardingSheet(
-                    onEnable = {
-                        showOnboarding = false
-                        scope.launch {
-                            settingsDataStore.setSmartUpdateOnboardingShown(true)
-                            settingsDataStore.setSmartUpdateEnabled(true)
-                            com.gratia.music.updater.UpdateCheckWorker.schedule(context)
-                            android.widget.Toast.makeText(context, "Smart Update enabled", android.widget.Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    onCancel = {
-                        showOnboarding = false
-                    },
-                    onDismiss = {
-                        showOnboarding = false
-                    }
-                )
             }
-            
-            if (updateState !is com.gratia.music.updater.UpdateState.Idle && updateState !is com.gratia.music.updater.UpdateState.UpToDate) {
-                com.gratia.music.ui.components.UpdatePromptSheet(
-                    state = updateState,
-                    onUpdateNow = { url ->
-                        scope.launch { GratiaApp.instance.updateManager.downloadUpdate(url) }
-                    },
-                    onLater = {
-                        GratiaApp.instance.updateManager.resetState()
-                    },
-                    onInstall = { file ->
-                        GratiaApp.instance.updateManager.installUpdate(file)
-                    },
-                    onDismiss = {
-                        if (updateState !is com.gratia.music.updater.UpdateState.Downloading) {
-                            GratiaApp.instance.updateManager.resetState()
-                        }
+        }
+        
+        if (showOnboarding) {
+            com.gratia.music.ui.components.SmartUpdateOnboardingSheet(
+                onEnable = {
+                    showOnboarding = false
+                    scope.launch {
+                        settingsDataStore.setSmartUpdateOnboardingShown(true)
+                        settingsDataStore.setSmartUpdateEnabled(true)
+                        com.gratia.music.updater.UpdateCheckWorker.schedule(context)
+                        android.widget.Toast.makeText(context, "Smart Update enabled", android.widget.Toast.LENGTH_SHORT).show()
                     }
-                )
-            } else if (updateState is com.gratia.music.updater.UpdateState.UpToDate) {
-                // If it is up to date, show a sheet or we can modify UpdatePromptSheet to handle it
-                com.gratia.music.ui.components.UpdatePromptSheet(
-                    state = updateState,
-                    onUpdateNow = {},
-                    onLater = {},
-                    onInstall = {},
-                    onDismiss = {
+                },
+                onCancel = {
+                    showOnboarding = false
+                },
+                onDismiss = {
+                    showOnboarding = false
+                }
+            )
+        }
+        
+        if (updateState !is com.gratia.music.updater.UpdateState.Idle && updateState !is com.gratia.music.updater.UpdateState.UpToDate) {
+            com.gratia.music.ui.components.UpdatePromptSheet(
+                state = updateState,
+                onUpdateNow = { url ->
+                    scope.launch { GratiaApp.instance.updateManager.downloadUpdate(url) }
+                },
+                onCancelDownload = {
+                    GratiaApp.instance.updateManager.cancelDownload()
+                },
+                onLater = {
+                    GratiaApp.instance.updateManager.resetState()
+                },
+                onInstall = { file ->
+                    GratiaApp.instance.updateManager.installUpdate(file)
+                },
+                onDismiss = {
+                    if (updateState is com.gratia.music.updater.UpdateState.Downloading) {
+                        GratiaApp.instance.updateManager.cancelDownload()
+                    } else {
                         GratiaApp.instance.updateManager.resetState()
                     }
-                )
-            }
+                }
+            )
+        } else if (updateState is com.gratia.music.updater.UpdateState.UpToDate) {
+            com.gratia.music.ui.components.UpdatePromptSheet(
+                state = updateState,
+                onUpdateNow = {},
+                onLater = {},
+                onInstall = {},
+                onDismiss = {
+                    GratiaApp.instance.updateManager.resetState()
+                }
+            )
         }
     }
 }

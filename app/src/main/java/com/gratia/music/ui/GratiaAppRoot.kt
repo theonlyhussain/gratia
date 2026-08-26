@@ -423,6 +423,9 @@ fun GratiaAppRoot() {
                 onNavigateToArtist = { artistName ->
                     navController.navigate("artist/${android.net.Uri.encode(artistName)}")
                 },
+                onNavigateToEqualizer = {
+                    navController.navigate("equalizer")
+                },
                 onDismiss = {
                     playerViewModel.setExpandedPlayerOpen(false)
                 }

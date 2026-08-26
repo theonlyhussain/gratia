@@ -86,6 +86,15 @@ class PlayerManager(private val context: Context) {
     private val _queue = MutableStateFlow<List<SongEntity>>(emptyList())
     val queue: StateFlow<List<SongEntity>> = _queue.asStateFlow()
 
+    private val _currentQueueIndex = MutableStateFlow(-1)
+    val currentQueueIndexFlow: StateFlow<Int> = _currentQueueIndex.asStateFlow()
+
+    var currentQueueIndex: Int
+        get() = _currentQueueIndex.value
+        set(value) {
+            _currentQueueIndex.value = value
+        }
+
     private var baseQueue: List<SongEntity> = emptyList()
 
     private val _shuffleEnabled = MutableStateFlow(false)
@@ -391,25 +400,43 @@ class PlayerManager(private val context: Context) {
             val remainder = if (idx >= 0 && idx < list.size - 1) list.subList(idx + 1, list.size) else emptyList()
             val before = if (idx > 0) list.subList(0, idx) else emptyList()
             _queue.value = before + listOf(song) + remainder.shuffled()
+            currentQueueIndex = before.size
         } else {
             _queue.value = list
+            currentQueueIndex = list.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
         }
         
         _currentSong.value = song
         if (oldCurrent?.id != song.id) {
-            _history.value = listOf(song) + _history.value
+            _history.value = (listOf(song) + _history.value).distinctBy { it.id }.take(20)
             
             // Log listening event for previously playing song
             if (oldCurrent != null) {
                 scope.launch { logListeningEventSuspend("skip", skipped = true) }
                 currentSessionStartTimeMs = 0L
-                
-                // Keep history limited to 20 items for UI
-                _history.value = _history.value.take(20)
             }
         }
         
         playSongInternal(song, _queue.value, playImmediately = playImmediately, seekPosition = 0L)
+    }
+
+    fun playSongAtQueueIndex(index: Int, playImmediately: Boolean = true) {
+        val q = _queue.value
+        if (index < 0 || index >= q.size) return
+        val song = q[index]
+        val oldCurrent = _currentSong.value
+        currentQueueIndex = index
+        _currentSong.value = song
+        
+        if (oldCurrent?.id != song.id) {
+            _history.value = (listOf(song) + _history.value).distinctBy { it.id }.take(20)
+            if (oldCurrent != null) {
+                scope.launch { logListeningEventSuspend("skip", skipped = true) }
+                currentSessionStartTimeMs = 0L
+            }
+        }
+        
+        playSongInternal(song, q, playImmediately = playImmediately, seekPosition = 0L)
     }
 
     private fun playSongInternal(song: SongEntity, songQueue: List<SongEntity>, playImmediately: Boolean = true, seekPosition: Long = 0L) {
@@ -530,14 +557,17 @@ class PlayerManager(private val context: Context) {
     }
 
     fun nextSong() {
-        val current = _currentSong.value ?: return
         val q = _queue.value
         if (q.isEmpty()) return
+        val current = _currentSong.value ?: q.firstOrNull() ?: return
 
-        val currentIndex = q.indexOfFirst { it.id == current.id }
+        var currentIndex = currentQueueIndex
+        if (currentIndex < 0 || currentIndex >= q.size || q[currentIndex].id != current.id) {
+            currentIndex = q.indexOfFirst { it.id == current.id }
+        }
         
         // Autoplay logic if at the end of queue
-        if (currentIndex == q.size - 1 && _autoplayEnabled.value) {
+        if (currentIndex >= q.size - 1 && _autoplayEnabled.value) {
             scope.launch {
                 val nextTrack = withContext(Dispatchers.IO) { autoPlayEngine.generateNextTrack(QueueAction.MAINTAIN_VIBE, current, q.map { it.id }) }
                 if (nextTrack != null) {
@@ -546,8 +576,9 @@ class PlayerManager(private val context: Context) {
                     withContext(Dispatchers.Main) {
                         _queue.value = newQueue
                         updatePreloadManager()
-                        // Queue grew, we can now confidently play the next index
-                        playSong(newQueue[currentIndex + 1], newQueue)
+                        val targetIndex = currentIndex + 1
+                        currentQueueIndex = targetIndex
+                        playSongAtQueueIndex(targetIndex)
                     }
                 }
             }
@@ -560,14 +591,15 @@ class PlayerManager(private val context: Context) {
             (currentIndex + 1) % q.size
         }
         
-        Log.d(TAG, "nextSong: index $currentIndex -> $nextIndex")
-        playSong(q[nextIndex], q)
+        Log.d(TAG, "nextSong: index $currentIndex -> $nextIndex (total: ${q.size})")
+        currentQueueIndex = nextIndex
+        playSongAtQueueIndex(nextIndex)
     }
 
     fun prevSong() {
-        val current = _currentSong.value ?: return
         val q = _queue.value
         if (q.isEmpty()) return
+        val current = _currentSong.value ?: return
 
         if (!ensureConnected()) return
         val controller = mediaController ?: return
@@ -579,15 +611,20 @@ class PlayerManager(private val context: Context) {
             return
         }
 
-        val currentIndex = q.indexOfFirst { it.id == current.id }
-        val prevIndex = if (currentIndex == -1) {
-            0
-        } else {
+        var currentIndex = currentQueueIndex
+        if (currentIndex < 0 || currentIndex >= q.size || q[currentIndex].id != current.id) {
+            currentIndex = q.indexOfFirst { it.id == current.id }
+        }
+
+        val prevIndex = if (currentIndex <= 0) {
             (currentIndex - 1 + q.size) % q.size
+        } else {
+            currentIndex - 1
         }
         
         Log.d(TAG, "prevSong: index $currentIndex -> $prevIndex")
-        playSong(q[prevIndex], q)
+        currentQueueIndex = prevIndex
+        playSongAtQueueIndex(prevIndex)
     }
 
     fun toggleShuffle() {
@@ -600,20 +637,24 @@ class PlayerManager(private val context: Context) {
         
         if (!currentShuffle) {
             // Turning ON shuffle: shuffle the remaining songs in the queue
-            val currentIndexInQueue = _queue.value.indexOfFirst { it.id == currentId }
+            var currentIndexInQueue = currentQueueIndex
+            if (currentIndexInQueue < 0 || currentIndexInQueue >= _queue.value.size || _queue.value[currentIndexInQueue].id != currentId) {
+                currentIndexInQueue = _queue.value.indexOfFirst { it.id == currentId }
+            }
             if (currentIndexInQueue >= 0 && currentIndexInQueue < _queue.value.size - 1) {
                 val before = _queue.value.subList(0, currentIndexInQueue + 1)
                 val after = _queue.value.subList(currentIndexInQueue + 1, _queue.value.size).shuffled()
                 _queue.value = before + after
+                currentQueueIndex = currentIndexInQueue
                 updatePreloadManager()
             }
         } else {
             // Turning OFF shuffle: restore order from baseQueue 
-            // We find current song in baseQueue and reconstruct to prevent UI jumping
             if (baseQueue.isNotEmpty()) {
                 val currentIndexInBase = baseQueue.indexOfFirst { it.id == currentId }
                 if (currentIndexInBase >= 0) {
                     _queue.value = baseQueue
+                    currentQueueIndex = currentIndexInBase
                     updatePreloadManager()
                 }
             }
@@ -654,22 +695,41 @@ class PlayerManager(private val context: Context) {
     fun removeFromQueue(songId: String) {
         val current = _currentSong.value
         if (current?.id == songId) return
-        val newQueue = _queue.value.filterNot { it.id == songId }
+        val currentQueue = _queue.value
+        val newQueue = currentQueue.filterNot { it.id == songId }
         _queue.value = newQueue
+        if (current != null) {
+            currentQueueIndex = newQueue.indexOfFirst { it.id == current.id }
+        }
         updatePreloadManager()
         Log.d(TAG, "removeFromQueue: removed $songId, queue size=${newQueue.size}")
     }
 
     fun playNext(song: SongEntity) {
+        val current = _currentSong.value
         val currentQueue = _queue.value.toMutableList()
-        val currentSongIndex = currentQueue.indexOfFirst { it.id == _currentSong.value?.id }
+        var currentSongIndex = currentQueueIndex
+        if (currentSongIndex < 0 || currentSongIndex >= currentQueue.size || (current != null && currentQueue[currentSongIndex].id != current.id)) {
+            currentSongIndex = if (current != null) currentQueue.indexOfFirst { it.id == current.id } else 0
+        }
+        
         if (currentSongIndex != -1) {
+            // Remove existing upcoming occurrence of this song (after currentSongIndex) so it cleanly moves to next position
+            val upcomingStart = currentSongIndex + 1
+            if (upcomingStart < currentQueue.size) {
+                val existingUpcomingIndex = currentQueue.subList(upcomingStart, currentQueue.size).indexOfFirst { it.id == song.id }
+                if (existingUpcomingIndex != -1) {
+                    currentQueue.removeAt(upcomingStart + existingUpcomingIndex)
+                }
+            }
             currentQueue.add(currentSongIndex + 1, song)
         } else {
             currentQueue.add(0, song)
+            currentQueueIndex = 0
         }
         _queue.value = currentQueue
         updatePreloadManager()
+        Log.d(TAG, "playNext: '${song.title}' added after index $currentSongIndex, queue size=${currentQueue.size}")
     }
 
     fun addToQueue(song: SongEntity) {
@@ -686,6 +746,10 @@ class PlayerManager(private val context: Context) {
         val item = q.removeAt(from)
         q.add(to, item)
         _queue.value = q
+        val current = _currentSong.value
+        if (current != null) {
+            currentQueueIndex = q.indexOfFirst { it.id == current.id }
+        }
         updatePreloadManager()
         Log.d(TAG, "moveInQueue: $from -> $to")
     }
@@ -697,6 +761,10 @@ class PlayerManager(private val context: Context) {
         
         val newQueue = currentQueue.subList(0, startIndex) + newUpcomingQueue
         _queue.value = newQueue
+        val current = _currentSong.value
+        if (current != null) {
+            currentQueueIndex = newQueue.indexOfFirst { it.id == current.id }
+        }
         updatePreloadManager()
         Log.d(TAG, "updateUpcomingQueue: updated from index $startIndex")
     }
@@ -706,7 +774,8 @@ class PlayerManager(private val context: Context) {
         val q = _queue.value
         if (index < 0 || index >= q.size) return
         Log.d(TAG, "playFromQueue: index=$index, song='${q[index].title}'")
-        playSong(q[index], q)
+        currentQueueIndex = index
+        playSongAtQueueIndex(index)
     }
 
     private suspend fun handleSongEndedSuspend() {
@@ -723,10 +792,13 @@ class PlayerManager(private val context: Context) {
 
         val current = _currentSong.value ?: return
         var q = _queue.value
-        var currentIndex = q.indexOfFirst { it.id == current.id }
+        var currentIndex = currentQueueIndex
+        if (currentIndex < 0 || currentIndex >= q.size || q[currentIndex].id != current.id) {
+            currentIndex = q.indexOfFirst { it.id == current.id }
+        }
 
         // If at the end of the queue and autoplay is enabled, generate a track
-        if (currentIndex == q.size - 1 && _autoplayEnabled.value) {
+        if (currentIndex >= q.size - 1 && _autoplayEnabled.value) {
             Log.d(TAG, "handleSongEnded: End of queue, Autoplay is enabled. Generating next track.")
             val nextTrack = withContext(Dispatchers.IO) { autoPlayEngine.generateNextTrack(QueueAction.MAINTAIN_VIBE, current, q.map { it.id }) }
             if (nextTrack != null) {
@@ -748,7 +820,8 @@ class PlayerManager(private val context: Context) {
                 Log.d(TAG, "handleSongEnded: REPEAT_ALL — looping back to start")
                 withContext(Dispatchers.Main) {
                     if (q.isNotEmpty()) {
-                        playSong(q.first(), q)
+                        currentQueueIndex = 0
+                        playSongAtQueueIndex(0)
                     }
                 }
             }

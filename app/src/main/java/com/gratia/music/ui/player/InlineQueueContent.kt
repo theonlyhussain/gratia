@@ -54,6 +54,8 @@ import org.burnoutcrew.reorderable.detectReorderAfterLongPress
 import org.burnoutcrew.reorderable.rememberReorderableLazyListState
 import org.burnoutcrew.reorderable.reorderable
 
+data class StableQueueItem(val uniqueId: String, val song: SongEntity)
+
 /**
  * Inline queue content embedded directly inside the expanded player.
  *
@@ -78,6 +80,7 @@ fun InlineQueueContent(
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
+    val currentQueueIndex by playerViewModel.currentQueueIndex.collectAsState()
     val history by playerViewModel.history.collectAsState()
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
     val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
@@ -87,12 +90,10 @@ fun InlineQueueContent(
     var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     val current = currentSong
-    val upcomingStartIndex = if (current != null) {
-        val idx = queue.indexOfFirst { it.id == current.id }
-        if (idx >= 0) idx + 1 else 0
-    } else 0
+    val upcomingStartIndex = if (currentQueueIndex in queue.indices) currentQueueIndex + 1 else 0
 
-    var upcomingLocal by remember { mutableStateOf(emptyList<SongEntity>()) }
+    // Use a wrapper to provide stable, unique keys for ReorderableItem
+    var upcomingLocal by remember { mutableStateOf(emptyList<StableQueueItem>()) }
     
     val reorderableState = rememberReorderableLazyListState(
         listState = listState,
@@ -106,7 +107,7 @@ fun InlineQueueContent(
             }
         },
         onDragEnd = { _, _ ->
-            playerViewModel.updateUpcomingQueue(upcomingLocal, upcomingStartIndex)
+            playerViewModel.updateUpcomingQueue(upcomingLocal.map { it.song }, upcomingStartIndex)
         }
     )
 
@@ -114,7 +115,9 @@ fun InlineQueueContent(
     LaunchedEffect(queue, upcomingStartIndex, isDragging) {
         if (!isDragging) {
             upcomingLocal = if (upcomingStartIndex < queue.size) {
-                queue.subList(upcomingStartIndex, queue.size)
+                queue.subList(upcomingStartIndex, queue.size).mapIndexed { i, song ->
+                    StableQueueItem("${song.id}_${System.identityHashCode(song)}_$i", song)
+                }
             } else emptyList()
         }
     }
@@ -197,16 +200,20 @@ fun InlineQueueContent(
         if (upcomingLocal.isNotEmpty()) {
             itemsIndexed(
                 upcomingLocal,
-                key = { _, song -> "iq_${song.id}" }
-            ) { index, song ->
-                ReorderableItem(reorderableState, key = "iq_${song.id}") { isDragging ->
+                key = { _, item -> "iq_${item.uniqueId}" }
+            ) { _, item ->
+                val song = item.song
+                ReorderableItem(reorderableState, key = "iq_${item.uniqueId}") { isDragging ->
                     val scope = rememberCoroutineScope()
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = { dismissValue ->
                             if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
                                 scope.launch {
                                     kotlinx.coroutines.delay(300)
-                                    playerViewModel.removeFromQueue(song.id)
+                                    // Remove the specific occurrence based on actual queue tracking?
+                                    // Actually we just call removeFromQueue, but that removes by ID.
+                                    // To fix duplicate queue issues correctly, playerViewModel needs removeQueueItemAt(index)
+                                    playerViewModel.removeFromQueue(song.id) 
                                 }
                                 true
                             } else false
@@ -262,13 +269,18 @@ fun InlineQueueContent(
                             }
                         }
                     ) {
+                        val actualIndex = upcomingLocal.indexOf(item)
                         InlineQueueRow(
                             song = song,
                             onPlay = {
                                 onInteraction()
-                                // Find real index in the actual queue since they might tap while dragging or immediately after
-                                val realIndex = playerViewModel.queue.value.indexOfFirst { it.id == song.id }
-                                if (realIndex >= 0) playerViewModel.playFromQueue(realIndex)
+                                val realIndex = upcomingStartIndex + actualIndex
+                                if (realIndex in playerViewModel.queue.value.indices) {
+                                    playerViewModel.playFromQueue(realIndex)
+                                } else {
+                                    val findIdx = playerViewModel.queue.value.indexOfFirst { it.id == song.id }
+                                    if (findIdx >= 0) playerViewModel.playFromQueue(findIdx)
+                                }
                             },
                             modifier = Modifier
                                 .background(

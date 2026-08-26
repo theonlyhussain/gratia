@@ -138,7 +138,9 @@ object CoverArtFetcher {
                 val genres = albumJson.optJSONObject("genres")
                 val genreData = genres?.optJSONArray("data")
                 if (genreData != null && genreData.length() > 0) {
-                    return genreData.getJSONObject(0).optString("name", null)
+                    val firstGenre = genreData.getJSONObject(0)
+                    val genreName = firstGenre.optString("name")
+                    return genreName.ifBlank { null }
                 }
             }
         } catch (e: Exception) {

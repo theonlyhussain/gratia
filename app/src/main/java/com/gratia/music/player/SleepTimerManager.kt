@@ -44,7 +44,7 @@ class SleepTimerManager(private val playerManager: PlayerManager) {
     private val _action = MutableStateFlow(SleepAction.FADE_OUT)
     val action: StateFlow<SleepAction> = _action.asStateFlow()
 
-    fun startTimer(minutes: Int, action: SleepAction) {
+    fun startTimer(minutes: Int, action: SleepAction = _action.value) {
         val durationMs = minutes * 60 * 1000L
         if (durationMs <= 0) return
 
@@ -57,20 +57,20 @@ class SleepTimerManager(private val playerManager: PlayerManager) {
         _isActive.value = true
 
         timerJob = scope.launch {
-            val startTime = System.currentTimeMillis()
+            val startTime = android.os.SystemClock.elapsedRealtime()
             var remaining = durationMs
             
             while (isActive && remaining > 0) {
                 // If fading out and we're in the fade window, handle volume
                 if (_action.value == SleepAction.FADE_OUT && remaining <= FADE_DURATION_MS) {
-                    val progress = remaining.toFloat() / FADE_DURATION_MS
-                    // e.g. 10s remaining -> vol 1.0, 5s remaining -> vol 0.5, 0s -> vol 0.0
+                    val progress = (remaining.toFloat() / FADE_DURATION_MS).coerceIn(0f, 1f)
                     playerManager.setVolume(progress)
                 }
 
-                delay(1000)
-                remaining = durationMs - (System.currentTimeMillis() - startTime)
-                _remainingMs.value = remaining.coerceAtLeast(0)
+                delay(500)
+                val elapsed = android.os.SystemClock.elapsedRealtime() - startTime
+                remaining = (durationMs - elapsed).coerceAtLeast(0)
+                _remainingMs.value = remaining
             }
 
             // Timer complete
@@ -78,8 +78,22 @@ class SleepTimerManager(private val playerManager: PlayerManager) {
         }
     }
 
+    fun addMinutes(minutes: Int) {
+        if (!_isActive.value) {
+            if (minutes > 0) startTimer(minutes)
+            return
+        }
+        val currentRemainingMins = (_remainingMs.value / 60000).toInt()
+        val newMinutes = (currentRemainingMins + minutes).coerceAtLeast(1)
+        startTimer(newMinutes, _action.value)
+    }
+
+    fun setAction(action: SleepAction) {
+        _action.value = action
+    }
+
     fun stopTimer() {
-        if (!_isActive.value) return
+        if (!_isActive.value && timerJob == null) return
         Log.d(TAG, "stopTimer")
         timerJob?.cancel()
         timerJob = null
@@ -88,16 +102,17 @@ class SleepTimerManager(private val playerManager: PlayerManager) {
         _durationMs.value = 0L
         
         // Restore volume if we were fading out
-        if (_action.value == SleepAction.FADE_OUT) {
-            playerManager.setVolume(1.0f)
-        }
+        playerManager.setVolume(1.0f)
     }
 
     private fun executeAction() {
         Log.d(TAG, "Timer ended, executing action: ${_action.value}")
         when (_action.value) {
             SleepAction.PAUSE -> playerManager.pause()
-            SleepAction.STOP -> playerManager.pause() // TODO: fully stop
+            SleepAction.STOP -> {
+                playerManager.pause()
+                playerManager.seekTo(0)
+            }
             SleepAction.FADE_OUT -> {
                 playerManager.pause()
                 // Restore volume for next time user plays

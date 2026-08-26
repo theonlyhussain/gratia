@@ -41,6 +41,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val history = playerManager.history
     val playbackError = playerManager.playbackError
     val audioFormat = playerManager.audioFormat
+    val currentQueueIndex = playerManager.currentQueueIndexFlow
 
     val songCount = songRepository.getSongCount()
     val playlistCount = playlistDao.getPlaylistCount()

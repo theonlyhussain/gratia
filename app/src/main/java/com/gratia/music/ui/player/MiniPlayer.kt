@@ -12,6 +12,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -91,8 +92,12 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     val offsetY = remember { androidx.compose.animation.core.Animatable(0f) }
 
     val initialPage = remember(queue, song.id) {
-        val idx = queue.indexOfFirst { it.id == song.id }
-        if (idx != -1) idx else 0
+        val idx = playerViewModel.playerManager.currentQueueIndex
+        if (idx in queue.indices && queue[idx].id == song.id) idx
+        else {
+            val findIdx = queue.indexOfFirst { it.id == song.id }
+            if (findIdx != -1) findIdx else 0
+        }
     }
     
     val pagerState = androidx.compose.foundation.pager.rememberPagerState(
@@ -100,17 +105,33 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
         pageCount = { queue.size.coerceAtLeast(1) }
     )
 
+    val isMiniDragged by pagerState.interactionSource.collectIsDraggedAsState()
+    var miniUserInitiatedSwipe by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isMiniDragged) {
+        if (isMiniDragged) {
+            miniUserInitiatedSwipe = true
+        }
+    }
+
     // Sync pager with current song when it changes externally
-    LaunchedEffect(song.id) {
-        val target = queue.indexOfFirst { it.id == song.id }
-        if (target != -1 && target != pagerState.currentPage) {
+    val currentQueueIndex = playerViewModel.playerManager.currentQueueIndex
+    LaunchedEffect(song.id, currentQueueIndex, queue.size) {
+        val target = if (currentQueueIndex in queue.indices && queue[currentQueueIndex].id == song.id) {
+            currentQueueIndex
+        } else {
+            queue.indexOfFirst { it.id == song.id }
+        }
+        if (target != -1 && target != pagerState.currentPage && target in queue.indices) {
+            miniUserInitiatedSwipe = false
             pagerState.animateScrollToPage(target)
         }
     }
 
-    // Play song when pager settles
-    LaunchedEffect(pagerState.isScrollInProgress, pagerState.currentPage) {
-        if (!pagerState.isScrollInProgress) {
+    // Play song ONLY when user commits a manual swipe gesture
+    LaunchedEffect(pagerState.isScrollInProgress) {
+        if (!pagerState.isScrollInProgress && miniUserInitiatedSwipe) {
+            miniUserInitiatedSwipe = false
             val targetSong = queue.getOrNull(pagerState.currentPage)
             if (targetSong != null && targetSong.id != currentSong?.id) {
                 haptics.light(view)

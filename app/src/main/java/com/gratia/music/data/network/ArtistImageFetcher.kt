@@ -42,8 +42,8 @@ object ArtistImageFetcher {
                 if (dataArray != null && dataArray.length() > 0) {
                     val firstResult = dataArray.getJSONObject(0)
                     // Try to get the highest quality picture, fallback to medium
-                    val fetchedUrl = firstResult.optString("picture_xl", null) 
-                        ?: firstResult.optString("picture_medium", null)
+                    val fetchedUrl = firstResult.optString("picture_xl").takeIf { it.isNotBlank() } 
+                        ?: firstResult.optString("picture_medium").takeIf { it.isNotBlank() }
                     
                     if (fetchedUrl != null) {
                         prefs?.edit()?.putString(artistName, fetchedUrl)?.apply()

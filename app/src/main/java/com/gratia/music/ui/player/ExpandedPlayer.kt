@@ -18,6 +18,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -120,6 +121,7 @@ fun ExpandedPlayer(
     onOpenSleepTimer: () -> Unit = {},
     onNavigateToAlbum: (String) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {},
+    onNavigateToEqualizer: () -> Unit = {},
     onDismiss: () -> Unit = { playerViewModel.setExpandedPlayerOpen(false) }
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
@@ -158,6 +160,10 @@ fun ExpandedPlayer(
     var showSongInfo by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showSleepTimerSheet by remember { mutableStateOf(false) }
+
+    val sleepTimerActive by playerViewModel.sleepTimerActive.collectAsState()
+    val sleepTimerRemainingMs by playerViewModel.sleepTimerRemainingMs.collectAsState()
 
     // --- Lyrics editor state ---
     var showLyricsEditor by remember { mutableStateOf(false) }
@@ -567,9 +573,18 @@ fun ExpandedPlayer(
         if (showSongMenu) {
             SongMenuSheet(
                 song = song,
+                isFavorite = isFavorite,
+                sleepTimerActive = sleepTimerActive,
+                sleepTimerRemainingMs = sleepTimerRemainingMs,
                 onDismiss = { showSongMenu = false },
-                onPlayNext = { playerViewModel.playNext(song) },
-                onAddToQueue = { playerViewModel.addToQueue(song) },
+                onPlayNext = {
+                    playerViewModel.playNext(song)
+                    scope.launch { snackbarHostState.showSnackbar("Playing next: ${song.title}") }
+                },
+                onAddToQueue = {
+                    playerViewModel.addToQueue(song)
+                    scope.launch { snackbarHostState.showSnackbar("Added to queue: ${song.title}") }
+                },
                 onAddToPlaylist = {
                     showSongMenu = false
                     showAddToPlaylist = true
@@ -581,7 +596,6 @@ fun ExpandedPlayer(
                 },
                 onGoToAlbum = {
                     if (!song.album.isNullOrBlank()) {
-                        onDismiss()
                         onDismiss()
                         onNavigateToAlbum(song.album)
                     }
@@ -602,10 +616,25 @@ fun ExpandedPlayer(
                     showLyricsEditor = true
                 },
                 onSongInfo = { showSongInfo = true },
+                onOpenSleepTimer = {
+                    showSongMenu = false
+                    showSleepTimerSheet = true
+                },
+                onOpenEqualizer = {
+                    onDismiss()
+                    onNavigateToEqualizer()
+                },
                 onDelete = {
                     showSongMenu = false
                     showDeleteConfirm = true
                 }
+            )
+        }
+
+        if (showSleepTimerSheet) {
+            SleepTimerSheet(
+                playerViewModel = playerViewModel,
+                onDismiss = { showSleepTimerSheet = false }
             )
         }
 
@@ -793,7 +822,9 @@ private fun NormalModeContent(
             // --- Hero Artwork area with HorizontalPager ---
             val queue by playerViewModel.queue.collectAsState()
             val currentIndex = remember(queue, song.id) {
-                queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                val idx = playerViewModel.playerManager.currentQueueIndex
+                if (idx in queue.indices && queue[idx].id == song.id) idx
+                else queue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
             }
             
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
@@ -801,9 +832,19 @@ private fun NormalModeContent(
                 pageCount = { queue.size.coerceAtLeast(1) }
             )
 
-            // Sync Player -> Pager (when song changes externally)
+            val isDragged by pagerState.interactionSource.collectIsDraggedAsState()
+            var userInitiatedSwipe by remember { mutableStateOf(false) }
+
+            LaunchedEffect(isDragged) {
+                if (isDragged) {
+                    userInitiatedSwipe = true
+                }
+            }
+
+            // Sync Player -> Pager (when song changes externally e.g. next/prev buttons)
             LaunchedEffect(currentIndex, queue.size) {
                 if (currentIndex != pagerState.currentPage && currentIndex in queue.indices) {
+                    userInitiatedSwipe = false
                     pagerState.animateScrollToPage(
                         page = currentIndex,
                         animationSpec = tween(300)
@@ -811,15 +852,16 @@ private fun NormalModeContent(
                 }
             }
 
-            // Sync Pager -> Player (when user commits a swipe)
-            LaunchedEffect(pagerState) {
-                snapshotFlow { pagerState.settledPage }
-                    .collect { settledPage ->
-                        val actualCurrentIndex = queue.indexOfFirst { it.id == song.id }
-                        if (actualCurrentIndex != -1 && settledPage != actualCurrentIndex && settledPage in queue.indices) {
-                            playerViewModel.playFromQueue(settledPage)
-                        }
+            // Sync Pager -> Player ONLY when user commits a manual swipe gesture
+            LaunchedEffect(pagerState.isScrollInProgress) {
+                if (!pagerState.isScrollInProgress && userInitiatedSwipe) {
+                    userInitiatedSwipe = false
+                    val settledPage = pagerState.currentPage
+                    val actualCurrentIndex = playerViewModel.playerManager.currentQueueIndex
+                    if (settledPage != actualCurrentIndex && settledPage in queue.indices) {
+                        playerViewModel.playFromQueue(settledPage)
                     }
+                }
             }
 
             Box(

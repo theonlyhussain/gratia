@@ -13,14 +13,21 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 
 sealed interface UpdateState {
     object Idle : UpdateState
     object Checking : UpdateState
     object UpToDate : UpdateState
     data class UpdateAvailable(val version: String, val changelog: String, val downloadUrl: String) : UpdateState
-    data class Downloading(val progress: Float) : UpdateState
-    data class ReadyToInstall(val apkFile: File) : UpdateState
+    data class Downloading(
+        val progress: Float,
+        val downloadedBytes: Long = 0L,
+        val totalBytes: Long = 0L,
+        val version: String = ""
+    ) : UpdateState
+    data class ReadyToInstall(val apkFile: File, val version: String = "") : UpdateState
     data class Error(val message: String) : UpdateState
 }
 
@@ -29,7 +36,12 @@ class UpdateManager(private val context: Context) {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state
     
+    private var downloadJob: Job? = null
+    @Volatile private var isCancelled = false
+    @Volatile private var activeConnection: HttpURLConnection? = null
+    
     private val repoUrl = "https://api.github.com/repos/theonlyhussain/gratia/releases/latest"
+
     suspend fun checkForUpdate(manualCheck: Boolean = false) {
         if (!manualCheck && _state.value is UpdateState.UpdateAvailable) return
         
@@ -64,7 +76,7 @@ class UpdateManager(private val context: Context) {
                     if (isNewerVersion(tagName, currentVersion) && downloadUrl.isNotEmpty()) {
                         val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-${tagName}.apk")
                         if (apkFile.exists() && verifyApk(apkFile)) {
-                            _state.value = UpdateState.ReadyToInstall(apkFile)
+                            _state.value = UpdateState.ReadyToInstall(apkFile, tagName)
                         } else {
                             _state.value = UpdateState.UpdateAvailable(tagName, body, downloadUrl)
                         }
@@ -86,65 +98,109 @@ class UpdateManager(private val context: Context) {
 
     suspend fun downloadUpdate(downloadUrl: String) {
         val availableState = _state.value as? UpdateState.UpdateAvailable ?: return
+        val version = availableState.version
+        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-$version.apk")
         
-        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-${availableState.version}.apk")
         if (apkFile.exists() && verifyApk(apkFile)) {
-            _state.value = UpdateState.ReadyToInstall(apkFile)
+            _state.value = UpdateState.ReadyToInstall(apkFile, version)
             return
         }
         
-        _state.value = UpdateState.Downloading(0f)
+        isCancelled = false
+        _state.value = UpdateState.Downloading(0f, 0L, 0L, version)
+        
         withContext(Dispatchers.IO) {
+            var output: FileOutputStream? = null
             try {
                 var url = URL(downloadUrl)
                 var connection = url.openConnection() as HttpURLConnection
+                activeConnection = connection
                 connection.instanceFollowRedirects = true
                 
-                // Manually handle redirects if needed
                 var redirectCount = 0
                 while (connection.responseCode in 300..399 && redirectCount < 5) {
+                    if (isCancelled || !isActive) return@withContext
                     val newUrl = connection.getHeaderField("Location")
                     url = URL(newUrl)
                     connection = url.openConnection() as HttpURLConnection
+                    activeConnection = connection
                     redirectCount++
                 }
 
-                val fileLength = connection.contentLength
+                if (isCancelled || !isActive) return@withContext
+
+                val fileLength = connection.contentLength.toLong()
+                output = FileOutputStream(apkFile)
 
                 connection.inputStream.use { input ->
-                    FileOutputStream(apkFile).use { output ->
-                        val data = ByteArray(8192)
-                        var total: Long = 0
-                        var count: Int
-                        var lastProgress = -1
-                        while (input.read(data).also { count = it } != -1) {
-                            total += count
-                            if (fileLength > 0) {
-                                val progressPercent = (total * 100 / fileLength).toInt()
-                                // Throttle UI updates to avoid overwhelming Compose
-                                if (progressPercent > lastProgress) {
-                                    lastProgress = progressPercent
-                                    val progress = progressPercent.toFloat() / 100f
-                                    _state.value = UpdateState.Downloading(progress)
+                    val data = ByteArray(8192)
+                    var total: Long = 0
+                    var count: Int
+                    var lastProgress = -1
+                    while (input.read(data).also { count = it } != -1) {
+                        if (isCancelled || !isActive) {
+                            break
+                        }
+                        total += count
+                        if (fileLength > 0) {
+                            val progressPercent = (total * 100 / fileLength).toInt()
+                            if (progressPercent > lastProgress) {
+                                lastProgress = progressPercent
+                                val progress = progressPercent.toFloat() / 100f
+                                if (!isCancelled && isActive) {
+                                    _state.value = UpdateState.Downloading(progress, total, fileLength, version)
                                 }
                             }
-                            output.write(data, 0, count)
+                        } else {
+                            if (!isCancelled && isActive) {
+                                _state.value = UpdateState.Downloading(0f, total, 0L, version)
+                            }
                         }
+                        output.write(data, 0, count)
                     }
                 }
                 
+                output.flush()
+                output.close()
+                output = null
+
+                if (isCancelled || !isActive) {
+                    apkFile.delete()
+                    return@withContext
+                }
+
                 if (verifyApk(apkFile)) {
-                    _state.value = UpdateState.ReadyToInstall(apkFile)
+                    _state.value = UpdateState.ReadyToInstall(apkFile, version)
                 } else {
                     _state.value = UpdateState.Error("Downloaded update is corrupted")
                     apkFile.delete()
                 }
 
             } catch (e: Exception) {
+                try { output?.close() } catch (ignored: Exception) {}
+                if (isCancelled || !isActive) {
+                    apkFile.delete()
+                    return@withContext
+                }
                 e.printStackTrace()
-                _state.value = UpdateState.Error("Download failed")
+                _state.value = UpdateState.Error("Download failed: ${e.localizedMessage ?: "Unknown error"}")
+            } finally {
+                activeConnection = null
             }
         }
+    }
+
+    fun cancelDownload() {
+        isCancelled = true
+        try {
+            activeConnection?.disconnect()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        activeConnection = null
+        downloadJob?.cancel()
+        downloadJob = null
+        _state.value = UpdateState.Idle
     }
 
     fun installUpdate(apkFile: File) {
