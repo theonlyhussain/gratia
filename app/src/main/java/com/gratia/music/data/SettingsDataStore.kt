@@ -122,8 +122,6 @@ class SettingsDataStore(private val context: Context) {
     }
 
     private val ONLINE_DATA_ENABLED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("online_data_enabled")
-    private val APP_UPDATES_ENABLED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("app_updates_enabled")
-
     val onlineDataEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[ONLINE_DATA_ENABLED_KEY] ?: true // default to true
@@ -132,17 +130,6 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setOnlineDataEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[ONLINE_DATA_ENABLED_KEY] = enabled
-        }
-    }
-
-    val appUpdatesEnabledFlow: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[APP_UPDATES_ENABLED_KEY] ?: true // default to true
-        }
-
-    suspend fun setAppUpdatesEnabled(enabled: Boolean) {
-        context.dataStore.edit { preferences ->
-            preferences[APP_UPDATES_ENABLED_KEY] = enabled
         }
     }
 

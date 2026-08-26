@@ -7,7 +7,6 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
@@ -31,16 +30,7 @@ class UpdateManager(private val context: Context) {
     val state: StateFlow<UpdateState> = _state
     
     private val repoUrl = "https://api.github.com/repos/theonlyhussain/gratia/releases/latest"
-
     suspend fun checkForUpdate(manualCheck: Boolean = false) {
-        val settings = com.gratia.music.data.SettingsDataStore(context)
-        val appUpdatesEnabled = settings.appUpdatesEnabledFlow.first()
-        
-        if (!appUpdatesEnabled && !manualCheck) {
-            _state.value = UpdateState.Idle
-            return
-        }
-
         if (!manualCheck && _state.value is UpdateState.UpdateAvailable) return
         
         _state.value = UpdateState.Checking
