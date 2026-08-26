@@ -238,12 +238,17 @@ fun GratiaAppRoot() {
                     )
                 }
                 navigation(startDestination = "library_main", route = Screen.Library.route) {
-                    composable("library_main") {
+                    composable(
+                        "library_main?tab={tab}",
+                        arguments = listOf(navArgument("tab") { type = NavType.StringType; nullable = true })
+                    ) { backStackEntry ->
+                        val tab = backStackEntry.arguments?.getString("tab")
                         LibraryScreen(
                             playerViewModel = playerViewModel,
                             onNavigateToAlbum = { navController.navigate("album/${android.net.Uri.encode(it)}") },
                             onNavigateToArtist = { navController.navigate("artist/${android.net.Uri.encode(it)}") },
-                            onNavigateToFolder = { navController.navigate("folder/${android.net.Uri.encode(it)}") }
+                            onNavigateToFolder = { navController.navigate("folder/${android.net.Uri.encode(it)}") },
+                            initialTab = tab
                         )
                     }
                 }
@@ -326,9 +331,9 @@ fun GratiaAppRoot() {
                         onNavigateToSmartUpdate = { navController.navigate("smartUpdate") },
                         onNavigateToLibrarySettings = { navController.navigate("settings/library") },
                         onNavigateToAbout = { navController.navigate("about") },
-                        onNavigateToSongs = { navController.navigate("library") }, // Note: may need adjustments based on real route
-                        onNavigateToAlbums = { navController.navigate("library") }, // Assuming there's a way to specify the tab, default to library for now
-                        onNavigateToArtists = { navController.navigate("library") },
+                        onNavigateToSongs = { navController.navigate("library_main?tab=Songs") },
+                        onNavigateToAlbums = { navController.navigate("library_main?tab=Albums") },
+                        onNavigateToArtists = { navController.navigate("library_main?tab=Artists") },
                         onNavigateToPlaylists = { navController.navigate("playlists") },
                         onNavigateToPlayback = { navController.navigate("settings/playback") }
                     )

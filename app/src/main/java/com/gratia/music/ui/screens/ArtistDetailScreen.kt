@@ -239,12 +239,12 @@ fun ArtistDetailScreen(
                             )
                         }
 
-                        // M3 Scalloped Star FAB
+                        // Clean, Premium Mix/Shuffle FAB
                         Box(
                             modifier = Modifier
-                                .size(72.dp)
-                                .clip(ScallopedStarShape())
-                                .background(MaterialTheme.colorScheme.primaryContainer) // Uses the injected global accent glow
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer)
                                 .clickable {
                                     if (artistSongs.isNotEmpty()) {
                                         val shuffled = artistSongs.shuffled()
@@ -256,8 +256,8 @@ fun ArtistDetailScreen(
                             Icon(
                                 Icons.Default.Shuffle, 
                                 contentDescription = "Shuffle",
-                                tint = MaterialTheme.colorScheme.primary, // The solid accent color
-                                modifier = Modifier.size(32.dp)
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }

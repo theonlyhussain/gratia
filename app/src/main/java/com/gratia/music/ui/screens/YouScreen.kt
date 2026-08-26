@@ -82,6 +82,7 @@ fun YouScreen(
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
     val onlineDataEnabled by settingsDataStore.onlineDataEnabledFlow.collectAsState(initial = true)
+    val appUpdatesEnabled by settingsDataStore.appUpdatesEnabledFlow.collectAsState(initial = true)
     val updateState by GratiaApp.instance.updateManager.state.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -95,6 +96,7 @@ fun YouScreen(
     var saveSuccess by remember { mutableStateOf(false) }
     
     var showOnlineDataWarning by remember { mutableStateOf(false) }
+    var showAppUpdatesWarning by remember { mutableStateOf(false) }
 
     val versionName = remember {
         try {
@@ -422,7 +424,7 @@ fun YouScreen(
         // SETTINGS
         SectionTitle("SETTINGS")
         SectionCard {
-            SettingsRow(icon = Icons.Default.Palette, iconBg = Color(0xFFFF9500), title = "Appearance", subtitle = "Theme, accent color, OLED", onClick = onNavigateToAppearance)
+            SettingsRow(icon = Icons.Default.Palette, iconBg = Color(0xFFFF9500), title = "Appearance", subtitle = "Theme, OLED", onClick = onNavigateToAppearance)
             SettingsDivider()
             SettingsRow(icon = Icons.Default.GraphicEq, iconBg = Color(0xFFFF2D55), title = "Equalizer", subtitle = "Audio effects & frequencies", onClick = onNavigateToEqualizer)
             SettingsDivider()
@@ -460,6 +462,21 @@ fun YouScreen(
                 showChevron = false
             )
             SettingsDivider()
+            SettingsRow(
+                icon = Icons.Default.SystemUpdate, 
+                iconBg = Color(0xFF34C759), 
+                title = "App Updates", 
+                subtitle = if (appUpdatesEnabled) "Enabled (Check GitHub)" else "Disabled", 
+                onClick = { 
+                    if (appUpdatesEnabled) {
+                        showAppUpdatesWarning = true
+                    } else {
+                        coroutineScope.launch { settingsDataStore.setAppUpdatesEnabled(true) } 
+                    }
+                }, 
+                showChevron = false
+            )
+            SettingsDivider()
             SettingsRow(icon = Icons.Default.Info, iconBg = Color(0xFF007AFF), title = "About Gratia", subtitle = "Version $versionName", onClick = onNavigateToAbout, showChevron = true)
         }
         
@@ -487,6 +504,33 @@ fun YouScreen(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { showOnlineDataWarning = false }) {
+                    androidx.compose.material3.Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = com.gratia.music.ui.theme.Inter)
+                }
+            }
+        )
+    }
+
+    if (showAppUpdatesWarning) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showAppUpdatesWarning = false },
+            title = { androidx.compose.material3.Text("Disable App Updates?", fontFamily = com.gratia.music.ui.theme.SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            text = { 
+                androidx.compose.material3.Text(
+                    "Are you sure you want to disable App Updates? Gratia will no longer check GitHub for new versions. You will have to manually check for updates.",
+                    fontFamily = com.gratia.music.ui.theme.Inter,
+                    color = GratiaTheme.colors.textSecondary
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    coroutineScope.launch { settingsDataStore.setAppUpdatesEnabled(false) }
+                    showAppUpdatesWarning = false
+                }) {
+                    androidx.compose.material3.Text("Disable", color = Color(0xFFFF3B30), fontFamily = com.gratia.music.ui.theme.Inter, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showAppUpdatesWarning = false }) {
                     androidx.compose.material3.Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = com.gratia.music.ui.theme.Inter)
                 }
             },

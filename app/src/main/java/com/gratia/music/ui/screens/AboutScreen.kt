@@ -225,8 +225,7 @@ fun AboutScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .verticalScroll(scrollState)
-                .padding(bottom = bottomInset + 32.dp),
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -456,6 +455,7 @@ fun AboutScreen(
                     Spacer(Modifier.height(24.dp))
                 }
             }
+            Spacer(Modifier.height(bottomInset + 32.dp))
         }
     }
 }

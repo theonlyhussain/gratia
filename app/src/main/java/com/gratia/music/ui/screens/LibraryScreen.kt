@@ -39,13 +39,14 @@ fun LibraryScreen(
     playerViewModel: PlayerViewModel,
     onNavigateToAlbum: (String) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {},
-    onNavigateToFolder: (String) -> Unit = {}
+    onNavigateToFolder: (String) -> Unit = {},
+    initialTab: String? = null
 ) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
     val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     
     // activeSubView: null means root library menu
-    var activeSubView by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+    var activeSubView: String? by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(initialTab) }
     
     val navController = LocalNavController.current
 
@@ -55,7 +56,7 @@ fun LibraryScreen(
 
     val springSpec = GratiaTheme.motion.springStandard<androidx.compose.ui.unit.IntOffset>()
 
-    AnimatedContent(
+    AnimatedContent<String?>(
         targetState = activeSubView,
         transitionSpec = {
             if (targetState != null) {

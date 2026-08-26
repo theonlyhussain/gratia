@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -198,10 +200,14 @@ fun InlineQueueContent(
                 key = { _, song -> "iq_${song.id}" }
             ) { index, song ->
                 ReorderableItem(reorderableState, key = "iq_${song.id}") { isDragging ->
+                    val scope = rememberCoroutineScope()
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = { dismissValue ->
                             if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
-                                playerViewModel.removeFromQueue(song.id)
+                                scope.launch {
+                                    kotlinx.coroutines.delay(300)
+                                    playerViewModel.removeFromQueue(song.id)
+                                }
                                 true
                             } else false
                         }

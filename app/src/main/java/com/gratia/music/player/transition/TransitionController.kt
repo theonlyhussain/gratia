@@ -134,8 +134,15 @@ class TransitionController(
             currentObservedPlayer = newPlayer
             newPlayer.addListener(listener)
 
-            if (newPlayer.isPlaying) {
-                newPlayer.currentMediaItem?.let { scheduleTransitionFor(it) }
+            scope.launch {
+                // Wait for the active transition to finish completely before scheduling the next one
+                while (currentState == TransitionState.TRANSITIONING || engine.isTransitionRunning()) {
+                    delay(100)
+                }
+                
+                if (newPlayer.isPlaying) {
+                    newPlayer.currentMediaItem?.let { scheduleTransitionFor(it) }
+                }
             }
         }
     }
@@ -421,8 +428,7 @@ class TransitionController(
         transitionSchedulerJob?.cancel()
 
         // Check if crossfade is globally enabled
-        val isCrossfadeEnabled = true
-        if (!isCrossfadeEnabled) {
+        if (this.crossfadeDurationMs <= 0) {
             Log.d(TAG, "Crossfade globally disabled. Skipping seek transition handling.")
             engine.cancelNext()
             engine.setPauseAtEndOfMediaItems(false)
@@ -439,7 +445,6 @@ class TransitionController(
             return
         }
 
-        val crossfadeDurationMs = 4000 // default 4 seconds
         val minFade = 500L
         val guardWindow = 150L
 
