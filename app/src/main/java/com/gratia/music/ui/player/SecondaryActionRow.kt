@@ -50,7 +50,11 @@ fun SecondaryActionRow(
         )
 
         // Device Selector (MediaRouter)
-        MediaOutputButton()
+        MediaOutputButton(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
+        )
 
         // Queue
         PlayerButton(
