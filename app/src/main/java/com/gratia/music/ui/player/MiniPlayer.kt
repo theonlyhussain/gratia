@@ -12,7 +12,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,6 +62,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentTimeMs by playerViewModel.currentTimeMs.collectAsState()
     val durationMs by playerViewModel.durationMs.collectAsState()
+    val queue by playerViewModel.queue.collectAsState()
 
     val song = currentSong ?: return
     val progress = if (durationMs > 0) currentTimeMs.toFloat() / durationMs.toFloat() else 0f
@@ -87,65 +88,90 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     }
 
     val scope = rememberCoroutineScope()
-    val offsetX = remember { androidx.compose.animation.core.Animatable(0f) }
     val offsetY = remember { androidx.compose.animation.core.Animatable(0f) }
 
-    GlassSurface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
-            .graphicsLayer {
-                translationX = offsetX.value
-                translationY = offsetY.value
-                alpha = (1f - (Math.abs(offsetX.value) / 1000f) - (Math.abs(offsetY.value) / 500f)).coerceIn(0f, 1f)
+    val initialPage = remember(queue, song.id) {
+        val idx = queue.indexOfFirst { it.id == song.id }
+        if (idx != -1) idx else 0
+    }
+    
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { queue.size.coerceAtLeast(1) }
+    )
+
+    // Sync pager with current song when it changes externally
+    LaunchedEffect(song.id) {
+        val target = queue.indexOfFirst { it.id == song.id }
+        if (target != -1 && target != pagerState.currentPage) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
+
+    // Play song when pager settles
+    LaunchedEffect(pagerState.isScrollInProgress, pagerState.currentPage) {
+        if (!pagerState.isScrollInProgress) {
+            val targetSong = queue.getOrNull(pagerState.currentPage)
+            if (targetSong != null && targetSong.id != currentSong?.id) {
+                haptics.light(view)
+                playerViewModel.playFromQueue(pagerState.currentPage)
             }
-            .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragEnd = {
-                        scope.launch {
-                            if (offsetY.value > 150f) {
-                                haptics.heavy(view)
-                                offsetY.animateTo(1000f, animationSpec = tween(300))
-                                playerViewModel.clearQueue()
-                                offsetY.snapTo(0f)
-                            } else if (offsetX.value < -200f) {
-                                haptics.light(view)
-                                offsetX.animateTo(-1000f, animationSpec = tween(300))
-                                playerViewModel.nextSong()
-                                offsetX.snapTo(0f)
-                            } else if (offsetX.value > 200f) {
-                                haptics.light(view)
-                                offsetX.animateTo(1000f, animationSpec = tween(300))
-                                playerViewModel.prevSong()
-                                offsetX.snapTo(0f)
-                            } else {
-                                // Snap back
-                                launch { offsetX.animateTo(0f, animationSpec = androidx.compose.animation.core.spring(stiffness = 300f)) }
-                                launch { offsetY.animateTo(0f, animationSpec = androidx.compose.animation.core.spring(stiffness = 300f)) }
+        }
+    }
+
+    androidx.compose.foundation.pager.HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 0.dp),
+        beyondViewportPageCount = 1
+    ) { page ->
+        val pageSong = queue.getOrNull(page) ?: return@HorizontalPager
+        
+        var pageCoverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
+        LaunchedEffect(pageSong.id, pageSong.coverArtPath) {
+            pageCoverColors = CoverColorCache.getColors(pageSong.id, pageSong.coverArtPath)
+        }
+
+        GlassSurface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
+                .graphicsLayer {
+                    translationY = offsetY.value
+                    alpha = (1f - (Math.abs(offsetY.value) / 500f)).coerceIn(0f, 1f)
+                }
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragEnd = {
+                            scope.launch {
+                                if (offsetY.value > 150f) {
+                                    haptics.heavy(view)
+                                    offsetY.animateTo(1000f, animationSpec = tween(300))
+                                    playerViewModel.clearQueue()
+                                    offsetY.snapTo(0f)
+                                } else {
+                                    offsetY.animateTo(0f, animationSpec = spring(stiffness = 300f))
+                                }
+                            }
+                        },
+                        onDragCancel = { 
+                            scope.launch {
+                                offsetY.animateTo(0f)
+                            }
+                        },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            scope.launch {
+                                if (dragAmount > 0 || offsetY.value > 0) {
+                                    offsetY.snapTo((offsetY.value + dragAmount).coerceAtLeast(0f))
+                                }
                             }
                         }
-                    },
-                    onDragCancel = { 
-                        scope.launch {
-                            launch { offsetX.animateTo(0f) }
-                            launch { offsetY.animateTo(0f) }
-                        }
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        scope.launch {
-                            if (Math.abs(offsetX.value) > 20f || Math.abs(dragAmount.x) > Math.abs(dragAmount.y)) {
-                                offsetX.snapTo(offsetX.value + dragAmount.x)
-                            } else if (dragAmount.y > 0 || offsetY.value > 0) {
-                                offsetY.snapTo((offsetY.value + dragAmount.y).coerceAtLeast(0f))
-                            }
-                        }
-                    }
-                )
-            },
+                    )
+                },
         shape = androidx.compose.foundation.shape.CircleShape,
         backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.95f),
-        glowColor = coverColors.dominant,
+        glowColor = pageCoverColors.dominant,
         elevation = 12.dp,
         borderColorStart = if (GratiaTheme.colors.isDark) {
             Color.White.copy(alpha = 0.1f)
@@ -166,9 +192,9 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                 // Album art with playing indicator overlay
                 Box(contentAlignment = Alignment.Center) {
                     CoverArtImage(
-                        coverArtPath = song.coverArtPath,
-                        title = song.title,
-                        artist = song.artist,
+                        coverArtPath = pageSong.coverArtPath,
+                        title = pageSong.title,
+                        artist = pageSong.artist,
                         size = 44.dp,
                         cornerRadius = 8.dp, // Rounded square
                         fontSize = 12.sp
@@ -176,7 +202,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                     
                     // Semi-transparent overlay when playing
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isPlaying,
+                        visible = isPlaying && pageSong.id == currentSong?.id,
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
@@ -199,7 +225,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                 // Title + Artist with crossfade
                 Column(modifier = Modifier.weight(1f)) {
                     AnimatedText(
-                        text = song.title,
+                        text = pageSong.title,
                         style = GratiaTheme.typography.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
                         color = GratiaTheme.colors.textPrimary,
                         maxLines = 1,
@@ -208,7 +234,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                         isMarquee = true
                     )
                     AnimatedText(
-                        text = song.artist,
+                        text = pageSong.artist,
                         style = GratiaTheme.typography.caption,
                         color = GratiaTheme.colors.textSecondary,
                         maxLines = 1,
@@ -334,10 +360,11 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                 }
             }
 
-            Spacer(Modifier.height(2.dp))
         }
     }
 }
+}
+
 
 /** Utility: format milliseconds as m:ss */
 fun formatTime(ms: Long): String {

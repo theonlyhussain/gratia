@@ -23,25 +23,7 @@ enum class ThemeOption(val value: String) {
     }
 }
 
-enum class AccentColorOption(val value: String, val hex: Long) {
-    DEFAULT("default", 0xFFFA243C),
-    BLUE("blue", 0xFF0A84FF),
-    CYAN("cyan", 0xFF32ADE6),
-    GREEN("green", 0xFF30D158),
-    TEAL("teal", 0xFF64D2FF),
-    PURPLE("purple", 0xFFBF5AF2),
-    VIOLET("violet", 0xFF5E5CE6),
-    PINK("pink", 0xFFFF375F),
-    RED("red", 0xFFFF453A),
-    ORANGE("orange", 0xFFFF9F0A),
-    YELLOW("yellow", 0xFFFFD60A);
 
-    companion object {
-        fun fromValue(value: String): AccentColorOption {
-            return values().find { it.value == value } ?: DEFAULT
-        }
-    }
-}
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "gratia_settings")
 
@@ -61,17 +43,16 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
-    private val ACCENT_KEY = stringPreferencesKey("accent_color")
+    private val CROSSFADE_KEY = androidx.datastore.preferences.core.intPreferencesKey("crossfade_duration_ms")
 
-    val accentColorOptionFlow: Flow<AccentColorOption> = context.dataStore.data
+    val crossfadeDurationFlow: Flow<Int> = context.dataStore.data
         .map { preferences ->
-            val accentValue = preferences[ACCENT_KEY] ?: AccentColorOption.DEFAULT.value
-            AccentColorOption.fromValue(accentValue)
+            preferences[CROSSFADE_KEY] ?: 4000
         }
 
-    suspend fun setAccentColorOption(option: AccentColorOption) {
+    suspend fun setCrossfadeDuration(durationMs: Int) {
         context.dataStore.edit { preferences ->
-            preferences[ACCENT_KEY] = option.value
+            preferences[CROSSFADE_KEY] = durationMs
         }
     }
 

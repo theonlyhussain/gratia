@@ -28,7 +28,7 @@ data class AudioRoute(
 class MediaOutputManager(private val context: Context) {
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private val mediaRouter = MediaRouter.getInstance(context)
+    private val mediaRouter by lazy { MediaRouter.getInstance(context) }
 
     private val _availableRoutes = MutableStateFlow<List<AudioRoute>>(emptyList())
     val availableRoutes: StateFlow<List<AudioRoute>> = _availableRoutes.asStateFlow()
@@ -127,9 +127,19 @@ class MediaOutputManager(private val context: Context) {
                 else -> AudioRoute.RouteType.UNKNOWN
             }
 
-            // FILTERING STALE ROUTES: If MediaRouter says Bluetooth but hardware isn't connected, skip!
-            if (type == AudioRoute.RouteType.BLUETOOTH && !hasBluetoothHardware) {
-                continue 
+            // FILTERING STALE ROUTES: Ensure the specific route's name matches a connected hardware device
+            if (type == AudioRoute.RouteType.BLUETOOTH) {
+                val isHardwareConnected = hardwareDevices.any { hw ->
+                    val hwType = hw.type
+                    val isBTHardware = hwType == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                            hwType == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                            hwType == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                            hwType == AudioDeviceInfo.TYPE_BLE_BROADCAST
+                    isBTHardware && (hw.productName?.toString() == mrRoute.name?.toString() || mrRoute.name?.toString()?.contains(hw.productName?.toString() ?: "", ignoreCase = true) == true)
+                }
+                if (!isHardwareConnected) {
+                    continue 
+                }
             }
 
             val audioRoute = AudioRoute(
@@ -166,8 +176,10 @@ class MediaOutputManager(private val context: Context) {
         }
         routes.add(0, phoneRoute)
 
+        // If MediaRouter has an active CAST or properly verified BLUETOOTH route, use it.
+        // Otherwise, fall back to what hardware is physically connected (Wired > USB > Phone).
         val trueActiveRoute = when {
-            hasBluetoothHardware && activeRouteFromMR?.type == AudioRoute.RouteType.BLUETOOTH -> activeRouteFromMR
+            activeRouteFromMR?.type == AudioRoute.RouteType.BLUETOOTH -> activeRouteFromMR
             activeRouteFromMR?.type == AudioRoute.RouteType.CAST -> activeRouteFromMR
             hasWiredHardware -> routes.firstOrNull { it.type == AudioRoute.RouteType.WIRED } ?: phoneRoute
             hasUsbHardware -> routes.firstOrNull { it.type == AudioRoute.RouteType.USB } ?: phoneRoute

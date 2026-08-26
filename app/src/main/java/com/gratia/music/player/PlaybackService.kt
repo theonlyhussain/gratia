@@ -15,6 +15,11 @@ import com.gratia.music.GratiaApp
 import com.gratia.music.player.transition.GratiaPlayerEngine
 import com.gratia.music.player.transition.TransitionController
 import androidx.core.app.ServiceCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * Foreground service for background audio playback.
@@ -33,6 +38,7 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var playerEngine: GratiaPlayerEngine? = null
     private var transitionController: TransitionController? = null
+    private val serviceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob())
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -92,6 +98,13 @@ class PlaybackService : MediaSessionService() {
         transitionController = TransitionController(engine)
         transitionController?.initialize()
         
+        val settings = com.gratia.music.data.SettingsDataStore(this)
+        serviceScope.launch {
+            settings.crossfadeDurationFlow.collect { duration ->
+                transitionController?.updateCrossfadeDuration(duration)
+            }
+        }
+        
         Log.d(TAG, "PlaybackService: GratiaPlayerEngine + MediaSession created")
     }
 
@@ -143,6 +156,7 @@ class PlaybackService : MediaSessionService() {
         }
         transitionController?.release()
         playerEngine?.release()
+        serviceScope.cancel()
         mediaSession = null
         transitionController = null
         playerEngine = null

@@ -61,7 +61,8 @@ fun YouScreen(
     onNavigateToSongs: () -> Unit,
     onNavigateToAlbums: () -> Unit,
     onNavigateToArtists: () -> Unit,
-    onNavigateToPlaylists: () -> Unit
+    onNavigateToPlaylists: () -> Unit,
+    onNavigateToPlayback: () -> Unit
 ) {
     val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
@@ -406,6 +407,14 @@ fun YouScreen(
         // PLAYBACK
         SectionTitle("PLAYBACK")
         SectionCard {
+            SettingsRow(
+                icon = Icons.Default.Speaker,
+                iconBg = Color(0xFF007AFF),
+                title = "Playback",
+                subtitle = "Crossfade",
+                onClick = onNavigateToPlayback
+            )
+            SettingsDivider()
             SettingsRow(icon = Icons.Default.BarChart, iconBg = Color(0xFF007AFF), title = "Listening History", subtitle = "Your listening statistics", onClick = onNavigateToListeningHistory)
         }
         Spacer(Modifier.height(20.dp))

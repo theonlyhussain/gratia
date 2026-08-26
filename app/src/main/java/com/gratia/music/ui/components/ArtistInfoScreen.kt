@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,7 +26,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
+import com.gratia.music.data.SettingsDataStore
 import com.gratia.music.data.repository.ArtistInfo
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
@@ -48,6 +51,13 @@ fun ArtistInfoScreen(
 ) {
     val motion = GratiaTheme.motion
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    
+    val settingsDataStore = remember { SettingsDataStore(context) }
+    val onlineDataEnabled by settingsDataStore.onlineDataEnabledFlow.collectAsState(initial = true)
+    
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editBioText by remember { mutableStateOf("") }
     
     // Independent swipe-down-to-dismiss gesture for this full-screen layer
     val dismissOffsetY = remember { Animatable(0f) }
@@ -133,7 +143,7 @@ fun ArtistInfoScreen(
                     }
                 }
 
-                // Gradient overlay blending smoothly into the background color (supports both Dark and Light mode)
+                // Gradient overlay blending smoothly into the background color
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -163,10 +173,10 @@ fun ArtistInfoScreen(
                             fontFamily = SpaceGrotesk,
                             fontWeight = FontWeight.Bold,
                             fontSize = 40.sp,
-                            color = GratiaTheme.colors.textPrimary, // Changed from White to Theme-aware
+                            color = GratiaTheme.colors.textPrimary,
                             lineHeight = 44.sp
                         )
-                        if (artistInfo?.isVerified == true) {
+                        if (artistInfo?.isVerified == true && onlineDataEnabled) {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(28.dp)) {
                                 Icon(
                                     imageVector = VerifiedRosette,
@@ -191,7 +201,7 @@ fun ArtistInfoScreen(
                             fontFamily = Inter,
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
-                            color = GratiaTheme.colors.textSecondary // Changed from White/Alpha to Theme-aware
+                            color = GratiaTheme.colors.textSecondary
                         )
                     }
                 }
@@ -200,17 +210,33 @@ fun ArtistInfoScreen(
             // Body: Bio and Info
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 val bio = artistInfo?.biography
-                if (!bio.isNullOrBlank()) {
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = "About",
                         fontFamily = SpaceGrotesk,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
-                        color = GratiaTheme.colors.textPrimary,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        color = GratiaTheme.colors.textPrimary
                     )
+                    
+                    if (!onlineDataEnabled) {
+                        IconButton(onClick = { 
+                            editBioText = bio ?: ""
+                            showEditDialog = true 
+                        }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Biography", tint = GratiaTheme.colors.textPrimary)
+                        }
+                    }
+                }
+
+                if (!bio.isNullOrBlank() || !onlineDataEnabled) {
                     Text(
-                        text = bio,
+                        text = if (bio.isNullOrBlank()) "No biography available." else bio,
                         fontFamily = Inter,
                         fontWeight = FontWeight.Normal,
                         fontSize = 16.sp,
@@ -297,7 +323,6 @@ fun ArtistInfoScreen(
         }
         
         // Sticky Top Bar (Back Button & Scrolled Title)
-        // Animates in based on scroll position
         val showTopBar = scrollState.value > 600
         Box(
             modifier = Modifier
@@ -337,5 +362,40 @@ fun ArtistInfoScreen(
                 }
             }
         }
+    }
+
+    // Edit Biography Dialog
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Edit Local Biography", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, color = GratiaTheme.colors.textPrimary) },
+            text = {
+                TextField(
+                    value = editBioText,
+                    onValueChange = { editBioText = it },
+                    placeholder = { Text("Enter a local biography override...", fontFamily = Inter) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp, max = 250.dp)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newBio = editBioText.trim().takeIf { it.isNotEmpty() }
+                    
+                    val appScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+                    appScope.launch {
+                        com.gratia.music.data.repository.ArtistInfoRepository.updateLocalBiography(artistName, newBio)
+                    }
+                    showEditDialog = false
+                }) {
+                    Text("Save", color = GratiaTheme.colors.accent, fontFamily = Inter, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Cancel", color = GratiaTheme.colors.textSecondary, fontFamily = Inter)
+                }
+            },
+            containerColor = GratiaTheme.colors.surface
+        )
     }
 }

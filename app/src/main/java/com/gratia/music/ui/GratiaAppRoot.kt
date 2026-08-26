@@ -329,7 +329,8 @@ fun GratiaAppRoot() {
                         onNavigateToSongs = { navController.navigate("library") }, // Note: may need adjustments based on real route
                         onNavigateToAlbums = { navController.navigate("library") }, // Assuming there's a way to specify the tab, default to library for now
                         onNavigateToArtists = { navController.navigate("library") },
-                        onNavigateToPlaylists = { navController.navigate("playlists") }
+                        onNavigateToPlaylists = { navController.navigate("playlists") },
+                        onNavigateToPlayback = { navController.navigate("settings/playback") }
                     )
                 }
                 composable("listeningHistory") {
@@ -342,6 +343,11 @@ fun GratiaAppRoot() {
                 }
                 composable("settings/appearance") {
                     SettingsAppearanceScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable("settings/playback") {
+                    SettingsPlaybackScreen(
                         onNavigateBack = { navController.popBackStack() }
                     )
                 }

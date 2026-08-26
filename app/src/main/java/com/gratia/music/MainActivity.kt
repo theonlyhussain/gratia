@@ -25,12 +25,10 @@ class MainActivity : FragmentActivity() {
             val context = LocalContext.current
             val settings = remember { com.gratia.music.data.SettingsDataStore(context) }
             val themeOption by settings.themeOptionFlow.collectAsState(initial = com.gratia.music.data.ThemeOption.SYSTEM)
-            val accentOption by settings.accentColorOptionFlow.collectAsState(initial = com.gratia.music.data.AccentColorOption.DEFAULT)
             val isOled by settings.oledThemeEnabledFlow.collectAsState(initial = false)
 
             GratiaTheme(
                 themeOption = themeOption,
-                accentOption = accentOption,
                 isOledThemeEnabled = isOled
             ) {
                 Surface(

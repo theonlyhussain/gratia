@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.gratia.music.data.AccentColorOption
 import com.gratia.music.data.SettingsDataStore
 import com.gratia.music.data.ThemeOption
 import com.gratia.music.ui.components.AppleLargeTitleHeader
@@ -41,8 +40,6 @@ fun SettingsAppearanceScreen(
     val settingsDataStore = remember { SettingsDataStore(context) }
     val themeOption by settingsDataStore.themeOptionFlow.collectAsState(initial = ThemeOption.SYSTEM)
     val oledThemeEnabled by settingsDataStore.oledThemeEnabledFlow.collectAsState(initial = false)
-    val accentOption by settingsDataStore.accentColorOptionFlow.collectAsState(initial = AccentColorOption.DEFAULT)
-
     // Determine if dark mode is actually active (for showing OLED toggle)
     val isSystemDark = isSystemInDarkTheme()
     val isDarkActive = when (themeOption) {
@@ -159,71 +156,7 @@ fun SettingsAppearanceScreen(
             Spacer(Modifier.height(20.dp))
         }
 
-        // ── ACCENT COLOR ──
-        item {
-            GratiaText(
-                text = "ACCENT COLOR",
-                style = GratiaTheme.typography.caption,
-                color = GratiaTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 32.dp, bottom = 8.dp)
-            )
 
-            AppearanceSectionCard {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    AccentColorOption.values().forEach { option ->
-                        val color = Color(option.hex)
-                        val isSelected = accentOption == option
-
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clickable(
-                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                    indication = null
-                                ) {
-                                    scope.launch { settingsDataStore.setAccentColorOption(option) }
-                                }
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .then(
-                                        if (isSelected) {
-                                            Modifier.border(3.dp, GratiaTheme.colors.textPrimary, CircleShape)
-                                        } else Modifier
-                                    )
-                                    .padding(3.dp)
-                                    .clip(CircleShape)
-                                    .background(color),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSelected) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "Selected",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            GratiaText(
-                                text = option.name.lowercase().replaceFirstChar { it.uppercase() },
-                                style = GratiaTheme.typography.caption.copy(fontSize = androidx.compose.ui.unit.TextUnit(11f, androidx.compose.ui.unit.TextUnitType.Sp)),
-                                color = if (isSelected) GratiaTheme.colors.textPrimary else GratiaTheme.colors.textSecondary
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(Modifier.height(20.dp))
-        }
     }
 }
 

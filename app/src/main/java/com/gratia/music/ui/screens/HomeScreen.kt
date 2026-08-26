@@ -62,6 +62,16 @@ fun HomeScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
 
+    val eventRepo = remember { com.gratia.music.data.repository.ListeningEventRepository(GratiaApp.instance.database.listeningEventDao()) }
+    var topArtists by remember { mutableStateOf<List<com.gratia.music.data.model.ArtistListenSummary>>(emptyList()) }
+    var totalListeningSeconds by remember { mutableStateOf(0L) }
+    
+    LaunchedEffect(Unit) {
+        val todayStart = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        topArtists = eventRepo.getTopArtists(todayStart, Long.MAX_VALUE, 3)
+        totalListeningSeconds = eventRepo.getTotalListeningSeconds(todayStart, Long.MAX_VALUE)
+    }
+
     val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
     val mostPlayed = remember(mostPlayedRaw) { mostPlayedRaw }
     val favoriteSongs = remember(favoriteSongsRaw) { favoriteSongsRaw }
@@ -161,6 +171,63 @@ fun HomeScreen(
                     }
                 }
             )
+        }
+
+        // Your Gratia Stats (Only show if there is listening time today)
+        if (totalListeningSeconds > 0) {
+            item {
+                AppleSectionHeader(title = "Your Gratia Stats")
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(GratiaTheme.colors.surface)
+                        .padding(20.dp)
+                ) {
+                    val hours = totalListeningSeconds / 3600
+                    val minutes = (totalListeningSeconds % 3600) / 60
+                    val timeString = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+                    
+                    GratiaText(
+                        text = "Today's Listening",
+                        style = GratiaTheme.typography.caption,
+                        color = GratiaTheme.colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    GratiaText(
+                        text = timeString,
+                        style = GratiaTheme.typography.largeTitle,
+                        color = GratiaTheme.colors.textPrimary
+                    )
+                    
+                    if (topArtists.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        GratiaText(
+                            text = "Top Artists",
+                            style = GratiaTheme.typography.caption,
+                            color = GratiaTheme.colors.textSecondary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        topArtists.forEachIndexed { index, artist ->
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = if (index < topArtists.size - 1) 8.dp else 0.dp)) {
+                                GratiaText(
+                                    text = "${index + 1}.",
+                                    style = GratiaTheme.typography.body,
+                                    color = GratiaTheme.colors.textSecondary,
+                                    modifier = Modifier.width(24.dp)
+                                )
+                                GratiaText(
+                                    text = artist.artist,
+                                    style = GratiaTheme.typography.body,
+                                    color = GratiaTheme.colors.textPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
 
         // Top Picks (greeting)

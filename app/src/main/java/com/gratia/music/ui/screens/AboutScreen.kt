@@ -219,11 +219,14 @@ fun AboutScreen(
             )
         }
 
+        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp)
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState)
+                .padding(bottom = bottomInset + 32.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

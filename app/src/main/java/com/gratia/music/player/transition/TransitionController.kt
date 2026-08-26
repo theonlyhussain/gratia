@@ -55,6 +55,12 @@ class TransitionController(
     private var scheduleGeneration: Long = 0L
     private var currentState: TransitionState = TransitionState.IDLE
     private var completionListener: TransitionListener? = null
+    private var crossfadeDurationMs: Int = 4000
+
+    fun updateCrossfadeDuration(durationMs: Int) {
+        crossfadeDurationMs = durationMs
+        Log.d(TAG, "Crossfade duration updated to $durationMs ms")
+    }
 
     fun setTransitionListener(listener: TransitionListener) {
         completionListener = listener
@@ -312,7 +318,12 @@ class TransitionController(
             setState(TransitionState.PREPARING)
             engine.prepareNext(nextMediaItem)
 
-            val crossfadeDurationMs = 4000
+            if (crossfadeDurationMs <= 0) {
+                Log.d(TAG, "Crossfade disabled by user settings.")
+                engine.setPauseAtEndOfMediaItems(false)
+                setState(TransitionState.IDLE)
+                return@launch
+            }
 
             // Wait for track duration to become available
             var duration = player.duration

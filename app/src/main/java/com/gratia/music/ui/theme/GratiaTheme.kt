@@ -88,7 +88,6 @@ object GratiaTheme {
 @Composable
 fun GratiaTheme(
     themeOption: com.gratia.music.data.ThemeOption = com.gratia.music.data.ThemeOption.SYSTEM,
-    accentOption: com.gratia.music.data.AccentColorOption = com.gratia.music.data.AccentColorOption.DEFAULT,
     isOledThemeEnabled: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -113,16 +112,6 @@ fun GratiaTheme(
         )
     }
 
-    // Apply dynamic global accent
-    if (accentOption != com.gratia.music.data.AccentColorOption.DEFAULT) {
-        val accentColor = androidx.compose.ui.graphics.Color(accentOption.hex)
-        targetColors = targetColors.copy(
-            accent = accentColor,
-            accentGlow = accentColor.copy(alpha = if (isDark) 0.3f else 0.2f),
-            playerGlow = accentColor.copy(alpha = if (isDark) 0.25f else 0.1f),
-            progressActive = accentColor
-        )
-    }
 
     val background by androidx.compose.animation.animateColorAsState(targetColors.background, label = "background")
     val surface by androidx.compose.animation.animateColorAsState(targetColors.surface, label = "surface")
