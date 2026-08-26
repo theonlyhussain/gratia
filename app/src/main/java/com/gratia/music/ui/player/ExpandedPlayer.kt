@@ -813,13 +813,11 @@ private fun NormalModeContent(
 
             // Sync Pager -> Player (when user commits a swipe)
             LaunchedEffect(pagerState) {
-                snapshotFlow { Pair(pagerState.currentPage, pagerState.isScrollInProgress) }
-                    .collect { (page, isScrolling) ->
-                        if (!isScrolling) {
-                            val actualCurrentIndex = queue.indexOfFirst { it.id == song.id }
-                            if (actualCurrentIndex != -1 && page != actualCurrentIndex && page in queue.indices) {
-                                playerViewModel.playFromQueue(page)
-                            }
+                snapshotFlow { pagerState.settledPage }
+                    .collect { settledPage ->
+                        val actualCurrentIndex = queue.indexOfFirst { it.id == song.id }
+                        if (actualCurrentIndex != -1 && settledPage != actualCurrentIndex && settledPage in queue.indices) {
+                            playerViewModel.playFromQueue(settledPage)
                         }
                     }
             }

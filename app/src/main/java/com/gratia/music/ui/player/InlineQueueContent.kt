@@ -211,24 +211,47 @@ fun InlineQueueContent(
                         state = dismissState,
                         modifier = Modifier.animateItem(),
                         backgroundContent = {
+                            val direction = dismissState.dismissDirection
+                            
                             val color by animateColorAsState(
-                                targetValue = if (dismissState.targetValue != SwipeToDismissBoxValue.Settled) Color.Red.copy(alpha = 0.8f) else Color.Transparent,
+                                targetValue = when (dismissState.targetValue) {
+                                    SwipeToDismissBoxValue.Settled -> Color.Transparent
+                                    else -> Color.Red.copy(alpha = 0.8f)
+                                },
+                                animationSpec = tween(300),
                                 label = "dismissColor"
                             )
+                            
+                            val alignment = when (direction) {
+                                SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                                SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                                else -> Alignment.CenterEnd
+                            }
+                            
+                            val scale by animateFloatAsState(
+                                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0.5f else 1f,
+                                animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+                                label = "iconScale"
+                            )
+                            
+                            val iconAlpha by animateFloatAsState(
+                                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.Settled) 0f else 1f,
+                                animationSpec = tween(300),
+                                label = "iconAlpha"
+                            )
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .background(color),
-                                contentAlignment = Alignment.Center
+                                    .background(color)
+                                    .padding(horizontal = 32.dp),
+                                contentAlignment = alignment
                             ) {
-                                val iconColor by animateColorAsState(
-                                    targetValue = if (dismissState.targetValue != SwipeToDismissBoxValue.Settled) Color.White else Color.Transparent,
-                                    label = "dismissIconColor"
-                                )
                                 Icon(
                                     Icons.Default.Delete,
                                     contentDescription = "Remove from Queue",
-                                    tint = iconColor
+                                    tint = Color.White.copy(alpha = iconAlpha),
+                                    modifier = Modifier.scale(scale)
                                 )
                             }
                         }

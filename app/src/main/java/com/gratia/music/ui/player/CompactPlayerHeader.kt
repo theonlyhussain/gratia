@@ -59,6 +59,10 @@ fun CompactPlayerHeader(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {}
             .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small),
         verticalAlignment = Alignment.CenterVertically
     ) {
