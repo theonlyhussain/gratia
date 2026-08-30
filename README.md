@@ -31,6 +31,19 @@ A modern, meticulously crafted music player focused on fluid playback, stunning 
 
 ---
 
+## Recent Updates
+
+The latest release focuses heavily on stability, UI polish, and unified navigation experiences. Key improvements include:
+
+- **Enhanced Playback Stability**: Addressed core media routing issues, native Media Output Switcher crashes, and improved gapless queue synchronization.
+- **UI Refinements**: Redesigned the MiniPlayer, PlayerControls, and Navigation Bar to closely align with reference aesthetic standards. Global accent colors and OLED theme logic have been improved.
+- **Unified Dashboards**: Consolidated the 'You' screen with the Listening History dashboard for a more cohesive user profile experience.
+- **Settings Overhaul**: Transitioned the settings screen into a categorical hub matching premium Apple aesthetics.
+- **Offline Privacy**: Strengthened offline data handling and user privacy controls for network-dependent features.
+- **Performance Fixes**: Resolved UI bugs, gesture handling edge-cases, system insets, and song row hit targets to ensure smooth, uninterrupted interactions.
+
+---
+
 ## Technology Stack
 
 | Component | Technology |
