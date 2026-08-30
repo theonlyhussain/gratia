@@ -57,6 +57,7 @@ fun BrowseScreen(playerViewModel: PlayerViewModel) {
     }
 
     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+    val topInset = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(150.dp),
@@ -66,6 +67,7 @@ fun BrowseScreen(playerViewModel: PlayerViewModel) {
         contentPadding = PaddingValues(
             start = 24.dp, 
             end = 24.dp, 
+            top = topInset,
             bottom = bottomInset + GratiaTheme.spacing.heroLarge
         ),
         horizontalArrangement = Arrangement.spacedBy(16.dp),

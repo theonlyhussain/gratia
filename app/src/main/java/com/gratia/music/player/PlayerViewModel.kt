@@ -264,6 +264,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun removeFromQueue(songId: String) = playerManager.removeFromQueue(songId)
+    fun removeQueueItemAt(index: Int) = playerManager.removeQueueItemAt(index)
     fun moveInQueue(from: Int, to: Int) = playerManager.moveInQueue(from, to)
     
     fun updateUpcomingQueue(newUpcomingQueue: List<SongEntity>, startIndex: Int) {
@@ -317,11 +318,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
     fun deleteSong(song: SongEntity, onUndoExpired: () -> Unit) {
         viewModelScope.launch {
-            // Remove from queue if present
-            playerManager.removeFromQueue(song.id)
             if (currentSong.value?.id == song.id) {
                 playerManager.nextSong()
             }
+            // Now remove from queue since it's no longer the current song
+            playerManager.removeFromQueue(song.id)
             // Delete from DB (temporarily)
             songRepository.deleteSong(song)
             

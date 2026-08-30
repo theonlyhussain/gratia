@@ -233,27 +233,51 @@ fun ArtistDetailScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
         ) {
-            // ── HERO ARTWORK HEADER WITH FADE & PARALLAX ──
             item {
-                Box(
+                // Header Action Buttons
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(340.dp)
-                        .clipToBounds()
+                        .statusBarsPadding()
+                        .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.medium),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Parallax Hero Image
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(GratiaTheme.colors.surface)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = GratiaTheme.colors.textSecondary)
+                    }
+                    if (onlineDataEnabled) {
+                        IconButton(
+                            onClick = { showEditSheet = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(GratiaTheme.colors.surface)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = GratiaTheme.colors.textSecondary)
+                        }
+                    } else {
+                        Spacer(Modifier.size(40.dp))
+                    }
+                }
+
+                // Rounded Rect Artwork
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = GratiaTheme.spacing.large),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                val offset = if (listState.firstVisibleItemIndex == 0) {
-                                    listState.firstVisibleItemScrollOffset * 0.5f
-                                } else 0f
-                                translationY = offset
-                                val scale = (1f - (listState.firstVisibleItemScrollOffset * 0.0004f)).coerceIn(0.85f, 1.15f)
-                                scaleX = scale
-                                scaleY = scale
-                            }
+                            .size(240.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(GratiaTheme.colors.surfaceHover),
+                        contentAlignment = Alignment.Center
                     ) {
                         if (displayImage != null) {
                             AsyncImage(
@@ -266,65 +290,15 @@ fun ArtistDetailScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(GratiaTheme.colors.surfaceHover),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Person,
-                                    contentDescription = null,
-                                    tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(96.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Smooth Gradient overlay blending seamlessly into background
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    0.0f to Color.Black.copy(alpha = 0.35f),
-                                    0.3f to Color.Transparent,
-                                    0.6f to GratiaTheme.colors.background.copy(alpha = 0.5f),
-                                    0.85f to GratiaTheme.colors.background.copy(alpha = 0.9f),
-                                    1.0f to GratiaTheme.colors.background
-                                )
+                            Icon(
+                                imageVector = Icons.Outlined.Person,
+                                contentDescription = null,
+                                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                                modifier = Modifier.size(96.dp)
                             )
-                    )
-
-                    // Top Bar Action Buttons
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .statusBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(
-                            onClick = onBack,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.3f))
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                        }
-                        IconButton(
-                            onClick = { showEditSheet = true },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.3f))
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
                         }
                     }
+                    Spacer(Modifier.height(GratiaTheme.spacing.large))
                 }
             }
 

@@ -20,4 +20,7 @@ interface ArtworkDao {
 
     @Update
     suspend fun updateArtwork(artwork: ArtworkEntity)
+
+    @Query("DELETE FROM artwork_cache")
+    suspend fun clearCache()
 }

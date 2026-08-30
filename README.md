@@ -6,7 +6,7 @@
 
 A modern, meticulously crafted music player focused on fluid playback, stunning aesthetics, and an ad-free, private listening experience.
 
-[![Version](https://img.shields.io/badge/Version-2.4.0-orange.svg)](https://github.com/theonlyhussain/gratia/releases)
+[![Version](https://img.shields.io/badge/Version-2.3.8-orange.svg)](https://github.com/theonlyhussain/gratia/releases)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg?logo=kotlin)](http://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Compose-Jetpack-4285F4.svg?logo=android)](https://developer.android.com/jetpack/compose)
 [![Media3](https://img.shields.io/badge/Media3-ExoPlayer-brightgreen.svg)](https://developer.android.com/media/media3)
@@ -97,7 +97,3 @@ Contributions are always welcome! Gratia is built to Apple and modern Android UX
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ---
-<div align="center">
-Built with Kotlin and Jetpack Compose.<br>
-<i>Designed to be fast, private, and deeply personal.</i>
-</div>

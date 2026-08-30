@@ -481,6 +481,7 @@ class GratiaPlayerEngine(
         if (isFading) {
             val duration = durationMs.toLong().coerceAtLeast(500L)
             val stepMs = 16L
+            val startTime = android.os.SystemClock.elapsedRealtime()
             var elapsed = 0L
 
             while (elapsed <= duration) {
@@ -500,7 +501,7 @@ class GratiaPlayerEngine(
                 }
 
                 delay(stepMs)
-                elapsed += stepMs
+                elapsed = android.os.SystemClock.elapsedRealtime() - startTime
             }
         } else {
             playerA.volume = 1f

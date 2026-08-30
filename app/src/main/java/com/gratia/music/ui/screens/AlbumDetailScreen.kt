@@ -127,6 +127,7 @@ fun AlbumDetailScreen(
                     isActive = currentSong?.id == song.id,
                     isPlaying = currentSong?.id == song.id && isPlaying,
                     onClick = { playerViewModel.playSong(song, albumSongs) },
+                    onMoreClick = {},
                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
                 )
             }

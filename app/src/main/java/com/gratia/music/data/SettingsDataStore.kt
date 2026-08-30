@@ -108,6 +108,32 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    private val UPDATE_CHANNELS_KEY = stringSetPreferencesKey("update_channels")
+
+    val updateChannelsFlow: Flow<Set<String>> = context.dataStore.data
+        .map { preferences ->
+            preferences[UPDATE_CHANNELS_KEY] ?: setOf("stable")
+        }
+
+    suspend fun setUpdateChannels(channels: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[UPDATE_CHANNELS_KEY] = channels
+        }
+    }
+
+    private val CACHE_LIMIT_MB_KEY = androidx.datastore.preferences.core.intPreferencesKey("cache_limit_mb")
+
+    val cacheLimitMbFlow: Flow<Int> = context.dataStore.data
+        .map { preferences ->
+            preferences[CACHE_LIMIT_MB_KEY] ?: 500
+        }
+
+    suspend fun setCacheLimitMb(limit: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[CACHE_LIMIT_MB_KEY] = limit
+        }
+    }
+
     private val SMART_UPDATE_ONBOARDING_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("smart_update_onboarding_shown")
     
     val smartUpdateOnboardingShownFlow: Flow<Boolean> = context.dataStore.data
