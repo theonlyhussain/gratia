@@ -140,59 +140,46 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
         }
     }
 
-    androidx.compose.foundation.pager.HorizontalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 0.dp),
-        beyondViewportPageCount = 1
-    ) { page ->
-        val pageSong = queue.getOrNull(page) ?: return@HorizontalPager
-        
-        var pageCoverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
-        LaunchedEffect(pageSong.id, pageSong.coverArtPath) {
-            pageCoverColors = CoverColorCache.getColors(pageSong.id, pageSong.coverArtPath)
-        }
-
-        GlassSurface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
-                .graphicsLayer {
-                    translationY = offsetY.value
-                    alpha = (1f - (Math.abs(offsetY.value) / 500f)).coerceIn(0f, 1f)
-                }
-                .pointerInput(Unit) {
-                    detectVerticalDragGestures(
-                        onDragEnd = {
-                            scope.launch {
-                                if (offsetY.value > 150f) {
-                                    haptics.heavy(view)
-                                    offsetY.animateTo(1000f, animationSpec = tween(300))
-                                    playerViewModel.clearQueue()
-                                    offsetY.snapTo(0f)
-                                } else {
-                                    offsetY.animateTo(0f, animationSpec = spring(stiffness = 300f))
-                                }
-                            }
-                        },
-                        onDragCancel = { 
-                            scope.launch {
-                                offsetY.animateTo(0f)
-                            }
-                        },
-                        onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            scope.launch {
-                                if (dragAmount > 0 || offsetY.value > 0) {
-                                    offsetY.snapTo((offsetY.value + dragAmount).coerceAtLeast(0f))
-                                }
+    GlassSurface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = GratiaTheme.spacing.mediumLarge, vertical = GratiaTheme.spacing.small)
+            .graphicsLayer {
+                translationY = offsetY.value
+                alpha = (1f - (Math.abs(offsetY.value) / 500f)).coerceIn(0f, 1f)
+            }
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            if (offsetY.value > 150f) {
+                                haptics.heavy(view)
+                                offsetY.animateTo(1000f, animationSpec = tween(300))
+                                playerViewModel.clearQueue()
+                                offsetY.snapTo(0f)
+                            } else {
+                                offsetY.animateTo(0f, animationSpec = spring(stiffness = 300f))
                             }
                         }
-                    )
-                },
+                    },
+                    onDragCancel = { 
+                        scope.launch {
+                            offsetY.animateTo(0f)
+                        }
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            if (dragAmount > 0 || offsetY.value > 0) {
+                                offsetY.snapTo((offsetY.value + dragAmount).coerceAtLeast(0f))
+                            }
+                        }
+                    }
+                )
+            },
         shape = androidx.compose.foundation.shape.CircleShape,
         backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.95f),
-        glowColor = pageCoverColors.dominant,
+        glowColor = coverColors.dominant,
         elevation = 12.dp,
         borderColorStart = if (GratiaTheme.colors.isDark) {
             Color.White.copy(alpha = 0.1f)
@@ -201,6 +188,17 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
         },
         borderColorEnd = Color.Transparent
     ) {
+        androidx.compose.foundation.pager.HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 0.dp),
+            beyondViewportPageCount = 1
+        ) { page ->
+            val pageSong = queue.getOrNull(page) ?: return@HorizontalPager
+        var pageCoverColors by remember { mutableStateOf(CoverColorCache.FALLBACK) }
+        LaunchedEffect(pageSong.id, pageSong.coverArtPath) {
+            pageCoverColors = CoverColorCache.getColors(pageSong.id, pageSong.coverArtPath)
+        }
         Column {
             // Main content row
             Row(
@@ -385,7 +383,6 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     }
 }
 }
-
 
 /** Utility: format milliseconds as m:ss */
 fun formatTime(ms: Long): String {

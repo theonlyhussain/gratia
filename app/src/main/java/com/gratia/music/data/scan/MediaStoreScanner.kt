@@ -155,6 +155,14 @@ object MediaStoreScanner {
             syncRequest
         )
 
+        val orphanedCount = songRepository.removeOrphanedSongs()
+        if (orphanedCount > 0) {
+            Log.d(TAG, "Removed $orphanedCount orphaned songs from the repository")
+            // PlayerManager queue update is handled reactively by the UI observing the queue, 
+            // but we might want to also remove from PlayerManager if it was playing.
+            // Since this runs in background, the flow will update naturally.
+        }
+
         importedCount
     }
 }

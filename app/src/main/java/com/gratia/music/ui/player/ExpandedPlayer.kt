@@ -569,13 +569,13 @@ fun ExpandedPlayer(
 
         // ========== OVERLAYS (unchanged) ==========
 
-        // --- Song Menu (three-dot) ---
         if (showSongMenu) {
             SongMenuSheet(
                 song = song,
                 isFavorite = isFavorite,
                 sleepTimerActive = sleepTimerActive,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
+                showPlayNextAndFavorite = false,
                 onDismiss = { showSongMenu = false },
                 onPlayNext = {
                     playerViewModel.playNext(song)
@@ -674,14 +674,10 @@ fun ExpandedPlayer(
                     androidx.compose.material3.TextButton(
                         onClick = {
                             showDeleteConfirm = false
+                            val appContext = context.applicationContext
                             playerViewModel.deleteSong(song) {
-                                try {
-                                    val uri = android.net.Uri.parse(song.localUri)
-                                    val file = java.io.File(uri.path ?: "")
-                                    if (file.exists()) file.delete()
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
+                                // Do nothing on disk to prevent SecurityExceptions on Android 10+.
+                                // Deleting from the database is sufficient to hide it from the library.
                             }
                             scope.launch {
                                 val result = snackbarHostState.showSnackbar(

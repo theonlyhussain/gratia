@@ -173,63 +173,6 @@ fun HomeScreen(
             )
         }
 
-        // Your Gratia Stats (Only show if there is listening time today)
-        if (totalListeningSeconds > 0) {
-            item {
-                AppleSectionHeader(title = "Your Gratia Stats")
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(GratiaTheme.colors.surface)
-                        .padding(20.dp)
-                ) {
-                    val hours = totalListeningSeconds / 3600
-                    val minutes = (totalListeningSeconds % 3600) / 60
-                    val timeString = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
-                    
-                    GratiaText(
-                        text = "Today's Listening",
-                        style = GratiaTheme.typography.caption,
-                        color = GratiaTheme.colors.textSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    GratiaText(
-                        text = timeString,
-                        style = GratiaTheme.typography.largeTitle,
-                        color = GratiaTheme.colors.textPrimary
-                    )
-                    
-                    if (topArtists.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        GratiaText(
-                            text = "Top Artists",
-                            style = GratiaTheme.typography.caption,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        topArtists.forEachIndexed { index, artist ->
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = if (index < topArtists.size - 1) 8.dp else 0.dp)) {
-                                GratiaText(
-                                    text = "${index + 1}.",
-                                    style = GratiaTheme.typography.body,
-                                    color = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier.width(24.dp)
-                                )
-                                GratiaText(
-                                    text = artist.artist,
-                                    style = GratiaTheme.typography.body,
-                                    color = GratiaTheme.colors.textPrimary
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-        }
-
         // Top Picks (greeting)
         if (mostPlayed.isNotEmpty()) {
             item {
@@ -353,6 +296,16 @@ fun HomeScreen(
             }
         }
 
+        if (totalListeningSeconds > 0 || topArtists.isNotEmpty()) {
+            item {
+                com.gratia.music.ui.components.ListeningStatsCard(
+                    totalListeningSeconds = totalListeningSeconds,
+                    topArtists = topArtists,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
 
         if (mostPlayed.isEmpty() && recentlyPlayed.isEmpty() && lastAdded.isEmpty()) {
             item {

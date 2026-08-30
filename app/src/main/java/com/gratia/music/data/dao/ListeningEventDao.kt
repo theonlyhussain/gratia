@@ -13,7 +13,7 @@ interface ListeningEventDao {
 
     @Query("""
         SELECT 
-            date((timestamp / 1000) + :timezoneOffsetSeconds, 'unixepoch') AS dateString,
+            date(timestamp / 1000, 'unixepoch', 'localtime') AS dateString,
             COUNT(DISTINCT songId) AS songsPlayed,
             SUM(listenedSeconds) AS listeningSeconds,
             SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) AS completedSongs,
@@ -25,7 +25,7 @@ interface ListeningEventDao {
         GROUP BY dateString
         ORDER BY dateString DESC
     """)
-    suspend fun getDailySummariesSince(startTimestamp: Long, timezoneOffsetSeconds: Long): List<DailyListeningSummary>
+    suspend fun getDailySummariesSince(startTimestamp: Long): List<DailyListeningSummary>
 
     @Query("DELETE FROM listening_events")
     suspend fun clearAllHistory()

@@ -258,7 +258,7 @@ fun QueueSheet(
                             index = upcomingStartIndex + index,
                             isCurrentSong = false,
                             onPlay = { playerViewModel.playFromQueue(upcomingStartIndex + index) },
-                            onRemove = { playerViewModel.removeFromQueue(song.id) },
+                            onRemove = { playerViewModel.removeQueueItemAt(upcomingStartIndex + index) },
                             modifier = Modifier
                                 .animateItem()
                                 .background(if (isDragging) GratiaTheme.colors.surfaceHover else Color.Transparent)

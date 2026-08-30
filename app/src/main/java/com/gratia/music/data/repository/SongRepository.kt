@@ -48,6 +48,19 @@ class SongRepository(private val songDao: SongDao) {
     suspend fun updateSong(song: SongEntity) = songDao.updateSong(song)
 
     suspend fun deleteSong(song: SongEntity) = songDao.deleteSong(song)
+    
+    suspend fun deleteSongs(songs: List<SongEntity>) = songDao.deleteSongs(songs)
+
+    suspend fun removeOrphanedSongs(): Int {
+        val allSongs = songDao.getAllSongsOnce()
+        val orphaned = allSongs.filter { 
+            it.storagePath != null && !java.io.File(it.storagePath).exists() 
+        }
+        if (orphaned.isNotEmpty()) {
+            songDao.deleteSongs(orphaned)
+        }
+        return orphaned.size
+    }
 
     suspend fun toggleFavorite(id: String, isFavorite: Boolean) =
         songDao.setFavorite(id, isFavorite)

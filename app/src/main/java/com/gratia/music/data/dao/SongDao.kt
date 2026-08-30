@@ -97,6 +97,9 @@ interface SongDao {
     @Delete
     suspend fun deleteSong(song: SongEntity)
 
+    @Delete
+    suspend fun deleteSongs(songs: List<SongEntity>)
+
     @Query("UPDATE songs SET isFavorite = :isFavorite, updatedAt = :now WHERE id = :id")
     suspend fun setFavorite(id: String, isFavorite: Boolean, now: Long = System.currentTimeMillis())
 

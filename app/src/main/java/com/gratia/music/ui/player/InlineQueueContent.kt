@@ -201,7 +201,7 @@ fun InlineQueueContent(
             itemsIndexed(
                 upcomingLocal,
                 key = { _, item -> "iq_${item.uniqueId}" }
-            ) { _, item ->
+            ) { index, item ->
                 val song = item.song
                 ReorderableItem(reorderableState, key = "iq_${item.uniqueId}") { isDragging ->
                     val scope = rememberCoroutineScope()
@@ -210,10 +210,8 @@ fun InlineQueueContent(
                             if (dismissValue == SwipeToDismissBoxValue.EndToStart || dismissValue == SwipeToDismissBoxValue.StartToEnd) {
                                 scope.launch {
                                     kotlinx.coroutines.delay(300)
-                                    // Remove the specific occurrence based on actual queue tracking?
-                                    // Actually we just call removeFromQueue, but that removes by ID.
-                                    // To fix duplicate queue issues correctly, playerViewModel needs removeQueueItemAt(index)
-                                    playerViewModel.removeFromQueue(song.id) 
+                                    // Actually we just call removeQueueItemAt
+                                    playerViewModel.removeQueueItemAt(upcomingStartIndex + index) 
                                 }
                                 true
                             } else false

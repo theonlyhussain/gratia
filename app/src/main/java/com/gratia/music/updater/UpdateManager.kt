@@ -74,7 +74,16 @@ class UpdateManager(private val context: Context) {
                     val currentVersion = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "1.0.0"
 
                     if (isNewerVersion(tagName, currentVersion) && downloadUrl.isNotEmpty()) {
-                        val apkFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "Gratia-Update-${tagName}.apk")
+                        val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                        downloadsDir?.listFiles()?.forEach { file ->
+                            if (file.name.startsWith("Gratia-Update-") && file.name.endsWith(".apk")) {
+                                if (!verifyApk(file)) {
+                                    file.delete()
+                                }
+                            }
+                        }
+                        
+                        val apkFile = File(downloadsDir, "Gratia-Update-${tagName}.apk")
                         if (apkFile.exists() && verifyApk(apkFile)) {
                             _state.value = UpdateState.ReadyToInstall(apkFile, tagName)
                         } else {
@@ -241,7 +250,23 @@ class UpdateManager(private val context: Context) {
         return try {
             val packageInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
             if (packageInfo != null) {
-                packageInfo.packageName == context.packageName
+                if (packageInfo.packageName != context.packageName) return false
+                
+                val currentPackageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                val downloadedVersionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    packageInfo.longVersionCode
+                } else {
+                    packageInfo.versionCode.toLong()
+                }
+                val currentVersionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    currentPackageInfo.longVersionCode
+                } else {
+                    currentPackageInfo.versionCode.toLong()
+                }
+                
+                if (downloadedVersionCode <= currentVersionCode) return false
+                
+                true
             } else {
                 false
             }

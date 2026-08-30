@@ -70,6 +70,7 @@ class PlayerManager(private val context: Context) {
     private val autoPlayEngine = AutoPlayEngine(songRepo)
 
     private var currentSessionStartTimeMs: Long = 0L
+    private var currentSongAccumulatedTimeMs: Long = 0L
 
     private val _currentSong = MutableStateFlow<SongEntity?>(null)
     val currentSong: StateFlow<SongEntity?> = _currentSong.asStateFlow()
@@ -161,6 +162,9 @@ class PlayerManager(private val context: Context) {
             } else {
                 stopProgressUpdates()
                 cancelBackgroundSync()
+                if (currentSessionStartTimeMs > 0) {
+                    currentSongAccumulatedTimeMs += (System.currentTimeMillis() - currentSessionStartTimeMs)
+                }
                 scope.launch { logListeningEventSuspend("pause") }
                 currentSessionStartTimeMs = 0L
             }
@@ -433,6 +437,7 @@ class PlayerManager(private val context: Context) {
             if (oldCurrent != null) {
                 scope.launch { logListeningEventSuspend("skip", skipped = true) }
                 currentSessionStartTimeMs = 0L
+                currentSongAccumulatedTimeMs = 0L
             }
         }
         
@@ -705,6 +710,22 @@ class PlayerManager(private val context: Context) {
         Log.d(TAG, "removeFromQueue: removed $songId, queue size=${newQueue.size}")
     }
 
+    /** Remove a specific item from the queue by its index. */
+    fun removeQueueItemAt(index: Int) {
+        val q = _queue.value.toMutableList()
+        if (index in q.indices) {
+            if (index == _currentQueueIndex.value) return
+            
+            q.removeAt(index)
+            _queue.value = q
+            
+            if (index < _currentQueueIndex.value) {
+                _currentQueueIndex.value -= 1
+            }
+            updatePreloadManager()
+        }
+    }
+
     fun playNext(song: SongEntity) {
         val current = _currentSong.value
         val currentQueue = _queue.value.toMutableList()
@@ -872,16 +893,22 @@ class PlayerManager(private val context: Context) {
 
     private suspend fun logListeningEventSuspend(reason: String, completed: Boolean = false, skipped: Boolean = false) {
         val current = _currentSong.value ?: return
-        if (currentSessionStartTimeMs <= 0) return
-        val listenedSec = (System.currentTimeMillis() - currentSessionStartTimeMs) / 1000
-        if (listenedSec <= (if (reason == "pause") 1 else 0)) return
+        
+        var activeSessionMs = 0L
+        if (currentSessionStartTimeMs > 0 && _isPlaying.value) {
+            activeSessionMs = System.currentTimeMillis() - currentSessionStartTimeMs
+        }
+        
+        val totalListenedSec = (currentSongAccumulatedTimeMs + activeSessionMs) / 1000
+        
+        if (totalListenedSec <= (if (reason == "pause") 1 else 0)) return
         
         // Process through RetentionManager
-        val action = retentionManager.processTrackEnd(listenedSec * 1000, _durationMs.value)
+        val action = retentionManager.processTrackEnd(totalListenedSec * 1000, _durationMs.value)
         
         scope.launch(Dispatchers.IO) {
-            listeningRepo.logEvent(current.id, reason, listenedSec, completed = completed, skipped = skipped)
-            GratiaApp.instance.database.songDao().incrementListenTime(current.id, listenedSec * 1000)
+            listeningRepo.logEvent(current.id, reason, totalListenedSec, completed = completed, skipped = skipped)
+            GratiaApp.instance.database.songDao().incrementListenTime(current.id, totalListenedSec * 1000)
         }
         
         // Handle Auto-Play logic synchronously in this coroutine

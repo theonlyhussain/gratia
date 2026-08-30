@@ -6,7 +6,7 @@
  
 A  modern, meticulously crafted music player focused on fluid playback, stunning aesthetics, and an ad-free, private listening experience.
 
-[![Version](https://img.shields.io/badge/Version-2.4.0-orange.svg)](https://github.com/theonlyhussain/gratia/releases)
+[![Version](https://img.shields.io/badge/Version-2.3.8-orange.svg)](https://github.com/theonlyhussain/gratia/releases)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.0-blue.svg?logo=kotlin)](http://kotlinlang.org)
 [![Compose](https://img.shields.io/badge/Compose-Jetpack-4285F4.svg?logo=android)](https://developer.android.com/jetpack/compose)
 [![Media3](https://img.shields.io/badge/Media3-ExoPlayer-brightgreen.svg)](https://developer.android.com/media/media3)
@@ -28,6 +28,19 @@ A  modern, meticulously crafted music player focused on fluid playback, stunning
 - **Smart In-App Updates**: Built-in non-intrusive update manager that detects, downloads, and installs the latest Gratia releases directly from GitHub.
 - **Media3 Notification**: Clean, monochrome silhouette notification with full playback controls and artwork integration.
 - **Absolute Privacy**: Complete offline-first architecture with zero analytics and zero telemetry. Your library stays strictly on your device.
+
+---
+
+## Recent Updates
+
+The latest release focuses heavily on stability, UI polish, and unified navigation experiences. Key improvements include:
+
+- **Enhanced Playback Stability**: Addressed core media routing issues, native Media Output Switcher crashes, and improved gapless queue synchronization.
+- **UI Refinements**: Redesigned the MiniPlayer, PlayerControls, and Navigation Bar to closely align with reference aesthetic standards. Global accent colors and OLED theme logic have been improved.
+- **Unified Dashboards**: Consolidated the 'You' screen with the Listening History dashboard for a more cohesive user profile experience.
+- **Settings Overhaul**: Transitioned the settings screen into a categorical hub matching premium Apple aesthetics.
+- **Offline Privacy**: Strengthened offline data handling and user privacy controls for network-dependent features.
+- **Performance Fixes**: Resolved UI bugs, gesture handling edge-cases, system insets, and song row hit targets to ensure smooth, uninterrupted interactions.
 
 ---
 
@@ -97,7 +110,3 @@ Contributions are always welcome! Gratia is built to Apple and modern Android UX
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ---
-<div align="center">
-Built with Kotlin and Jetpack Compose.<br>
-<i>Designed to be fast, private, and deeply personal.</i>
-</div>

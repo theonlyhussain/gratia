@@ -36,6 +36,7 @@ fun SongMenuSheet(
     isFavorite: Boolean = song.isFavorite,
     sleepTimerActive: Boolean = false,
     sleepTimerRemainingMs: Long = 0L,
+    showPlayNextAndFavorite: Boolean = true,
     onDismiss: () -> Unit,
     onPlayNext: () -> Unit = {},
     onAddToQueue: () -> Unit = {},
@@ -118,31 +119,33 @@ fun SongMenuSheet(
                     )
                 }
 
-                // Favorite
-                item {
-                    ControlTile(
-                        icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        title = if (isFavorite) "Liked" else "Favorite",
-                        subtitle = null,
-                        iconTint = if (isFavorite) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
-                        onClick = {
-                            onToggleLike()
-                            onDismiss()
-                        }
-                    )
-                }
+                if (showPlayNextAndFavorite) {
+                    // Favorite
+                    item {
+                        ControlTile(
+                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            title = if (isFavorite) "Liked" else "Favorite",
+                            subtitle = null,
+                            iconTint = if (isFavorite) GratiaTheme.colors.accent else GratiaTheme.colors.textPrimary,
+                            onClick = {
+                                onToggleLike()
+                                onDismiss()
+                            }
+                        )
+                    }
 
-                // Play Next
-                item {
-                    ControlTile(
-                        icon = Icons.Outlined.SkipNext,
-                        title = "Play Next",
-                        subtitle = "Play next track",
-                        onClick = {
-                            onPlayNext()
-                            onDismiss()
-                        }
-                    )
+                    // Play Next
+                    item {
+                        ControlTile(
+                            icon = Icons.Outlined.SkipNext,
+                            title = "Play Next",
+                            subtitle = "Play next track",
+                            onClick = {
+                                onPlayNext()
+                                onDismiss()
+                            }
+                        )
+                    }
                 }
 
                 // Equalizer

@@ -36,8 +36,7 @@ class ListeningEventRepository(private val dao: ListeningEventDao) {
                 .atStartOfDay(ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli()
-            val offsetSeconds = ZoneId.systemDefault().rules.getOffset(java.time.Instant.now()).totalSeconds.toLong()
-            dao.getDailySummariesSince(startTimestamp, offsetSeconds)
+            dao.getDailySummariesSince(startTimestamp)
         }
     }
 
