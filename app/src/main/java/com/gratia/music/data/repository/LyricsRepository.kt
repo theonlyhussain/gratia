@@ -1,5 +1,6 @@
 package com.gratia.music.data.repository
 
+import android.util.Log
 import com.gratia.music.data.dao.LyricsDao
 import com.gratia.music.data.model.LyricsEntity
 import com.gratia.music.data.model.SongEntity
@@ -9,13 +10,36 @@ import com.gratia.music.lyrics.LyricsProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withTimeoutOrNull
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.SettingsDataStore
 
 class LyricsRepository(
     private val lyricsDao: LyricsDao
 ) {
-    private val providers: List<LyricsProvider> = listOf(LyricallyProvider(), LRCLIBProvider())
+    private val ytmLyricsProvider = com.gratia.music.lyrics.YouTubeMusicLyricsProvider()
+    private val providers: List<LyricsProvider> = listOf(
+        com.gratia.music.lyrics.BetterLyrics,
+        com.gratia.music.lyrics.LyricsPlus,
+        com.gratia.music.lyrics.SimpMusicLyrics,
+        com.gratia.music.lyrics.KuGou,
+        LRCLIBProvider(),
+        LyricallyProvider(),
+        ytmLyricsProvider
+    )
+
+    // Used as a tie-breaker if SyncLevel, matchConfidence, and duration difference are all equal
+    private val providerPreferenceOrder = mapOf(
+        "BetterLyrics" to 70,
+        "LyricsPlus" to 60,
+        "SimpMusic" to 50,
+        "YouTube Music" to 40,
+        "KuGou" to 30,
+        "Lyrically" to 20,
+        "LRCLIB" to 10
+    )
 
     suspend fun getLyrics(song: SongEntity, forceRefresh: Boolean = false): LyricsEntity? = withContext(Dispatchers.IO) {
         val allLyrics = lyricsDao.getLyricsForSong(song.id)
@@ -40,35 +64,51 @@ class LyricsRepository(
             return@withContext activeLyrics
         }
 
-        // Fetch from providers
-        for (provider in providers) {
-            val result = if (provider is LRCLIBProvider) {
-                provider.fetchLyricsWithDuration(song.title, song.artist, song.album, song.durationMs)
-            } else {
-                provider.fetchLyrics(song.title, song.artist, song.album)
+        val videoId = song.providerTrackId ?: (if (song.storageProvider == "youtube_music") song.id.removePrefix("ytm_") else null)
+        
+        // Concurrently fetch from all providers
+        val deferredResults = providers.map { provider ->
+            async {
+                try {
+                    provider.fetchLyrics(song.title, song.artist, song.album, song.durationMs, videoId)
+                } catch (e: Exception) {
+                    Log.e("LyricsRepository", "Error fetching from ${provider.name}", e)
+                    null
+                }
             }
+        }
+        
+        // Await all with a hard timeout of 8 seconds to prevent indefinite hangs
+        val results: List<com.gratia.music.lyrics.LyricsResult> = withTimeoutOrNull(8000L) {
+            deferredResults.awaitAll()
+        }?.filterNotNull() ?: emptyList()
+
+        if (results.isEmpty()) return@withContext activeLyrics
+
+        // Filter and sort results
+        val bestResult = results
+            .filter { it.durationDifferenceMs <= 15000L } // Reject wildly wrong durations
+            .sortedWith(
+                compareByDescending<com.gratia.music.lyrics.LyricsResult> { it.syncLevel.priority }
+                    .thenByDescending { it.matchConfidence }
+                    .thenBy { it.durationDifferenceMs }
+                    .thenByDescending { providerPreferenceOrder[it.providerName] ?: 0 }
+            ).firstOrNull()
             
-            if (result != null) {
-                // Determine format
-                // Priority: Enhanced -> Synced -> Plain
-                // We trust the provider's result to be the highest priority it found.
-                // We save it as "automatic" to ensure only ONE automatic version exists.
-                val existingOffset = autoLyrics?.offsetMs ?: 0L
-                val newLyrics = LyricsEntity(
-                    songId = song.id,
-                    text = result.text,
-                    isSynced = result.isSynced,
-                    provider = "automatic",
-                    offsetMs = existingOffset,
-                    isManuallyEdited = false,
-                    isWordLevel = result.isWordLevel,
-                    isActiveOverride = false
-                )
-                lyricsDao.insertLyrics(newLyrics)
-                
-                // If user doesn't have an active manual override, we return the newly fetched one.
-                return@withContext if (manualLyrics?.isActiveOverride == true) manualLyrics else newLyrics
-            }
+        if (bestResult != null) {
+            val existingOffset = autoLyrics?.offsetMs ?: 0L
+            val newLyrics = LyricsEntity(
+                songId = song.id,
+                text = bestResult.text,
+                isSynced = bestResult.syncLevel >= com.gratia.music.lyrics.SyncLevel.LINE,
+                provider = "automatic",
+                offsetMs = existingOffset,
+                isManuallyEdited = false,
+                isWordLevel = bestResult.syncLevel >= com.gratia.music.lyrics.SyncLevel.WORD,
+                isActiveOverride = false
+            )
+            lyricsDao.insertLyrics(newLyrics)
+            return@withContext if (manualLyrics?.isActiveOverride == true) manualLyrics else newLyrics
         }
 
         return@withContext activeLyrics

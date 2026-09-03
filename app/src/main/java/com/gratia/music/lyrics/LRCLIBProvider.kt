@@ -12,8 +12,13 @@ class LRCLIBProvider : LyricsProvider {
     override val name = "LRCLIB"
     private val TAG = "LRCLIBProvider"
 
-    // Optional duration Ms for precise matching
-    suspend fun fetchLyricsWithDuration(title: String, artist: String, album: String?, durationMs: Long?): LyricsResult? {
+    override suspend fun fetchLyrics(
+        title: String,
+        artist: String,
+        album: String?,
+        durationMs: Long?,
+        videoId: String?
+    ): LyricsResult? {
         // Fallback cascade logic according to spec:
         // 1. Artist + Title + Duration (LRCLIB API prefers this order actually, but the query params don't care)
         // Let's use the explicit cascade:
@@ -36,10 +41,6 @@ class LRCLIBProvider : LyricsProvider {
         Log.d(TAG, "Search 4 failed. Falling back to /api/search endpoint.")
         result = trySearchEndpoint(title, artist)
         return result
-    }
-
-    override suspend fun fetchLyrics(title: String, artist: String, album: String?): LyricsResult? {
-        return fetchLyricsWithDuration(title, artist, album, null)
     }
 
     private fun cleanTitle(title: String): String {
@@ -92,9 +93,9 @@ class LRCLIBProvider : LyricsProvider {
                 val plainLyrics = json.optString("plainLyrics")
 
                 if (syncedLyrics.isNotBlank()) {
-                    return@withContext LyricsResult(syncedLyrics, true, name)
+                    return@withContext LyricsResult(syncedLyrics, SyncLevel.LINE, name, 90, 0L)
                 } else if (plainLyrics.isNotBlank()) {
-                    return@withContext LyricsResult(plainLyrics, false, name)
+                    return@withContext LyricsResult(plainLyrics, SyncLevel.UNSYNCED, name, 90, 0L)
                 }
             } else if (responseCode == 404) {
                 Log.d(TAG, "API returned 404 Not Found")
@@ -140,9 +141,9 @@ class LRCLIBProvider : LyricsProvider {
                     val plainLyrics = bestMatch.optString("plainLyrics")
 
                     if (syncedLyrics.isNotBlank()) {
-                        return@withContext LyricsResult(syncedLyrics, true, name)
+                        return@withContext LyricsResult(syncedLyrics, SyncLevel.LINE, name, 80, 0L)
                     } else if (plainLyrics.isNotBlank()) {
-                        return@withContext LyricsResult(plainLyrics, false, name)
+                        return@withContext LyricsResult(plainLyrics, SyncLevel.UNSYNCED, name, 80, 0L)
                     }
                 }
             }

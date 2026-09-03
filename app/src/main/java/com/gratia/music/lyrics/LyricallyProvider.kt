@@ -14,7 +14,13 @@ class LyricallyProvider : LyricsProvider {
     private val TAG = "LyricallyProvider"
     private val BASE_URL = "https://lyrics.paxsenix.org/"
 
-    override suspend fun fetchLyrics(title: String, artist: String, album: String?): LyricsResult? = withContext(Dispatchers.IO) {
+    override suspend fun fetchLyrics(
+        title: String,
+        artist: String,
+        album: String?,
+        durationMs: Long?,
+        videoId: String?
+    ): LyricsResult? = withContext(Dispatchers.IO) {
         try {
             val query = "$title $artist".trim()
             val queryEncoded = URLEncoder.encode(query, "UTF-8")
@@ -41,7 +47,7 @@ class LyricallyProvider : LyricsProvider {
                         null
                     }                    
                     if (trackId != null) {
-                        return@withContext fetchLyricsForId(trackId)
+                        return@withContext fetchLyricsForId(trackId, durationMs)
                     }
                 }
             } else {
@@ -53,7 +59,7 @@ class LyricallyProvider : LyricsProvider {
         return@withContext null
     }
 
-    private suspend fun fetchLyricsForId(id: String): LyricsResult? = withContext(Dispatchers.IO) {
+    private suspend fun fetchLyricsForId(id: String, durationMs: Long?): LyricsResult? = withContext(Dispatchers.IO) {
         try {
             val urlString = "${BASE_URL}netease/lyrics?id=$id&word=true"
             Log.d(TAG, "Lyrics Requesting: $urlString")
@@ -76,9 +82,10 @@ class LyricallyProvider : LyricsProvider {
                     // We return the raw JSON response as the text, which our parser will consume
                     return@withContext LyricsResult(
                         text = response,
-                        isSynced = true,
+                        syncLevel = SyncLevel.WORD,
                         providerName = name,
-                        isWordLevel = true
+                        matchConfidence = 85, // Title/Artist match
+                        durationDifferenceMs = 0L // No duration provided from search
                     )
                 }
             } else {

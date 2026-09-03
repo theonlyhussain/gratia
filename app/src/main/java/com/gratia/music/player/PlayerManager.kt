@@ -123,6 +123,7 @@ class PlayerManager(private val context: Context) {
     private data class PendingPlayRequest(val song: SongEntity, val queue: List<SongEntity>, val playImmediately: Boolean, val seekPosition: Long)
     // Pending playback request — used when we need to reconnect before playing
     private var pendingPlay: PendingPlayRequest? = null
+    private var isRetryingPlayback = false
 
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -172,6 +173,24 @@ class PlayerManager(private val context: Context) {
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e(TAG, "onPlayerError: ${error.errorCodeName} — ${error.message}")
+            val current = _currentSong.value
+            if (current != null && current.storageProvider != "local" && !isRetryingPlayback) {
+                Log.w(TAG, "Remote stream failed. Invalidate cache and attempt fresh resolution once.")
+                isRetryingPlayback = true
+                scope.launch {
+                    val freshSource = withContext(Dispatchers.IO) {
+                        GratiaApp.instance.providerManager.resolvePlayback(current, forceFresh = true)
+                    }
+                    if (freshSource != null && freshSource.streamUrl.isNotBlank()) {
+                        Log.d(TAG, "Re-resolution succeeded, resuming playback")
+                        playResolvedMediaItem(current, freshSource.streamUrl, playImmediately = true, seekPosition = _currentTimeMs.value)
+                    } else {
+                        _playbackError.value = "Couldn't play this song. Try again."
+                    }
+                    isRetryingPlayback = false
+                }
+                return
+            }
             _playbackError.value = "Couldn't play this song. Try another file or check permission."
             // Don't manually set _isPlaying here — ExoPlayer will fire onIsPlayingChanged(false) 
         }
@@ -445,27 +464,59 @@ class PlayerManager(private val context: Context) {
     }
 
     private fun playSongInternal(song: SongEntity, songQueue: List<SongEntity>, playImmediately: Boolean = true, seekPosition: Long = 0L) {
-        Log.d(TAG, "playSongInternal: '${song.title}' by ${song.artist}")
+        Log.d(TAG, "playSongInternal: '${song.title}' by ${song.artist} (provider=${song.storageProvider})")
 
         _currentSong.value = song
         _queue.value = songQueue.toList() // Copy to prevent ConcurrentModificationException
-        _currentTimeMs.value = 0L
+        _currentTimeMs.value = seekPosition
         _playbackError.value = null
         updatePreloadManager()
-
-        val uri = song.localUri
-        if (uri == null) {
-            Log.e(TAG, "playSong: localUri is null for '${song.title}'")
-            return
-        }
 
         if (!ensureConnected()) {
             Log.w(TAG, "playSong: not connected, queuing for after reconnect")
             pendingPlay = PendingPlayRequest(song, songQueue, playImmediately, seekPosition)
             return
         }
-        
-        val controller = mediaController!!
+
+        val isRemote = song.storageProvider != "local"
+        if (isRemote) {
+            // Asynchronously resolve stream from remote provider
+            scope.launch {
+                try {
+                    val source = withContext(Dispatchers.IO) {
+                        GratiaApp.instance.providerManager.resolvePlayback(song, forceFresh = false)
+                    }
+                    if (source == null || source.streamUrl.isBlank()) {
+                        Log.e(TAG, "Failed to resolve remote playback for '${song.title}' (videoId=${song.providerTrackId})")
+                        _playbackError.value = "Couldn't resolve stream for this song. Try again."
+                        return@launch
+                    }
+
+                    // Only proceed if user hasn't switched to another track while resolving
+                    if (_currentSong.value?.id != song.id) {
+                        Log.d(TAG, "User moved to another song while resolving '${song.title}', aborting play")
+                        return@launch
+                    }
+
+                    playResolvedMediaItem(song, source.streamUrl, playImmediately, seekPosition)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception resolving remote playback for '${song.title}'", e)
+                    _playbackError.value = "Couldn't play this song. Check network connection."
+                }
+            }
+        } else {
+            val uri = song.localUri
+            if (uri == null) {
+                Log.e(TAG, "playSong: localUri is null for '${song.title}'")
+                _playbackError.value = "File not found."
+                return
+            }
+            playResolvedMediaItem(song, uri, playImmediately, seekPosition)
+        }
+    }
+
+    private fun playResolvedMediaItem(song: SongEntity, mediaUri: String, playImmediately: Boolean, seekPosition: Long) {
+        val controller = mediaController ?: return
 
         try {
             val metadataBuilder = MediaMetadata.Builder()
@@ -473,12 +524,13 @@ class PlayerManager(private val context: Context) {
                 .setArtist(song.artist)
                 .setAlbumTitle(song.album ?: "Gratia")
             
-            if (!song.coverArtPath.isNullOrBlank()) {
+            val artwork = song.artworkUrl ?: song.coverArtPath
+            if (!artwork.isNullOrBlank()) {
                 try {
-                    val uriString = if (song.coverArtPath.startsWith("content://") || song.coverArtPath.startsWith("http")) {
-                        song.coverArtPath
+                    val uriString = if (artwork.startsWith("content://") || artwork.startsWith("http")) {
+                        artwork
                     } else {
-                        "file://${song.coverArtPath}"
+                        "file://$artwork"
                     }
                     metadataBuilder.setArtworkUri(Uri.parse(uriString))
                 } catch (e: Exception) {
@@ -487,7 +539,7 @@ class PlayerManager(private val context: Context) {
             }
 
             val mediaItem = MediaItem.Builder()
-                .setUri(Uri.parse(uri))
+                .setUri(Uri.parse(mediaUri))
                 .setMediaId(song.id)
                 .setMediaMetadata(metadataBuilder.build())
                 .build()
@@ -504,11 +556,11 @@ class PlayerManager(private val context: Context) {
                     GratiaApp.instance.database.songDao().updateLastPlayedAt(song.id, System.currentTimeMillis())
                 }
             }
-            Log.d(TAG, "playSongInternal: commands sent to controller")
+            Log.d(TAG, "playResolvedMediaItem: commands sent to controller for '${song.title}'")
             saveStateToDataStore()
             
         } catch (e: Exception) {
-            Log.e(TAG, "playSongInternal: exception — ${e.message}")
+            Log.e(TAG, "playResolvedMediaItem: exception — ${e.message}")
             _playbackError.value = "Couldn't play this song. Try another file or check permission."
         }
     }
@@ -1013,12 +1065,13 @@ fun SongEntity.toMediaItem(): MediaItem {
         .setArtist(artist)
         .setAlbumTitle(album ?: "Gratia")
 
-    if (!coverArtPath.isNullOrBlank()) {
+    val artwork = artworkUrl ?: coverArtPath
+    if (!artwork.isNullOrBlank()) {
         try {
-            val uriString = if (coverArtPath.startsWith("content://") || coverArtPath.startsWith("http")) {
-                coverArtPath
+            val uriString = if (artwork.startsWith("content://") || artwork.startsWith("http")) {
+                artwork
             } else {
-                "file://${coverArtPath}"
+                "file://${artwork}"
             }
             metadataBuilder.setArtworkUri(android.net.Uri.parse(uriString))
         } catch (e: Exception) {

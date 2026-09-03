@@ -5,6 +5,7 @@ import com.gratia.music.audio.EqualizerManager
 import com.gratia.music.audio.EqualizerRepository
 import com.gratia.music.data.db.GratiaDatabase
 import com.gratia.music.player.PlayerManager
+import kotlinx.coroutines.launch
 
 class GratiaApp : Application() {
 
@@ -32,6 +33,9 @@ class GratiaApp : Application() {
     lateinit var recommendationManager: com.gratia.music.data.repository.RecommendationManager
         private set
 
+    lateinit var providerManager: com.gratia.music.provider.ProviderManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -39,6 +43,9 @@ class GratiaApp : Application() {
         preloadManager = com.gratia.music.player.PreloadManager(this)
         com.gratia.music.data.network.ArtistImageFetcher.init(this)
         
+        providerManager = com.gratia.music.provider.ProviderManager(this)
+        val settingsDataStore = com.gratia.music.data.SettingsDataStore(this)
+
         updateManager = com.gratia.music.updater.UpdateManager(this)
         
         playerManager = PlayerManager(this)

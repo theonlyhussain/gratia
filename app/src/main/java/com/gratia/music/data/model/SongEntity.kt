@@ -47,6 +47,12 @@ data class SongEntity(
     val mimeType: String? = null,
     val fileName: String? = null,
     
+    // Remote Provider Metadata
+    val providerTrackId: String? = null,
+    val providerArtistId: String? = null,
+    val providerAlbumId: String? = null,
+    val artworkUrl: String? = null,
+    
     // Audio quality metadata — added in v2
     val format: String? = null,
     val bitrate: Int? = null,

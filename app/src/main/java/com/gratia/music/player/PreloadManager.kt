@@ -63,13 +63,13 @@ class PreloadManager(private val context: Context) {
         val window = queue.subList(startIndex, endIndex)
 
         // Convert to MediaItems matching what PlayerManager uses
-        val mediaItems = window.map { song ->
-            song.toMediaItem()
-        }
-
-        mediaItems.forEachIndexed { index, mediaItem ->
-            val actualIndex = startIndex + index
-            manager.add(mediaItem, actualIndex)
+        // Skip songs without a resolved URI (e.g. pending remote tracks)
+        window.forEachIndexed { index, song ->
+            if (!song.localUri.isNullOrBlank()) {
+                val mediaItem = song.toMediaItem()
+                val actualIndex = startIndex + index
+                manager.add(mediaItem, actualIndex)
+            }
         }
 
         targetPreloadStatusControl.currentPlayingIndex = currentIndex

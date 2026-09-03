@@ -66,7 +66,9 @@ fun ArtworkView(
     )
     
     val cornerRadius = 16.dp
-    val hasCover = !coverArtPath.isNullOrBlank() && File(coverArtPath).exists()
+    val isHttpUrl = coverArtPath?.startsWith("http") == true
+    val isLocalFile = !coverArtPath.isNullOrBlank() && !isHttpUrl && File(coverArtPath).exists()
+    val hasCover = isHttpUrl || isLocalFile
 
     Box(
         modifier = modifier
@@ -87,9 +89,10 @@ fun ArtworkView(
                 .clip(RoundedCornerShape(cornerRadius))
         ) {
             if (hasCover) {
+                val modelData = if (isHttpUrl) coverArtPath else File(coverArtPath!!)
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(File(coverArtPath!!))
+                        .data(modelData)
                         .crossfade(300)
                         .build(),
                     contentDescription = "$title cover art",

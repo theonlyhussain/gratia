@@ -213,14 +213,18 @@ fun GratiaAppRoot() {
                             }
                         },
                         onNavigateToUpload = { navController.navigate("upload") },
-                        onNavigateToYou = { navController.navigate("you") }
+                        onNavigateToYou = { navController.navigate("you") },
+                        onNavigateToRemotePlaylist = { navController.navigate("remote_playlist/${android.net.Uri.encode(it)}") }
                     )
                 }
                 navigation(startDestination = "search_main", route = Screen.Search.route) {
                     composable("search_main") {
                         SearchScreen(
                             playerViewModel = playerViewModel,
-                            onNavigateToGenre = { navController.navigate("genre/${android.net.Uri.encode(it)}") }
+                            onNavigateToGenre = { navController.navigate("genre/${android.net.Uri.encode(it)}") },
+                            onNavigateToRemoteArtist = { navController.navigate("remote_artist/${android.net.Uri.encode(it)}") },
+                            onNavigateToRemoteAlbum = { navController.navigate("remote_album/${android.net.Uri.encode(it)}") },
+                            onNavigateToRemotePlaylist = { navController.navigate("remote_playlist/${android.net.Uri.encode(it)}") }
                         )
                     }
                 }
@@ -233,6 +237,46 @@ fun GratiaAppRoot() {
                     val genre = backStackEntry.arguments?.getString("genreName") ?: return@composable
                     GenreDetailScreen(
                         genre = genre,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+
+                // Remote Content Destinations (YouTube Music)
+                composable(
+                    "remote_artist/{channelId}",
+                    arguments = listOf(navArgument("channelId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val channelId = backStackEntry.arguments?.getString("channelId") ?: return@composable
+                    RemoteArtistScreen(
+                        channelId = channelId,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() },
+                        onNavigateToAlbum = { navController.navigate("remote_album/${android.net.Uri.encode(it)}") },
+                        onNavigateToArtist = { navController.navigate("remote_artist/${android.net.Uri.encode(it)}") }
+                    )
+                }
+
+                composable(
+                    "remote_album/{browseId}",
+                    arguments = listOf(navArgument("browseId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val browseId = backStackEntry.arguments?.getString("browseId") ?: return@composable
+                    RemoteAlbumScreen(
+                        browseId = browseId,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() },
+                        onNavigateToArtist = { navController.navigate("remote_artist/${android.net.Uri.encode(it)}") }
+                    )
+                }
+
+                composable(
+                    "remote_playlist/{playlistId}",
+                    arguments = listOf(navArgument("playlistId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val playlistId = backStackEntry.arguments?.getString("playlistId") ?: return@composable
+                    RemotePlaylistScreen(
+                        playlistId = playlistId,
                         playerViewModel = playerViewModel,
                         onBack = { navController.popBackStack() }
                     )

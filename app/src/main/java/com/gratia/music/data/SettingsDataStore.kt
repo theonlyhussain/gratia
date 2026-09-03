@@ -217,4 +217,17 @@ class SettingsDataStore(private val context: Context) {
             preferences[SAVED_CURRENT_TIME_MS_KEY] = currentTimeMs
         }
     }
+
+    // YouTube Music Backend URL
+    private val YTMUSIC_BACKEND_URL_KEY = stringPreferencesKey("ytmusic_backend_url")
+
+    val ytmusicBackendUrlFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[YTMUSIC_BACKEND_URL_KEY] ?: "http://10.0.2.2:8000"
+    }
+
+    suspend fun setYtmusicBackendUrl(url: String) {
+        context.dataStore.edit { preferences ->
+            preferences[YTMUSIC_BACKEND_URL_KEY] = url
+        }
+    }
 }
