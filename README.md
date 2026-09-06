@@ -3,7 +3,7 @@
 # Gratia
 
 **The Premium, Local-First Android Music Player**
- 
+  
 A  modern, meticulously crafted music player focused on fluid playback, stunning aesthetics, and an ad-free, private listening experience.
 
 [![Version](https://img.shields.io/badge/Version-2.3.8-orange.svg)](https://github.com/theonlyhussain/gratia/releases)
