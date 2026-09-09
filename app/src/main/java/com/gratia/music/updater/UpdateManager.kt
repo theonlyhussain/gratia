@@ -2,6 +2,7 @@ package com.gratia.music.updater
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import android.os.Environment
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
@@ -214,15 +215,28 @@ class UpdateManager(private val context: Context) {
 
     fun installUpdate(apkFile: File) {
         try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    Toast.makeText(context, "Please allow Gratia to install unknown apps, then click Install again.", Toast.LENGTH_LONG).show()
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = android.net.Uri.parse("package:${context.packageName}")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                    return
+                }
+            }
+
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", apkFile)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(intent)
         } catch (e: Exception) {
             e.printStackTrace()
-            _state.value = UpdateState.Error("Installation failed")
+            _state.value = UpdateState.Error("Installation failed: ${e.localizedMessage}")
         }
     }
 

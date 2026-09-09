@@ -144,4 +144,7 @@ interface SongDao {
 
     @Query("SELECT * FROM songs ORDER BY playCount ASC, RANDOM() LIMIT 1")
     suspend fun getRandomSong(): SongEntity?
+
+    @Query("UPDATE songs SET isDownloaded = :isDownloaded, downloadPath = :downloadPath, updatedAt = :now WHERE id = :id")
+    suspend fun updateDownloadState(id: String, isDownloaded: Boolean, downloadPath: String?, now: Long = System.currentTimeMillis())
 }

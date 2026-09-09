@@ -230,4 +230,16 @@ class SettingsDataStore(private val context: Context) {
             preferences[YTMUSIC_BACKEND_URL_KEY] = url
         }
     }
+
+    private val AUDIO_QUALITY_KEY = stringPreferencesKey("audio_quality")
+
+    val audioQualityFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[AUDIO_QUALITY_KEY] ?: "HIGH" // LOW, NORMAL, HIGH
+    }
+
+    suspend fun setAudioQuality(quality: String) {
+        context.dataStore.edit { preferences ->
+            preferences[AUDIO_QUALITY_KEY] = quality
+        }
+    }
 }

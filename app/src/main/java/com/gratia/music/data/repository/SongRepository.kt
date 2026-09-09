@@ -89,4 +89,6 @@ class SongRepository(private val songDao: SongDao) {
     suspend fun getRandomSongExcludingArtist(excludedArtist: String): SongEntity? = songDao.getRandomSongExcludingArtist(excludedArtist)
 
     suspend fun getRandomSong(): SongEntity? = songDao.getRandomSong()
+
+    suspend fun updateDownloadState(id: String, isDownloaded: Boolean, downloadPath: String?) = songDao.updateDownloadState(id, isDownloaded, downloadPath)
 }

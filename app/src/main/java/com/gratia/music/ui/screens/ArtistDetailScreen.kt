@@ -48,6 +48,12 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.blur
+import androidx.compose.animation.animateColorAsState
+import coil.imageLoader
+import coil.request.SuccessResult
+import android.graphics.drawable.BitmapDrawable
+import androidx.palette.graphics.Palette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,85 +228,142 @@ fun ArtistDetailScreen(
     }
 
     val listState = rememberLazyListState()
+    var dominantColor by remember { mutableStateOf(Color(0xFF1B1716)) }
+    val animatedDominantColor by animateColorAsState(dominantColor, label = "bg_color")
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(GratiaTheme.colors.background)
-    ) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
-        ) {
-            item {
-                // Header Action Buttons
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = GratiaTheme.spacing.medium, vertical = GratiaTheme.spacing.medium),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(GratiaTheme.colors.surface)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = GratiaTheme.colors.textSecondary)
-                    }
-                    if (onlineDataEnabled) {
-                        IconButton(
-                            onClick = { showEditSheet = true },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(GratiaTheme.colors.surface)
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = GratiaTheme.colors.textSecondary)
-                        }
-                    } else {
-                        Spacer(Modifier.size(40.dp))
-                    }
-                }
-
-                // Rounded Rect Artwork
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = GratiaTheme.spacing.large),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(240.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(GratiaTheme.colors.surfaceHover),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (displayImage != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(displayImage)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = "Artist Image",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Outlined.Person,
-                                contentDescription = null,
-                                tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
-                                modifier = Modifier.size(96.dp)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(GratiaTheme.spacing.large))
+    LaunchedEffect(displayImage) {
+        displayImage?.let { url ->
+            val request = ImageRequest.Builder(context)
+                .data(url)
+                .allowHardware(false)
+                .size(300)
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result is SuccessResult) {
+                (result.drawable as? BitmapDrawable)?.bitmap?.let { bmp ->
+                    val palette = Palette.from(bmp).generate()
+                    dominantColor = Color(palette.getDominantColor(0xFF1B1716.toInt()))
                 }
             }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Dynamic Blurred Background
+        if (displayImage != null) {
+            AsyncImage(
+                model = displayImage,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(radius = 80.dp)
+                    .graphicsLayer { alpha = 0.8f }
+            )
+        } else {
+            Box(Modifier.fillMaxSize().background(Color(0xFF090909)))
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(animatedDominantColor.copy(alpha = 0.5f))
+                .background(Color.Black.copy(alpha = 0.6f))
+        )
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
+                    },
+                    actions = {
+                        if (onlineDataEnabled) {
+                            IconButton(onClick = { showEditSheet = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = GratiaTheme.spacing.heroLarge)
+                ) {
+                    // Hero Artist Header with Parallax
+                    item {
+                        val scrollOffset = listState.firstVisibleItemScrollOffset
+                        val isFirstVisible = listState.firstVisibleItemIndex == 0
+                        val parallaxOffset = if (isFirstVisible) scrollOffset * 0.5f else 0f
+                        val scale = if (isFirstVisible) (1f - scrollOffset * 0.001f).coerceAtLeast(0.8f) else 1f
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(280.dp)
+                                .graphicsLayer {
+                                    translationY = parallaxOffset
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                        ) {
+                            if (displayImage != null) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(displayImage)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "Artist Image",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(GratiaTheme.colors.surfaceHover),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Person,
+                                        contentDescription = null,
+                                        tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(96.dp)
+                                    )
+                                }
+                            }
+
+                            // Dark gradient scrim for readability
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                Color.Transparent,
+                                                Color.Black.copy(alpha = 0.4f),
+                                                Color.Black.copy(alpha = 0.7f)
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+                    }
 
             // ── ARTIST TITLE & SHUFFLE CONTROLS ──
             item {
@@ -316,10 +379,10 @@ fun ArtistDetailScreen(
                             text = artistName,
                             fontFamily = SpaceGrotesk,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 34.sp,
-                            color = GratiaTheme.colors.textPrimary,
+                            fontSize = 40.sp,
+                            color = Color.White,
                             maxLines = 2,
-                            lineHeight = 38.sp,
+                            lineHeight = 44.sp,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(Modifier.height(4.dp))
@@ -328,7 +391,7 @@ fun ArtistDetailScreen(
                             fontFamily = Inter,
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,
-                            color = GratiaTheme.colors.textSecondary
+                            color = Color.White.copy(alpha = 0.8f)
                         )
                     }
 
@@ -375,6 +438,8 @@ fun ArtistDetailScreen(
             }
         }
     }
+    }
+}
 }
 
 @Composable

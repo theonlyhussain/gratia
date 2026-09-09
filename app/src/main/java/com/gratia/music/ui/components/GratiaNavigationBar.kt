@@ -34,14 +34,18 @@ fun GratiaNavigationBar(
     val isDark = androidx.compose.foundation.isSystemInDarkTheme()
     
     // Dynamic Pill Container
-    Box(
+    GlassSurface(
         modifier = modifier
             .padding(horizontal = 24.dp, vertical = 12.dp)
             .windowInsetsPadding(WindowInsets.navigationBars)
             .fillMaxWidth()
-            .height(64.dp)
-            .background(GratiaTheme.colors.surface, CircleShape)
-            .border(1.dp, GratiaTheme.colors.textSecondary.copy(alpha = 0.15f), CircleShape)
+            .height(64.dp),
+        shape = CircleShape,
+        backgroundColor = GratiaTheme.colors.surface.copy(alpha = 0.8f),
+        elevation = 8.dp,
+        borderWidth = 1.dp,
+        borderColorStart = GratiaTheme.colors.textSecondary.copy(alpha = 0.15f),
+        borderColorEnd = GratiaTheme.colors.textSecondary.copy(alpha = 0.05f)
     ) {
         // Sliding Background Pill removed in favor of inline animated pill
 

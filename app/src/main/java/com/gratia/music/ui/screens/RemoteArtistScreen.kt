@@ -44,6 +44,14 @@ import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import coil.imageLoader
+import coil.request.SuccessResult
+import android.graphics.drawable.BitmapDrawable
+import androidx.palette.graphics.Palette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +71,27 @@ fun RemoteArtistScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
+    
+    val listState = rememberLazyListState()
+    var dominantColor by remember { mutableStateOf(Color(0xFF1B1716)) }
+    val animatedDominantColor by animateColorAsState(dominantColor, label = "bg_color")
+
+    LaunchedEffect(artist?.artworkUrl) {
+        artist?.artworkUrl?.let { url ->
+            val request = ImageRequest.Builder(context)
+                .data(url)
+                .allowHardware(false)
+                .size(300)
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result is SuccessResult) {
+                (result.drawable as? BitmapDrawable)?.bitmap?.let { bmp ->
+                    val palette = Palette.from(bmp).generate()
+                    dominantColor = Color(palette.getDominantColor(0xFF1B1716.toInt()))
+                }
+            }
+        }
+    }
 
     LaunchedEffect(channelId) {
         isLoading = true
@@ -95,28 +124,50 @@ fun RemoteArtistScreen(
         )
     }
 
-    Scaffold(
-        containerColor = GratiaTheme.colors.background,
-        topBar = {
-            TopAppBar(
-                title = { },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = GratiaTheme.colors.textPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Dynamic Blurred Background
+        if (!artist?.artworkUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = artist!!.artworkUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(radius = 80.dp)
+                    .graphicsLayer { alpha = 0.8f }
             )
+        } else {
+            Box(Modifier.fillMaxSize().background(Color(0xFF090909)))
         }
-    ) { padding ->
+        
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .background(animatedDominantColor.copy(alpha = 0.5f))
+                .background(Color.Black.copy(alpha = 0.6f))
+        )
+
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
         ) {
             when {
                 isLoading -> {
@@ -150,15 +201,26 @@ fun RemoteArtistScreen(
                     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
 
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge)
+                        contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = bottomInset + GratiaTheme.spacing.heroLarge)
                     ) {
-                        // Hero Artist Header
+                        // Hero Artist Header with Parallax
                         item {
+                            val scrollOffset = listState.firstVisibleItemScrollOffset
+                            val isFirstVisible = listState.firstVisibleItemIndex == 0
+                            val parallaxOffset = if (isFirstVisible) scrollOffset * 0.5f else 0f
+                            val scale = if (isFirstVisible) (1f - scrollOffset * 0.001f).coerceAtLeast(0.8f) else 1f
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(280.dp)
+                                    .graphicsLayer {
+                                        translationY = parallaxOffset
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
                             ) {
                                 if (!currentArtist.artworkUrl.isNullOrBlank()) {
                                     AsyncImage(
@@ -202,8 +264,9 @@ fun RemoteArtistScreen(
                                         text = currentArtist.name,
                                         fontFamily = SpaceGrotesk,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 32.sp,
-                                        color = GratiaTheme.colors.textPrimary,
+                                        fontSize = 40.sp,
+                                        lineHeight = 44.sp,
+                                        color = Color.White,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -215,7 +278,7 @@ fun RemoteArtistScreen(
                                             fontFamily = Inter,
                                             fontWeight = FontWeight.Medium,
                                             fontSize = 14.sp,
-                                            color = GratiaTheme.colors.accent
+                                            color = Color.White.copy(alpha = 0.8f)
                                         )
                                     }
                                 }
@@ -464,4 +527,5 @@ fun RemoteArtistScreen(
             }
         }
     }
+}
 }

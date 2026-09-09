@@ -89,6 +89,28 @@ class ProviderManager(
         streamCache.remove(videoId)
     }
 
+    suspend fun resolveForDownload(song: SongEntity, maxKbps: Int): PlaybackSource? {
+        val providerType = MusicProviderType.fromId(song.storageProvider)
+        if (providerType == MusicProviderType.LOCAL) {
+            return null
+        }
+        val videoId = song.providerTrackId ?: song.id.removePrefix("ytm_")
+        if (videoId.isBlank()) return null
+        
+        return if (providerType == MusicProviderType.YOUTUBE_MUSIC) {
+            try {
+                val stream = com.gratia.music.provider.ytmusic.innertube.StreamResolver.resolveForDownload(videoId, maxKbps)
+                PlaybackSource(videoId, stream.url)
+            } catch (e: Exception) {
+                Log.e(TAG, "resolveForDownload failed", e)
+                null
+            }
+        } else {
+            // Other providers might not support specific quality downloads yet, fallback to standard resolve
+            getProvider(providerType)?.resolvePlayback(videoId)
+        }
+    }
+
     fun clearCache() {
         streamCache.clear()
     }

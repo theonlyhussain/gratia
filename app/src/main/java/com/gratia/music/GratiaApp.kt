@@ -36,6 +36,9 @@ class GratiaApp : Application() {
     lateinit var providerManager: com.gratia.music.provider.ProviderManager
         private set
 
+    lateinit var downloadManager: com.gratia.music.download.DownloadManager
+        private set
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -47,6 +50,8 @@ class GratiaApp : Application() {
         val settingsDataStore = com.gratia.music.data.SettingsDataStore(this)
 
         updateManager = com.gratia.music.updater.UpdateManager(this)
+        
+        downloadManager = com.gratia.music.download.DownloadManager(this)
         
         playerManager = PlayerManager(this)
         

@@ -68,7 +68,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         try {
             val sections = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                GratiaApp.instance.providerManager.youtubeMusicProvider.getHome(limit = 4)
+                GratiaApp.instance.providerManager.youtubeMusicProvider.getHome(limit = 8)
             }
             remoteHomeSections = sections
         } catch (e: Exception) {
@@ -307,76 +307,6 @@ fun HomeScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(32.dp))
-            }
-        }
-
-        if (remoteHomeSections.isNotEmpty()) {
-            remoteHomeSections.forEach { section ->
-                item {
-                    AppleSectionHeader(title = section.title)
-                    Spacer(Modifier.height(8.dp))
-                    if (section.tracks.isNotEmpty()) {
-                        val trackEntities = section.tracks.map { com.gratia.music.provider.RemoteTrackMapper.toSongEntity(it) }
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(trackEntities) { song ->
-                                RecentCard(
-                                    song = song,
-                                    onClick = { playerViewModel.playSong(song, trackEntities) }
-                                )
-                            }
-                        }
-                    } else if (section.collections.isNotEmpty()) {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(section.collections) { col ->
-                                Column(
-                                    modifier = Modifier
-                                        .width(140.dp)
-                                        .bounceClick { onNavigateToRemotePlaylist(col.id) }
-                                ) {
-                                    coil.compose.AsyncImage(
-                                        model = coil.request.ImageRequest.Builder(context)
-                                            .data(col.artworkUrl)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = col.title,
-                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(140.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(GratiaTheme.colors.surface)
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                    androidx.compose.material3.Text(
-                                        text = col.title,
-                                        fontFamily = com.gratia.music.ui.theme.Inter,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp,
-                                        color = GratiaTheme.colors.textPrimary,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                    if (!col.author.isNullOrBlank()) {
-                                        androidx.compose.material3.Text(
-                                            text = col.author,
-                                            fontFamily = com.gratia.music.ui.theme.Inter,
-                                            fontSize = 12.sp,
-                                            color = GratiaTheme.colors.textSecondary,
-                                            maxLines = 1,
-                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
             }
         }
 

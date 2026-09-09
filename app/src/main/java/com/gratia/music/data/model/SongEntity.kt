@@ -58,6 +58,10 @@ data class SongEntity(
     val bitrate: Int? = null,
     val sampleRate: Int? = null,
     val fileSizeBytes: Long? = null,
+    
+    // Download Status
+    val isDownloaded: Boolean = false,
+    val downloadPath: String? = null,
 
     // Legacy fields preserved for backward compatibility until UI rewrite
     val coverArtPath: String? = null,

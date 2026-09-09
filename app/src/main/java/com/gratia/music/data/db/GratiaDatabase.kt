@@ -284,6 +284,13 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE songs ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE songs ADD COLUMN downloadPath TEXT DEFAULT NULL")
+    }
+}
+
 @Database(
     entities = [
         SongEntity::class,
@@ -299,7 +306,7 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         ArtworkEntity::class,
         SyncQueueEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class GratiaDatabase : RoomDatabase() {
@@ -335,7 +342,8 @@ abstract class GratiaDatabase : RoomDatabase() {
                         MIGRATION_6_7,
                         MIGRATION_7_8,
                         MIGRATION_8_9,
-                        MIGRATION_9_10
+                        MIGRATION_9_10,
+                        MIGRATION_10_11
                     )
                     .build()
                 INSTANCE = instance

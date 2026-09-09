@@ -479,6 +479,18 @@ class PlayerManager(private val context: Context) {
         }
 
         val isRemote = song.storageProvider != "local"
+
+        if (song.isDownloaded && !song.downloadPath.isNullOrBlank()) {
+            val file = java.io.File(song.downloadPath)
+            if (file.exists()) {
+                Log.d(TAG, "Playing downloaded offline file: ${file.absolutePath}")
+                playResolvedMediaItem(song, file.absolutePath, playImmediately, seekPosition)
+                return
+            } else {
+                Log.w(TAG, "Downloaded file missing at ${file.absolutePath}, falling back to stream")
+            }
+        }
+
         if (isRemote) {
             // Asynchronously resolve stream from remote provider
             scope.launch {

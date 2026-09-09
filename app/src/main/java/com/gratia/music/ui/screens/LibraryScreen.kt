@@ -79,6 +79,7 @@ fun LibraryScreen(
                 onNavigateToAlbums = { activeSubView = "Albums" },
                 onNavigateToSongs = { activeSubView = "Songs" },
                 onNavigateToFolders = { activeSubView = "Folders" },
+                onNavigateToDownloads = { activeSubView = "Downloads" },
                 onNavigateToAlbum = onNavigateToAlbum
             )
         } else {
@@ -104,6 +105,7 @@ fun LibraryRootView(
     onNavigateToAlbums: () -> Unit,
     onNavigateToSongs: () -> Unit,
     onNavigateToFolders: () -> Unit,
+    onNavigateToDownloads: () -> Unit,
     onNavigateToAlbum: (String) -> Unit
 ) {
     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
@@ -203,7 +205,21 @@ fun LibraryRootView(
                         modifier = Modifier.size(28.dp)
                     )
                 },
-                onClick = onNavigateToFolders,
+                onClick = onNavigateToFolders
+            )
+        }
+        item {
+            AppleListRow(
+                title = "Downloads",
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Downloads",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToDownloads,
                 showDivider = false
             )
         }
@@ -347,6 +363,40 @@ fun LibrarySubView(
                                     isSelectionMode = isSelectionMode,
                                     isSelected = selectedIds.contains(song.id),
                                     onPlay = { playerViewModel.playSong(song, favoriteSongs) },
+                                    onLongPress = { selectionManager.startSelection(song.id) },
+                                    onToggleSelection = { selectionManager.toggle(song.id) },
+                                    modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
+                                )
+                            }
+                        }
+                    }
+                }
+                "Downloads" -> {
+                    val downloadedSongs = remember(allSongs) { allSongs.filter { it.isDownloaded } }
+                    if (downloadedSongs.isEmpty()) {
+                        EmptyStateView(
+                            icon = Icons.Default.Download,
+                            headline = "No downloads yet",
+                            description = "Download songs to listen offline."
+                        )
+                    } else {
+                        val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+                        LazyColumn(
+                            contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small),
+                            verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
+                        ) {
+                            itemsIndexed(
+                                items = downloadedSongs,
+                                key = { _, song -> song.id }
+                            ) { index, song ->
+                                SelectableSongRow(
+                                    song = song,
+                                    index = index,
+                                    isActive = currentSong?.id == song.id,
+                                    isPlaying = currentSong?.id == song.id && isPlaying,
+                                    isSelectionMode = isSelectionMode,
+                                    isSelected = selectedIds.contains(song.id),
+                                    onPlay = { playerViewModel.playSong(song, downloadedSongs) },
                                     onLongPress = { selectionManager.startSelection(song.id) },
                                     onToggleSelection = { selectionManager.toggle(song.id) },
                                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
