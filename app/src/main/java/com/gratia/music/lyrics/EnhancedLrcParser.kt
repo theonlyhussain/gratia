@@ -31,34 +31,8 @@ object EnhancedLrcParser {
                 val lastTagEnd = timeTags.last().range.last + 1
                 val content = line.substring(lastTagEnd).trim()
 
-                // Parse word tokens in the content
                 val wordMatches = ELRC_WORD_PATTERN.findAll(content).toList()
-                val words = mutableListOf<LyricWord>()
-                val lineTextBuilder = StringBuilder()
-
-                for (i in wordMatches.indices) {
-                    val currentMatch = wordMatches[i]
-                    val nextMatch = if (i < wordMatches.size - 1) wordMatches[i + 1] else null
-
-                    val wordMin = currentMatch.groupValues[1].toIntOrNull() ?: 0
-                    val wordSec = currentMatch.groupValues[2].toIntOrNull() ?: 0
-                    val wordMillisStr = currentMatch.groupValues[3]
-                    val wordMillis = if (wordMillisStr.isEmpty()) 0 else wordMillisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
-                    val wordStartMs = (wordMin * 60_000L) + (wordSec * 1000L) + wordMillis
-
-                    val wordTextStart = currentMatch.range.last + 1
-                    val wordTextEnd = nextMatch?.range?.first ?: content.length
-                    val rawWordText = content.substring(wordTextStart, wordTextEnd)
-                    val trimmedWordText = rawWordText.trim()
-
-                    if (trimmedWordText.isNotEmpty()) {
-                        words.add(LyricWord(text = trimmedWordText, startMs = wordStartMs, endMs = 0L))
-                        if (lineTextBuilder.isNotEmpty()) lineTextBuilder.append(" ")
-                        lineTextBuilder.append(trimmedWordText)
-                    }
-                }
-
-                val finalText = if (words.isEmpty()) content.trim() else lineTextBuilder.toString()
+                val finalText = content.replace(ELRC_WORD_PATTERN, "").replace("\\s+".toRegex(), " ").trim()
 
                 for (tag in timeTags) {
                     val minutes = tag.groupValues[1].toIntOrNull() ?: 0
@@ -67,8 +41,36 @@ object EnhancedLrcParser {
                     val millis = if (millisStr.isEmpty()) 0 else millisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
                     val lineStartMs = (minutes * 60_000L) + (seconds * 1000L) + millis
 
-                    // Copy the words list (deep copy not strictly necessary since words are read-only data classes, but we do need new instances of the list)
-                    lines.add(LyricLine(text = finalText, startMs = lineStartMs, words = words.toList()))
+                    val words = mutableListOf<LyricWord>()
+
+                    if (wordMatches.isNotEmpty() && wordMatches.first().range.first > 0) {
+                        val leadingText = content.substring(0, wordMatches.first().range.first).trim()
+                        if (leadingText.isNotEmpty()) {
+                            words.add(LyricWord(text = leadingText, startMs = lineStartMs, endMs = 0L))
+                        }
+                    }
+
+                    for (i in wordMatches.indices) {
+                        val currentMatch = wordMatches[i]
+                        val nextMatch = if (i < wordMatches.size - 1) wordMatches[i + 1] else null
+
+                        val wordMin = currentMatch.groupValues[1].toIntOrNull() ?: 0
+                        val wordSec = currentMatch.groupValues[2].toIntOrNull() ?: 0
+                        val wordMillisStr = currentMatch.groupValues[3]
+                        val wordMillis = if (wordMillisStr.isEmpty()) 0 else wordMillisStr.padEnd(3, '0').take(3).toIntOrNull() ?: 0
+                        val wordStartMs = (wordMin * 60_000L) + (wordSec * 1000L) + wordMillis
+
+                        val wordTextStart = currentMatch.range.last + 1
+                        val wordTextEnd = nextMatch?.range?.first ?: content.length
+                        val rawWordText = content.substring(wordTextStart, wordTextEnd)
+                        val trimmedWordText = rawWordText.trim()
+
+                        if (trimmedWordText.isNotEmpty()) {
+                            words.add(LyricWord(text = trimmedWordText, startMs = wordStartMs, endMs = 0L))
+                        }
+                    }
+
+                    lines.add(LyricLine(text = finalText, startMs = lineStartMs, words = words))
                 }
             }
         }

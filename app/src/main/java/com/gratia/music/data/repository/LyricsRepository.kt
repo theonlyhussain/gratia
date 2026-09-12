@@ -27,12 +27,14 @@ class LyricsRepository(
         com.gratia.music.lyrics.KuGou,
         LRCLIBProvider(),
         LyricallyProvider(),
+        com.gratia.music.lyrics.LyricsifyProvider(),
         ytmLyricsProvider
     )
 
     // Used as a tie-breaker if SyncLevel, matchConfidence, and duration difference are all equal
     private val providerPreferenceOrder = mapOf(
         "BetterLyrics" to 70,
+        "Lyricsify" to 65,
         "LyricsPlus" to 60,
         "SimpMusic" to 50,
         "YouTube Music" to 40,

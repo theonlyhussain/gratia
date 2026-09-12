@@ -1,7 +1,7 @@
 package com.gratia.music.lyrics
 
 enum class LyricsMode {
-    PLAIN, LRC, ELRC, JSON
+    PLAIN, LRC, ELRC, JSON, TTML
 }
 
 object LyricsModeDetector {
@@ -19,9 +19,14 @@ object LyricsModeDetector {
         // 1. JSON Mode Detection
         if ((trimmed.startsWith("[") && trimmed.endsWith("]")) ||
             (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
-            if (trimmed.contains("\"words\"") || trimmed.contains("'words'")) {
+            if (trimmed.contains("\"words\"") || trimmed.contains("'words'") || trimmed.contains("\"syllabus\"") || trimmed.contains("\"lyrics\"")) {
                 return LyricsMode.JSON
             }
+        }
+
+        // TTML Mode Detection
+        if (trimmed.startsWith("<") && (trimmed.contains("ttm:") || trimmed.contains("<tt") || trimmed.contains("<body>"))) {
+            return LyricsMode.TTML
         }
 
         // 2 & 3. LRC / ELRC Mode Detection

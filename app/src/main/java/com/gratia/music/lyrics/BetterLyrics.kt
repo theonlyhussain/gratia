@@ -51,10 +51,9 @@ object BetterLyrics : LyricsProvider {
         val lines = TtmlLyrics.parse(ttml).takeIf { it.isNotEmpty() } ?: return@withContext null
         
         val isSyllable = lines.any { it.isWordSynced }
-        val text = if (isSyllable) lines.toEnhancedLrc() else lines.toLrc()
 
         LyricsResult(
-            text = text,
+            text = ttml,
             syncLevel = if (isSyllable) SyncLevel.SYLLABLE else SyncLevel.LINE,
             providerName = name,
             matchConfidence = 90, // BetterLyrics considers duration internally

@@ -180,4 +180,83 @@ class LyricsParserTest {
         assertEquals("Valid line", lines[0].text)
         assertEquals(10500L, lines[0].startMs)
     }
+
+    @Test
+    fun testEnhancedLrcLeadingText() {
+        // Text before the first timestamp
+        val elrc = "[00:10.00]motorways <00:12.00>and <00:13.00>tramlines"
+        val doc = LyricsParser.parse(elrc)
+        
+        assertTrue(doc is LyricsDocument.WordSynced)
+        val wordDoc = doc as LyricsDocument.WordSynced
+        assertEquals(1, wordDoc.lines.size)
+        
+        val words = wordDoc.lines[0].words
+        assertEquals(3, words.size)
+        assertEquals("motorways", words[0].text)
+        assertEquals(10_000L, words[0].startMs) // Inherits line start
+        
+        assertEquals("and", words[1].text)
+        assertEquals(12_000L, words[1].startMs)
+        
+        assertEquals("tramlines", words[2].text)
+        assertEquals(13_000L, words[2].startMs)
+    }
+
+    @Test
+    fun testEnhancedLrcEmbeddedTimestamp() {
+        // Timestamp embedded in the middle of a word
+        val elrc = "[00:30.00]stopp<00:32.66>ing"
+        val doc = LyricsParser.parse(elrc)
+        
+        assertTrue(doc is LyricsDocument.WordSynced)
+        val wordDoc = doc as LyricsDocument.WordSynced
+        assertEquals(1, wordDoc.lines.size)
+        
+        val words = wordDoc.lines[0].words
+        assertEquals(2, words.size)
+        assertEquals("stopp", words[0].text)
+        assertEquals(30_000L, words[0].startMs)
+        
+        assertEquals("ing", words[1].text)
+        assertEquals(32_660L, words[1].startMs)
+        
+        // Final text should be stripped of the tag
+        assertEquals("stopping", wordDoc.lines[0].text)
+    }
+
+    @Test
+    fun testTtmlParsing() {
+        val ttml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body>
+                    <div>
+                        <p begin="00:00:10.000" end="00:00:15.000">
+                            <span begin="00:00:10.000" end="00:00:11.000">He</span><span begin="00:00:11.000" end="00:00:12.000">llo </span>
+                            <span begin="00:00:12.000" end="00:00:13.000">world</span>
+                        </p>
+                    </div>
+                </body>
+            </tt>
+        """.trimIndent()
+        
+        val doc = LyricsParser.parse(ttml)
+        assertTrue(doc is LyricsDocument.WordSynced)
+        val wordDoc = doc as LyricsDocument.WordSynced
+        
+        // withInstrumentalGaps adds a "" gap if the first line starts after 4s (MIN_GAP_MS)
+        assertEquals(2, wordDoc.lines.size)
+        assertEquals("", wordDoc.lines[0].text)
+        
+        val words = wordDoc.lines[1].words
+        
+        // TtmlLyrics merges syllables. "He" and "llo " -> "Hello "
+        assertEquals(2, words.size)
+        assertEquals("Hello", words[0].text) // trimmed
+        assertEquals(10_000L, words[0].startMs)
+        
+        assertEquals("world", words[1].text)
+        assertEquals(12_000L, words[1].startMs)
+    }
 }

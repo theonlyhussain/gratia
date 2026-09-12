@@ -17,6 +17,15 @@ object LyricsParser {
         val mode = LyricsModeDetector.detectMode(input)
 
         when (mode) {
+            LyricsMode.TTML -> {
+                try {
+                    val lines = TtmlLyrics.parse(input)
+                    if (lines.isNotEmpty()) {
+                        val hasWords = lines.any { it.words.isNotEmpty() }
+                        return if (hasWords) LyricsDocument.WordSynced(lines) else LyricsDocument.LineSynced(lines)
+                    }
+                } catch (_: Exception) {}
+            }
             LyricsMode.JSON -> {
                 try {
                     val lines = JsonWordLyricsParser.parse(input)
@@ -48,6 +57,16 @@ object LyricsParser {
         }
 
         // Sequential Fallback sequence:
+        
+        // Try TTML
+        try {
+            val lines = TtmlLyrics.parse(input)
+            if (lines.isNotEmpty()) {
+                val hasWords = lines.any { it.words.isNotEmpty() }
+                return if (hasWords) LyricsDocument.WordSynced(lines) else LyricsDocument.LineSynced(lines)
+            }
+        } catch (_: Exception) {}
+        
         // Try JSON
         try {
             val lines = JsonWordLyricsParser.parse(input)

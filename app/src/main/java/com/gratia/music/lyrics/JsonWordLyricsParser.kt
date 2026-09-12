@@ -30,11 +30,13 @@ object JsonWordLyricsParser {
             val lineObj = jsonArray.getJSONObject(i)
             
             // Lyrically API uses 'timestamp' and 'endtime' on lines and words
-            val lineStartMs = getMsValue(lineObj, "timestamp", "start_time", "start", "startMs", "start_ms") ?: 0L
-            val lineEndMs = getMsValue(lineObj, "endtime", "end_time", "end", "endMs", "end_ms")
+            val lineStartMs = getMsValue(lineObj, "timestamp", "start_time", "start", "startMs", "start_ms", "time") ?: 0L
+            val lineEndMs = getMsValue(lineObj, "endtime", "end_time", "end", "endMs", "end_ms", "duration")?.let {
+                if (lineObj.has("duration")) lineStartMs + it else it
+            }
 
-            // Lyrically uses 'text' array for words, others use 'words'
-            val wordsArray = lineObj.optJSONArray("words") ?: lineObj.optJSONArray("text")
+            // Lyrically uses 'text' array for words, LyricsPlus uses 'syllabus', others use 'words'
+            val wordsArray = lineObj.optJSONArray("words") ?: lineObj.optJSONArray("text") ?: lineObj.optJSONArray("syllabus")
             val words = mutableListOf<LyricWord>()
             val builtLineText = StringBuilder()
             
@@ -42,8 +44,10 @@ object JsonWordLyricsParser {
                 for (j in 0 until wordsArray.length()) {
                     val wordObj = wordsArray.getJSONObject(j)
                     val wordText = wordObj.optString("word", wordObj.optString("text", ""))
-                    val wordStartMs = getMsValue(wordObj, "timestamp", "start_time", "start", "startMs", "start_ms") ?: lineStartMs
-                    val wordEndMs = getMsValue(wordObj, "endtime", "end_time", "end", "endMs", "end_ms") ?: (wordStartMs + 200L)
+                    val wordStartMs = getMsValue(wordObj, "timestamp", "start_time", "start", "startMs", "start_ms", "time") ?: lineStartMs
+                    val wordEndMs = getMsValue(wordObj, "endtime", "end_time", "end", "endMs", "end_ms", "duration")?.let {
+                        if (wordObj.has("duration")) wordStartMs + it else it
+                    } ?: (wordStartMs + 200L)
                     if (wordText.isNotEmpty()) {
                         words.add(LyricWord(text = wordText, startMs = wordStartMs, endMs = wordEndMs))
                         builtLineText.append(wordText)

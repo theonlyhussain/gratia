@@ -169,7 +169,7 @@ object LrcParser {
      */
     private fun parseWordTimestamps(content: String, lineStartMs: Long): List<LyricWord> {
         val matcher = WORD_TIMESTAMP_PATTERN.matcher(content)
-        val wordMatches = mutableListOf<Pair<Long, Int>>() // (timestamp, endIndex)
+        val wordMatches = mutableListOf<Triple<Long, Int, Int>>() // (timestamp, startIndex, endIndex)
 
         while (matcher.find()) {
             val minutes = matcher.group(1)!!.toLong()
@@ -177,21 +177,23 @@ object LrcParser {
             val millisStr = matcher.group(3) ?: ""
             val millis = if (millisStr.isEmpty()) 0L
             else millisStr.padEnd(3, '0').take(3).toLong()
-            wordMatches.add(Pair(minutes * 60_000L + seconds * 1000L + millis, matcher.end()))
+            wordMatches.add(Triple(minutes * 60_000L + seconds * 1000L + millis, matcher.start(), matcher.end()))
         }
 
         if (wordMatches.isEmpty()) return emptyList()
 
         val words = mutableListOf<LyricWord>()
-        for (i in wordMatches.indices) {
-            val (ts, textStart) = wordMatches[i]
-            val textEnd = if (i < wordMatches.size - 1) {
-                // Find the start of the next <timestamp> tag
-                val nextTagStart = content.indexOf('<', textStart)
-                if (nextTagStart >= 0) nextTagStart else content.length
-            } else {
-                content.length
+        
+        if (wordMatches.first().second > 0) {
+            val leadingText = content.substring(0, wordMatches.first().second).trim()
+            if (leadingText.isNotEmpty()) {
+                words.add(LyricWord(text = leadingText, startMs = lineStartMs, endMs = 0L))
             }
+        }
+        
+        for (i in wordMatches.indices) {
+            val (ts, _, textStart) = wordMatches[i]
+            val textEnd = if (i < wordMatches.size - 1) wordMatches[i + 1].second else content.length
             val wordText = content.substring(textStart, textEnd).trim()
             if (wordText.isNotEmpty()) {
                 words.add(LyricWord(text = wordText, startMs = ts, endMs = 0L))

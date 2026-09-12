@@ -55,19 +55,19 @@ object LyricsPlus : LyricsProvider {
         // Take the first mirror to answer with something usable
         try {
             while (pending.isNotEmpty()) {
-                val (host, lines) = select {
+                val (host, body) = select {
                     pending.forEach { (host, job) -> job.onAwait { host to it } }
                 }
                 pending.removeAll { it.first == host }
-                if (!lines.isNullOrEmpty()) {
+                if (body != null) {
                     lastGood.set(host)
-                    val isSyllable = lines.any { it.isWordSynced }
-                    val text = if (isSyllable) lines.toEnhancedLrc() else lines.toLrc()
+                    val response = runCatching { lyricsJson.decodeFromString<Response>(body) }.getOrNull()
+                    val isSyllable = response?.lyrics?.any { !it.syllabus.isNullOrEmpty() } == true
                     
                     // Match confidence heuristic: 
                     // LyricsPlus is title+artist based. High confidence.
                     return@coroutineScope LyricsResult(
-                        text = text,
+                        text = body,
                         syncLevel = if (isSyllable) SyncLevel.SYLLABLE else SyncLevel.LINE,
                         providerName = name,
                         matchConfidence = 85, // Reasonable default for T/A match
@@ -87,7 +87,7 @@ object LyricsPlus : LyricsProvider {
         artist: String,
         durationMs: Long,
         album: String?,
-    ): List<LyricLine>? = withContext(Dispatchers.IO) {
+    ): String? = withContext(Dispatchers.IO) {
         val url = "$host/v2/lyrics/get".toHttpUrl().newBuilder()
             .addQueryParameter("title", title)
             .addQueryParameter("artist", artist)
@@ -101,58 +101,7 @@ object LyricsPlus : LyricsProvider {
         val body = lyricsGet(url.toString()) ?: return@withContext null
         val response = runCatching { lyricsJson.decodeFromString<Response>(body) }.getOrNull()
             ?: return@withContext null
-        parse(response).takeIf { it.isNotEmpty() }
-    }
-
-    internal fun parse(response: Response): List<LyricLine> =
-        response.lyrics.orEmpty().mapNotNull { line ->
-            val start = line.time ?: return@mapNotNull null
-            val words = mergeSyllables(line.syllabus.orEmpty())
-            when {
-                words.isNotEmpty() -> LyricLine(
-                    startMs = minOf(start, words.first().startMs),
-                    text = words.joinToString(" ") { it.text },
-                    words = words,
-                )
-                // Some sources are only line-synced; still worth showing.
-                // The line's duration is the only end it gets, and without it
-                // an interlude can't be told from a slowly sung line.
-                !line.text.isNullOrBlank() -> LyricLine(
-                    startMs = start,
-                    text = line.text.trim(),
-                    endMs = line.duration?.takeIf { it > 0 }?.let { start + it },
-                )
-                else -> null
-            }
-        }.sortedBy { it.timeMs }.withInstrumentalGaps()
-
-    /**
-     * Glues syllables back into words.
-     *
-     * The API's own spacing is the word boundary — it emits `"e"` then
-     * `"nough "`, and the trailing space is the only thing saying those are
-     * one word. Splitting on the syllable instead would render "e nough".
-     */
-    private fun mergeSyllables(syllables: List<Syllable>): List<LyricWord> {
-        val words = mutableListOf<LyricWord>()
-        val current = StringBuilder()
-        var start = 0L
-        var end = 0L
-
-        syllables.forEach { syllable ->
-            val text = syllable.text ?: return@forEach
-            if (text.isBlank()) return@forEach
-            val time = syllable.time ?: return@forEach
-            if (current.isEmpty()) start = time
-            current.append(text.trim())
-            end = time + (syllable.duration ?: 0L)
-            if (text.last().isWhitespace()) {
-                words += LyricWord(start, end, current.toString())
-                current.setLength(0)
-            }
-        }
-        if (current.isNotEmpty()) words += LyricWord(start, end, current.toString())
-        return words
+        if (response.lyrics.isNullOrEmpty()) null else body
     }
 
     @Serializable

@@ -56,9 +56,8 @@ object SimpMusicLyrics : LyricsProvider {
             ?.takeIf { it.isNotEmpty() }
             
         if (wordLines != null) {
-            val text = wordLines.toEnhancedLrc()
             return@withContext LyricsResult(
-                text = text,
+                text = track.richSyncLyrics ?: "",
                 syncLevel = SyncLevel.WORD,
                 providerName = name,
                 matchConfidence = 95, // High because it's a videoId match!
@@ -71,9 +70,8 @@ object SimpMusicLyrics : LyricsProvider {
             ?.takeIf { it.isNotEmpty() }
             
         if (lineLines != null) {
-            val text = lineLines.toLrc()
             return@withContext LyricsResult(
-                text = text,
+                text = track.syncedLyrics ?: "",
                 syncLevel = SyncLevel.LINE,
                 providerName = name,
                 matchConfidence = 95,
