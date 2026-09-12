@@ -63,7 +63,12 @@ fun SyncedLyricsView(
             parsedLyricsInput
         } else {
             withContext(Dispatchers.Default) {
-                LrcParser.parse(lyrics)
+                val document = com.gratia.music.lyrics.LyricsParser.parse(lyrics)
+                when (document) {
+                    is com.gratia.music.lyrics.LyricsDocument.WordSynced -> document.lines
+                    is com.gratia.music.lyrics.LyricsDocument.LineSynced -> document.lines
+                    is com.gratia.music.lyrics.LyricsDocument.Plain -> emptyList()
+                }
             }
         }
     }

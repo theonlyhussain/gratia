@@ -9,7 +9,7 @@ object LyricsParser {
     /**
      * Parses the lyrics raw text.
      */
-    fun parse(input: String?): LyricsDocument {
+    fun parse(input: String?, enableEstimatedTimings: Boolean = false): LyricsDocument {
         if (input.isNullOrBlank()) {
             return LyricsDocument.Plain("")
         }
@@ -45,7 +45,7 @@ object LyricsParser {
             }
             LyricsMode.LRC -> {
                 try {
-                    val lines = LrcParser.parse(input)
+                    val lines = LrcParser.parse(input, enableEstimatedTimings)
                     if (lines.isNotEmpty()) {
                         return LyricsDocument.LineSynced(lines)
                     }
@@ -84,7 +84,7 @@ object LyricsParser {
 
         // Try LRC
         try {
-            val lines = LrcParser.parse(input)
+            val lines = LrcParser.parse(input, enableEstimatedTimings)
             if (lines.isNotEmpty()) return LyricsDocument.LineSynced(lines)
         } catch (_: Exception) {}
 

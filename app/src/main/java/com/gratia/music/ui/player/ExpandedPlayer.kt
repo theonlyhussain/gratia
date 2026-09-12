@@ -305,7 +305,12 @@ fun ExpandedPlayer(
     val lyricsRaw = currentLyrics?.text ?: ""
     val parsedLines = remember(lyricsRaw, enableEstimatedTimings) {
         if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
-            LrcParser.parse(lyricsRaw, enableEstimatedTimings)
+            val doc = com.gratia.music.lyrics.LyricsParser.parse(lyricsRaw, enableEstimatedTimings)
+            when (doc) {
+                is com.gratia.music.lyrics.LyricsDocument.WordSynced -> doc.lines
+                is com.gratia.music.lyrics.LyricsDocument.LineSynced -> doc.lines
+                is com.gratia.music.lyrics.LyricsDocument.Plain -> emptyList()
+            }
         } else emptyList()
     }
 
