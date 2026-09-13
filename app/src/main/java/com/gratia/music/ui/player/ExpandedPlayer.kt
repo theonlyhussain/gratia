@@ -524,7 +524,10 @@ fun ExpandedPlayer(
                     },
                     onSeekLyrics = { seekMs ->
                         onUserInteraction()
-                        playerViewModel.seekTo(seekMs)
+                        // Ensure we don't seek exactly to the end of the song, which causes it to skip to the next track.
+                        // Leave a 500ms buffer before the end.
+                        val safeSeekMs = seekMs.coerceAtMost(maxOf(0L, durationMs - 500L))
+                        playerViewModel.seekTo(safeSeekMs)
                     },
                     onDragStart = {
                         onUserInteraction()

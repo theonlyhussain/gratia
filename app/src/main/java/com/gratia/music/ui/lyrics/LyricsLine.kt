@@ -96,11 +96,18 @@ fun LyricsLine(
                         500L
                     }
 
-                    AnimatedWord(
-                        word = word,
-                        durationMs = durationMs.toInt(),
-                        currentPositionProvider = currentPositionProvider
-                    )
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.clickable(
+                            enabled = onSeek != null,
+                            onClick = { onSeek?.invoke(word.startMs) }
+                        )
+                    ) {
+                        AnimatedWord(
+                            word = word,
+                            durationMs = durationMs.toInt(),
+                            currentPositionProvider = currentPositionProvider
+                        )
+                    }
 
                     // Space between words
                     if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
