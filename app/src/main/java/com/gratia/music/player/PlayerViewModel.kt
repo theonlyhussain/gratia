@@ -198,6 +198,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * Save manual lyrics with auto-detected format from content.
+     */
+    fun saveManualLyrics(text: String, isActive: Boolean = true) {
+        lyricsManager.saveLyrics(text, isActive)
+    }
+
+    /**
+     * Legacy save with explicit format flags.
+     */
     fun saveManualLyrics(text: String, isSynced: Boolean, isWordLevel: Boolean, isActive: Boolean) {
         lyricsManager.saveLyrics(text, isSynced, isWordLevel, isActive)
     }

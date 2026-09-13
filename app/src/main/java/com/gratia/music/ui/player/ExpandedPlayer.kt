@@ -52,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.data.CoverColorCache
 import com.gratia.music.lyrics.LyricsParser
-import com.gratia.music.lyrics.LrcParser
+import com.gratia.music.lyrics.LyricsDocument
 
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.AnimatedText
@@ -302,16 +302,20 @@ fun ExpandedPlayer(
     }
 
     // --- Parse lyrics for the SyncedLyricsView ---
+    // Critical: do NOT gate on isSynced — the parser detects the actual format
+    // from content. A TTML payload with isSynced=false will still parse correctly.
     val lyricsRaw = currentLyrics?.text ?: ""
-    val parsedLines = remember(lyricsRaw, enableEstimatedTimings) {
-        if (currentLyrics?.isSynced == true && lyricsRaw.isNotBlank()) {
-            val doc = com.gratia.music.lyrics.LyricsParser.parse(lyricsRaw, enableEstimatedTimings)
-            when (doc) {
-                is com.gratia.music.lyrics.LyricsDocument.WordSynced -> doc.lines
-                is com.gratia.music.lyrics.LyricsDocument.LineSynced -> doc.lines
-                is com.gratia.music.lyrics.LyricsDocument.Plain -> emptyList()
-            }
-        } else emptyList()
+    val parsedDocument = remember(lyricsRaw, enableEstimatedTimings) {
+        if (lyricsRaw.isNotBlank()) {
+            LyricsParser.parse(lyricsRaw, enableEstimatedTimings)
+        } else LyricsDocument.Plain("")
+    }
+    val parsedLines = remember(parsedDocument) {
+        when (parsedDocument) {
+            is LyricsDocument.WordSynced -> parsedDocument.lines
+            is LyricsDocument.LineSynced -> parsedDocument.lines
+            is LyricsDocument.Plain -> emptyList()
+        }
     }
 
     // Queue list state
@@ -508,6 +512,7 @@ fun ExpandedPlayer(
                     visualTimeProvider = { visualTimeState.longValue },
                     lyricsRaw = lyricsRaw,
                     parsedLines = parsedLines,
+                    parsedDocument = parsedDocument,
                     queueListState = queueListState,
                     audioFormat = playerViewModel.audioFormat.collectAsState().value,
                     enableEstimatedTimings = enableEstimatedTimings,
@@ -732,8 +737,8 @@ fun ExpandedPlayer(
                 allLyrics = allLyricsList,
                 currentTimeMs = visualTimeState.longValue,
                 onDismiss = { showLyricsEditor = false },
-                onSave = { newLyrics, isSynced, isWordLevel ->
-                    playerViewModel.saveManualLyrics(newLyrics, isSynced, isWordLevel, isActive = true)
+                onSave = { newLyrics ->
+                    playerViewModel.saveManualLyrics(newLyrics, isActive = true)
                     showLyricsEditor = false
                 },
                 onDelete = { provider ->
@@ -1022,6 +1027,7 @@ private fun ContentModeLayout(
     visualTimeProvider: () -> Long,
     lyricsRaw: String,
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
+    parsedDocument: LyricsDocument?,
     queueListState: androidx.compose.foundation.lazy.LazyListState,
     audioFormat: com.gratia.music.player.AudioFormatInfo?,
     enableEstimatedTimings: Boolean,
@@ -1093,6 +1099,7 @@ private fun ContentModeLayout(
                         LyricsContentArea(
                             lyricsRaw = lyricsRaw,
                             parsedLines = parsedLines,
+                            parsedDocument = parsedDocument,
                             currentLyrics = currentLyrics,
                             visualTimeProvider = visualTimeProvider,
                             syncOffset = syncOffset,
@@ -1180,6 +1187,7 @@ private fun ContentModeLayout(
 private fun LyricsContentArea(
     lyricsRaw: String,
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
+    parsedDocument: LyricsDocument?,
     currentLyrics: com.gratia.music.data.model.LyricsEntity?,
     visualTimeProvider: () -> Long,
     syncOffset: Long,
@@ -1222,7 +1230,7 @@ private fun LyricsContentArea(
             )
             
             // Estimated timing toggle button overlay
-            if (currentLyrics?.isSynced == true && currentLyrics.isWordLevel == false) {
+            if (parsedDocument is LyricsDocument.LineSynced) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = !isFullscreenContent,
                     enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),

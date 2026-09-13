@@ -4,9 +4,91 @@ import org.junit.Assert.*
 import org.junit.Test
 
 /**
- * Unit tests verifying parser behaviors and edge case fallbacks.
+ * Unit tests verifying parser behaviors, format detection, and edge case fallbacks.
  */
 class LyricsParserTest {
+
+    // ─── Format Detection ────────────────────────────────────────
+
+    @Test
+    fun testFormatDetection_Plain() {
+        val input = "First line of lyrics\nSecond line"
+        assertEquals(LyricsFormat.PLAIN, LyricsFormatDetector.detect(input))
+    }
+
+    @Test
+    fun testFormatDetection_LRC() {
+        val input = "[00:05.00] First line starts here\n[00:10.50] Second line"
+        assertEquals(LyricsFormat.LRC, LyricsFormatDetector.detect(input))
+    }
+
+    @Test
+    fun testFormatDetection_ELRC() {
+        val input = "[00:14.20] <00:14.20> I <00:14.50> want <00:14.80> to"
+        assertEquals(LyricsFormat.ENHANCED_LRC, LyricsFormatDetector.detect(input))
+    }
+
+    @Test
+    fun testFormatDetection_TTML() {
+        val ttml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body><div><p begin="10.0" end="15.0">Hello</p></div></body>
+            </tt>
+        """.trimIndent()
+        assertEquals(LyricsFormat.TTML, LyricsFormatDetector.detect(ttml))
+    }
+
+    @Test
+    fun testFormatDetection_JSON() {
+        val json = """[{"line": "Hello", "start_time": 10.0, "words": [{"word": "Hello", "start": 10.0}]}]"""
+        assertEquals(LyricsFormat.JSON_WORD, LyricsFormatDetector.detect(json))
+    }
+
+    @Test
+    fun testFormatDetection_Null() {
+        assertEquals(LyricsFormat.PLAIN, LyricsFormatDetector.detect(null))
+    }
+
+    @Test
+    fun testFormatDetection_Empty() {
+        assertEquals(LyricsFormat.PLAIN, LyricsFormatDetector.detect(""))
+    }
+
+    // ─── Quality Ranking ─────────────────────────────────────────
+
+    @Test
+    fun testQualityRanking() {
+        assertTrue(LyricsQuality.SYLLABLE_SYNCED.priority > LyricsQuality.WORD_SYNCED.priority)
+        assertTrue(LyricsQuality.WORD_SYNCED.priority > LyricsQuality.LINE_SYNCED.priority)
+        assertTrue(LyricsQuality.LINE_SYNCED.priority > LyricsQuality.PLAIN.priority)
+    }
+
+    @Test
+    fun testParsedDocumentQuality_Plain() {
+        val doc = LyricsParser.parse("Just plain text\nAnother line")
+        assertTrue(doc is LyricsDocument.Plain)
+        assertEquals(LyricsQuality.PLAIN, doc.quality)
+        assertEquals(LyricsFormat.PLAIN, doc.format)
+    }
+
+    @Test
+    fun testParsedDocumentQuality_LineSynced() {
+        val doc = LyricsParser.parse("[00:05.00] First line\n[00:10.50] Second line")
+        assertTrue(doc is LyricsDocument.LineSynced)
+        assertEquals(LyricsQuality.LINE_SYNCED, doc.quality)
+        assertEquals(LyricsFormat.LRC, doc.format)
+    }
+
+    @Test
+    fun testParsedDocumentQuality_WordSynced() {
+        val doc = LyricsParser.parse("[00:14.20] <00:14.20> I <00:14.50> want <00:14.80> to")
+        assertTrue(doc is LyricsDocument.WordSynced)
+        assertTrue(doc.quality.priority >= LyricsQuality.WORD_SYNCED.priority)
+        assertEquals(LyricsFormat.ENHANCED_LRC, doc.format)
+    }
+
+    // ─── Plain Lyrics ────────────────────────────────────────────
 
     @Test
     fun testPlainLyrics() {
@@ -20,6 +102,8 @@ class LyricsParserTest {
         assertTrue("Expected Plain lyrics mode", doc is LyricsDocument.Plain)
         assertEquals(input, (doc as LyricsDocument.Plain).text)
     }
+
+    // ─── Standard LRC ────────────────────────────────────────────
 
     @Test
     fun testStandardLrc() {
@@ -66,6 +150,8 @@ class LyricsParserTest {
         assertEquals(5000L, lines[0].endMs)
     }
 
+    // ─── Enhanced LRC ────────────────────────────────────────────
+
     @Test
     fun testEnhancedLrc() {
         val input = """
@@ -109,6 +195,73 @@ class LyricsParserTest {
         assertEquals(5000L, lines[1].startMs)
         assertEquals(8000L, lines[1].endMs)
     }
+
+    @Test
+    fun testEnhancedLrcLeadingText() {
+        // Text before the first timestamp
+        val elrc = "[00:10.00]motorways <00:12.00>and <00:13.00>tramlines"
+        val doc = LyricsParser.parse(elrc)
+        
+        assertTrue(doc is LyricsDocument.WordSynced)
+        val wordDoc = doc as LyricsDocument.WordSynced
+        assertEquals(1, wordDoc.lines.size)
+        
+        val words = wordDoc.lines[0].words
+        assertEquals(3, words.size)
+        assertEquals("motorways", words[0].text)
+        assertEquals(10_000L, words[0].startMs) // Inherits line start
+        
+        assertEquals("and", words[1].text)
+        assertEquals(12_000L, words[1].startMs)
+        
+        assertEquals("tramlines", words[2].text)
+        assertEquals(13_000L, words[2].startMs)
+    }
+
+    @Test
+    fun testEnhancedLrcEmbeddedTimestamp() {
+        // Timestamp embedded in the middle of a word
+        val elrc = "[00:30.00]stopp<00:32.66>ing"
+        val doc = LyricsParser.parse(elrc)
+        
+        assertTrue(doc is LyricsDocument.WordSynced)
+        val wordDoc = doc as LyricsDocument.WordSynced
+        assertEquals(1, wordDoc.lines.size)
+        
+        val words = wordDoc.lines[0].words
+        assertEquals(2, words.size)
+        assertEquals("stopp", words[0].text)
+        assertEquals(30_000L, words[0].startMs)
+        
+        assertEquals("ing", words[1].text)
+        assertEquals(32_660L, words[1].startMs)
+        
+        // Final text should be stripped of the tag
+        assertEquals("stopping", wordDoc.lines[0].text)
+    }
+
+    // ─── Lyricsify ELRC Regression ───────────────────────────────
+
+    @Test
+    fun testLyricsifyElrcRichSync() {
+        // Real-world format from Lyricsify / SimpMusic richSyncLyrics
+        val elrc = "[00:22.00]Transport, <00:24.38>motorways <00:26.08>and <00:26.44>tram <00:27.83>lines"
+        val doc = LyricsParser.parse(elrc)
+        
+        assertTrue("Expected WordSynced from ELRC with leading word", doc is LyricsDocument.WordSynced)
+        val wordDoc = doc as LyricsDocument.WordSynced
+        assertEquals(1, wordDoc.lines.size)
+        
+        val words = wordDoc.lines[0].words
+        // "Transport," should be captured as a timed word at the line start
+        assertTrue("First word should be 'Transport,'", words[0].text == "Transport,")
+        assertEquals(22_000L, words[0].startMs)
+        
+        assertEquals("motorways", words[1].text)
+        assertEquals(24_380L, words[1].startMs)
+    }
+
+    // ─── JSON Word Lyrics ────────────────────────────────────────
 
     @Test
     fun testJsonWordLyrics() {
@@ -165,65 +318,7 @@ class LyricsParserTest {
         assertTrue((doc as LyricsDocument.Plain).text.startsWith("["))
     }
 
-    @Test
-    fun testMalformedTimestampsSkippedSafely() {
-        val input = """
-            [00:05.xx] Malformed seconds decimals
-            [00:10.50] Valid line
-            [00:abc] Malformed digits
-        """.trimIndent()
-
-        val doc = LyricsParser.parse(input)
-        assertTrue("Expected LineSynced mode from single valid LRC row", doc is LyricsDocument.LineSynced)
-        val lines = (doc as LyricsDocument.LineSynced).lines
-        assertEquals(1, lines.size)
-        assertEquals("Valid line", lines[0].text)
-        assertEquals(10500L, lines[0].startMs)
-    }
-
-    @Test
-    fun testEnhancedLrcLeadingText() {
-        // Text before the first timestamp
-        val elrc = "[00:10.00]motorways <00:12.00>and <00:13.00>tramlines"
-        val doc = LyricsParser.parse(elrc)
-        
-        assertTrue(doc is LyricsDocument.WordSynced)
-        val wordDoc = doc as LyricsDocument.WordSynced
-        assertEquals(1, wordDoc.lines.size)
-        
-        val words = wordDoc.lines[0].words
-        assertEquals(3, words.size)
-        assertEquals("motorways", words[0].text)
-        assertEquals(10_000L, words[0].startMs) // Inherits line start
-        
-        assertEquals("and", words[1].text)
-        assertEquals(12_000L, words[1].startMs)
-        
-        assertEquals("tramlines", words[2].text)
-        assertEquals(13_000L, words[2].startMs)
-    }
-
-    @Test
-    fun testEnhancedLrcEmbeddedTimestamp() {
-        // Timestamp embedded in the middle of a word
-        val elrc = "[00:30.00]stopp<00:32.66>ing"
-        val doc = LyricsParser.parse(elrc)
-        
-        assertTrue(doc is LyricsDocument.WordSynced)
-        val wordDoc = doc as LyricsDocument.WordSynced
-        assertEquals(1, wordDoc.lines.size)
-        
-        val words = wordDoc.lines[0].words
-        assertEquals(2, words.size)
-        assertEquals("stopp", words[0].text)
-        assertEquals(30_000L, words[0].startMs)
-        
-        assertEquals("ing", words[1].text)
-        assertEquals(32_660L, words[1].startMs)
-        
-        // Final text should be stripped of the tag
-        assertEquals("stopping", wordDoc.lines[0].text)
-    }
+    // ─── TTML ────────────────────────────────────────────────────
 
     @Test
     fun testTtmlParsing() {
@@ -243,6 +338,7 @@ class LyricsParserTest {
         
         val doc = LyricsParser.parse(ttml)
         assertTrue(doc is LyricsDocument.WordSynced)
+        assertEquals(LyricsFormat.TTML, doc.format)
         val wordDoc = doc as LyricsDocument.WordSynced
         
         // withInstrumentalGaps adds a "" gap if the first line starts after 4s (MIN_GAP_MS)
@@ -258,5 +354,75 @@ class LyricsParserTest {
         
         assertEquals("world", words[1].text)
         assertEquals(12_000L, words[1].startMs)
+    }
+
+    @Test
+    fun testTtmlBlankLyricsRegression() {
+        // This is the exact bug: valid TTML content, but isSynced=false in the DB.
+        // The parser should still produce WordSynced from the content alone.
+        val ttml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body>
+                    <div>
+                        <p begin="5.0" end="8.0">
+                            <span begin="5.0" end="5.5">Take</span> <span begin="5.5" end="6.0">me</span> <span begin="6.0" end="7.0">home</span>
+                        </p>
+                        <p begin="10.0" end="14.0">
+                            <span begin="10.0" end="11.0">Country</span> <span begin="11.0" end="12.0">roads</span>
+                        </p>
+                    </div>
+                </body>
+            </tt>
+        """.trimIndent()
+        
+        val doc = LyricsParser.parse(ttml)
+        assertTrue("TTML should parse to synced document regardless of DB flags", doc is LyricsDocument.WordSynced)
+        assertEquals(LyricsFormat.TTML, doc.format)
+        
+        val lines = (doc as LyricsDocument.WordSynced).lines.filter { it.text.isNotBlank() }
+        assertTrue("Should have parsed lines with words", lines.isNotEmpty())
+        assertTrue("Lines should have timed words", lines.all { it.words.isNotEmpty() })
+    }
+
+    // ─── Malformed / Edge Cases ──────────────────────────────────
+
+    @Test
+    fun testMalformedTimestampsSkippedSafely() {
+        val input = """
+            [00:05.xx] Malformed seconds decimals
+            [00:10.50] Valid line
+            [00:abc] Malformed digits
+        """.trimIndent()
+
+        val doc = LyricsParser.parse(input)
+        assertTrue("Expected LineSynced mode from single valid LRC row", doc is LyricsDocument.LineSynced)
+        val lines = (doc as LyricsDocument.LineSynced).lines
+        assertEquals(1, lines.size)
+        assertEquals("Valid line", lines[0].text)
+        assertEquals(10500L, lines[0].startMs)
+    }
+
+    @Test
+    fun testUnknownFormatSafety() {
+        // Gibberish that looks like JSON but isn't valid
+        val input = "{garbage data here}"
+        val doc = LyricsParser.parse(input)
+        // Should not crash, should return Plain
+        assertTrue(doc is LyricsDocument.Plain)
+    }
+
+    @Test
+    fun testEmptyInput() {
+        val doc = LyricsParser.parse("")
+        assertTrue(doc is LyricsDocument.Plain)
+        assertEquals("", (doc as LyricsDocument.Plain).text)
+    }
+
+    @Test
+    fun testNullInput() {
+        val doc = LyricsParser.parse(null)
+        assertTrue(doc is LyricsDocument.Plain)
+        assertEquals("", (doc as LyricsDocument.Plain).text)
     }
 }

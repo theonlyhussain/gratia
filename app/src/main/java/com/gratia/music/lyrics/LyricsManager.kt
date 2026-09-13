@@ -99,6 +99,21 @@ class LyricsManager(
         }
     }
 
+    /**
+     * Save manual lyrics with automatic format detection from content.
+     * This is the preferred entry point — the UI should not specify format flags.
+     */
+    fun saveLyrics(text: String, isActive: Boolean = true) {
+        val song = playerManager.currentSong.value ?: return
+        scope.launch {
+            lyricsRepository.saveManualLyrics(song.id, text, isActive)
+            fetchLyricsForSong(song, forceRefresh = false)
+        }
+    }
+
+    /**
+     * Legacy save with explicit format flags. Kept for backwards compatibility.
+     */
     fun saveLyrics(text: String, isSynced: Boolean, isWordLevel: Boolean, isActive: Boolean) {
         val song = playerManager.currentSong.value ?: return
         scope.launch {

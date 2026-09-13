@@ -98,15 +98,18 @@ class LyricsRepository(
             ).firstOrNull()
             
         if (bestResult != null) {
+            // Re-parse the content to determine actual sync level from content
+            // rather than trusting provider metadata
+            val doc = com.gratia.music.lyrics.LyricsParser.parse(bestResult.text)
             val existingOffset = autoLyrics?.offsetMs ?: 0L
             val newLyrics = LyricsEntity(
                 songId = song.id,
                 text = bestResult.text,
-                isSynced = bestResult.syncLevel >= com.gratia.music.lyrics.SyncLevel.LINE,
+                isSynced = doc !is com.gratia.music.lyrics.LyricsDocument.Plain,
                 provider = "automatic",
                 offsetMs = existingOffset,
                 isManuallyEdited = false,
-                isWordLevel = bestResult.syncLevel >= com.gratia.music.lyrics.SyncLevel.WORD,
+                isWordLevel = doc is com.gratia.music.lyrics.LyricsDocument.WordSynced,
                 isActiveOverride = false
             )
             lyricsDao.insertLyrics(newLyrics)
@@ -116,6 +119,31 @@ class LyricsRepository(
         return@withContext activeLyrics
     }
 
+    /**
+     * Saves manual lyrics with auto-detected format from content.
+     * This is the preferred entry point — the UI should not specify isSynced/isWordLevel.
+     */
+    suspend fun saveManualLyrics(songId: String, text: String, isActive: Boolean = true) {
+        val doc = com.gratia.music.lyrics.LyricsParser.parse(text)
+        val allLyrics = lyricsDao.getLyricsForSong(songId)
+        val manualLyrics = allLyrics.find { it.provider == "manual" }
+        
+        val newLyrics = LyricsEntity(
+            songId = songId,
+            text = text,
+            isSynced = doc !is com.gratia.music.lyrics.LyricsDocument.Plain,
+            provider = "manual",
+            offsetMs = manualLyrics?.offsetMs ?: 0L,
+            isManuallyEdited = true,
+            isWordLevel = doc is com.gratia.music.lyrics.LyricsDocument.WordSynced,
+            isActiveOverride = isActive
+        )
+        lyricsDao.insertLyrics(newLyrics)
+    }
+
+    /**
+     * Legacy overload for callers that still pass explicit format flags (e.g. UploadScreen).
+     */
     suspend fun saveManualLyrics(songId: String, text: String, isSynced: Boolean, isWordLevel: Boolean = false, isActive: Boolean = true) {
         val allLyrics = lyricsDao.getLyricsForSong(songId)
         val manualLyrics = allLyrics.find { it.provider == "manual" }

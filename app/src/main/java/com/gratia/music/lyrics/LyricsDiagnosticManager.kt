@@ -41,15 +41,8 @@ object LyricsDiagnosticManager {
                 val time = System.currentTimeMillis() - start
                 
                 if (result != null) {
-                    val mode = LyricsModeDetector.detectMode(result.text)
+                    val format = LyricsFormatDetector.detect(result.text)
                     val parsed = LyricsParser.parse(result.text)
-                    
-                    val syncType = when (parsed) {
-                        is LyricsDocument.WordSynced -> "WordSynced"
-                        is LyricsDocument.LineSynced -> "LineSynced"
-                        is LyricsDocument.Plain -> "Plain"
-                        null -> "Failed to Parse"
-                    }
                     
                     val lineCount = when (parsed) {
                         is LyricsDocument.WordSynced -> parsed.lines.size
@@ -61,7 +54,12 @@ object LyricsDiagnosticManager {
                         else -> 0
                     }
                     
-                    Log.d(TAG, "[${provider.name}] (${time}ms) - Format: $mode - Sync: $syncType - Lines: $lineCount - Words: $wordCount")
+                    Log.d(TAG, "[${provider.name}] (${time}ms) " +
+                        "Format: ${format.label} " +
+                        "Quality: ${parsed.quality.name} " +
+                        "Lines: $lineCount " +
+                        "Words: $wordCount " +
+                        "Provider SyncLevel: ${result.syncLevel.name}")
                 } else {
                     Log.d(TAG, "[${provider.name}] (${time}ms) - Failed or No Lyrics Found")
                 }

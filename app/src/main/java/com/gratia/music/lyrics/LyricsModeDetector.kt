@@ -1,46 +1,25 @@
 package com.gratia.music.lyrics
 
+/**
+ * @deprecated Use [LyricsFormatDetector] instead. This shim exists only
+ * for backwards compatibility while callers are migrated.
+ */
 enum class LyricsMode {
     PLAIN, LRC, ELRC, JSON, TTML
 }
 
+/**
+ * @deprecated Use [LyricsFormatDetector.detect] instead.
+ */
 object LyricsModeDetector {
-    private val LRC_TIMESTAMP_REGEX = Regex("""\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]""")
-    private val ELRC_TIMESTAMP_REGEX = Regex("""<\d{1,2}:\d{2}(?:\.\d{1,3})?>""")
-
-    /**
-     * Detects the lyric format type from a raw string.
-     */
     fun detectMode(input: String?): LyricsMode {
-        if (input.isNullOrBlank()) return LyricsMode.PLAIN
-
-        val trimmed = input.trim()
-
-        // 1. JSON Mode Detection
-        if ((trimmed.startsWith("[") && trimmed.endsWith("]")) ||
-            (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
-            if (trimmed.contains("\"words\"") || trimmed.contains("'words'") || trimmed.contains("\"syllabus\"") || trimmed.contains("\"lyrics\"")) {
-                return LyricsMode.JSON
-            }
+        return when (LyricsFormatDetector.detect(input)) {
+            LyricsFormat.PLAIN -> LyricsMode.PLAIN
+            LyricsFormat.LRC -> LyricsMode.LRC
+            LyricsFormat.ENHANCED_LRC -> LyricsMode.ELRC
+            LyricsFormat.JSON_WORD -> LyricsMode.JSON
+            LyricsFormat.TTML -> LyricsMode.TTML
+            LyricsFormat.UNKNOWN -> LyricsMode.PLAIN
         }
-
-        // TTML Mode Detection
-        if (trimmed.startsWith("<") && (trimmed.contains("ttm:") || trimmed.contains("<tt") || trimmed.contains("<body>"))) {
-            return LyricsMode.TTML
-        }
-
-        // 2 & 3. LRC / ELRC Mode Detection
-        val hasLrcTimestamp = trimmed.contains(LRC_TIMESTAMP_REGEX)
-        if (hasLrcTimestamp) {
-            val hasWordTimestamp = trimmed.contains(ELRC_TIMESTAMP_REGEX)
-            return if (hasWordTimestamp) {
-                LyricsMode.ELRC
-            } else {
-                LyricsMode.LRC
-            }
-        }
-
-        // 4. Default plain lyrics fallback
-        return LyricsMode.PLAIN
     }
 }

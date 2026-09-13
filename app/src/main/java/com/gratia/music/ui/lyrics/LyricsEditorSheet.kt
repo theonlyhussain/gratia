@@ -1,18 +1,10 @@
 package com.gratia.music.ui.lyrics
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -40,22 +32,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.data.model.SongEntity
+import com.gratia.music.lyrics.LyricsFormatDetector
+import com.gratia.music.lyrics.LyricsFormat
+import com.gratia.music.lyrics.LyricsParser
+import com.gratia.music.lyrics.LyricsDocument
+import com.gratia.music.lyrics.LyricsQuality
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.JetBrainsMono
 import com.gratia.music.ui.theme.SpaceGrotesk
-
-enum class LyricsEditorFormat {
-    Plain, Synced, Enhanced
-}
+import kotlinx.coroutines.delay
 
 /**
- * Premium full-screen lyrics editor.
+ * Unified lyrics editor with automatic format detection.
  *
- * Replaces the old AlertDialog-based editor with a ModalBottomSheet
- * featuring format toggle, monospaced LRC editing, line numbers,
- * and a real-time timestamp insertion button.
+ * No format chips — the user pastes or types lyrics in any format
+ * (LRC, ELRC, TTML, JSON, plain) and Gratia automatically detects
+ * the format and sync quality. A status bar shows what was detected.
+ *
+ * @param onSave Called with the raw lyrics text. Format detection and
+ *               database flag setting happen in the repository layer.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +61,7 @@ fun LyricsEditorSheet(
     allLyrics: List<com.gratia.music.data.model.LyricsEntity>,
     currentTimeMs: Long,
     onDismiss: () -> Unit,
-    onSave: (String, Boolean, Boolean) -> Unit,
+    onSave: (String) -> Unit,
     onDelete: (String) -> Unit,
     onSetActive: (String) -> Unit
 ) {
@@ -75,84 +72,61 @@ fun LyricsEditorSheet(
         if (manualLyrics?.isActiveOverride == true) "manual" else "automatic"
     }
 
-    // Determine the format of existing lyrics
-    fun getFormat(lyrics: com.gratia.music.data.model.LyricsEntity?): LyricsEditorFormat? {
-        if (lyrics == null) return null
-        return when {
-            lyrics.isWordLevel -> LyricsEditorFormat.Enhanced
-            lyrics.isSynced -> LyricsEditorFormat.Synced
-            else -> LyricsEditorFormat.Plain
+    // Single unified text state — the user's content, regardless of format
+    val initialText = remember(allLyrics) {
+        when {
+            manualLyrics != null -> manualLyrics.text
+            automaticLyrics != null -> automaticLyrics.text
+            else -> ""
         }
     }
 
-    val manualFormat = getFormat(manualLyrics)
-    val autoFormat = getFormat(automaticLyrics)
+    var editorText by remember(allLyrics) {
+        mutableStateOf(TextFieldValue(text = initialText))
+    }
 
-    var editorMode by remember {
-        mutableStateOf(
-            when {
-                manualFormat != null -> manualFormat
-                autoFormat != null -> autoFormat
-                else -> LyricsEditorFormat.Plain
+    // Live format detection — debounced to avoid lag while typing
+    var detectedFormat by remember { mutableStateOf(LyricsFormatDetector.detect(initialText)) }
+    var parsedDocument by remember { mutableStateOf(LyricsParser.parse(initialText)) }
+
+    // Stats derived from parsed document
+    val lineCount = remember(parsedDocument) {
+        when (parsedDocument) {
+            is LyricsDocument.WordSynced -> (parsedDocument as LyricsDocument.WordSynced).lines.count { it.text.isNotBlank() }
+            is LyricsDocument.LineSynced -> (parsedDocument as LyricsDocument.LineSynced).lines.count { it.text.isNotBlank() }
+            is LyricsDocument.Plain -> (parsedDocument as LyricsDocument.Plain).text.lines().count { it.isNotBlank() }
+        }
+    }
+    val wordCount = remember(parsedDocument) {
+        when (parsedDocument) {
+            is LyricsDocument.WordSynced -> (parsedDocument as LyricsDocument.WordSynced).lines.sumOf { it.words.size }
+            is LyricsDocument.LineSynced -> (parsedDocument as LyricsDocument.LineSynced).lines.sumOf {
+                it.text.split(Regex("\\s+")).count { w -> w.isNotBlank() }
             }
-        )
-    }
-
-    var plainText by remember(allLyrics) {
-        mutableStateOf(
-            TextFieldValue(
-                text = when (LyricsEditorFormat.Plain) {
-                    manualFormat -> manualLyrics?.text ?: ""
-                    autoFormat -> automaticLyrics?.text ?: ""
-                    else -> ""
-                }
-            )
-        )
-    }
-    
-    var syncedText by remember(allLyrics) {
-        mutableStateOf(
-            TextFieldValue(
-                text = when (LyricsEditorFormat.Synced) {
-                    manualFormat -> manualLyrics?.text ?: ""
-                    autoFormat -> automaticLyrics?.text ?: ""
-                    else -> ""
-                }
-            )
-        )
-    }
-    
-    var enhancedText by remember(allLyrics) {
-        mutableStateOf(
-            TextFieldValue(
-                text = when (LyricsEditorFormat.Enhanced) {
-                    manualFormat -> manualLyrics?.text ?: ""
-                    autoFormat -> automaticLyrics?.text ?: ""
-                    else -> ""
-                }
-            )
-        )
-    }
-
-    val currentTextFieldValue = when (editorMode) {
-        LyricsEditorFormat.Plain -> plainText
-        LyricsEditorFormat.Synced -> syncedText
-        LyricsEditorFormat.Enhanced -> enhancedText
-    }
-
-    val onCurrentTextChanged: (TextFieldValue) -> Unit = { newValue ->
-        when (editorMode) {
-            LyricsEditorFormat.Plain -> plainText = newValue
-            LyricsEditorFormat.Synced -> syncedText = newValue
-            LyricsEditorFormat.Enhanced -> enhancedText = newValue
+            is LyricsDocument.Plain -> (parsedDocument as LyricsDocument.Plain).text.split(Regex("\\s+")).count { it.isNotBlank() }
         }
     }
+    val timedWordCount = remember(parsedDocument) {
+        when (parsedDocument) {
+            is LyricsDocument.WordSynced -> (parsedDocument as LyricsDocument.WordSynced).lines.sumOf { it.words.size }
+            else -> 0
+        }
+    }
+
+    // Debounced re-detection when text changes
+    LaunchedEffect(editorText.text) {
+        delay(300) // debounce 300ms
+        detectedFormat = LyricsFormatDetector.detect(editorText.text)
+        parsedDocument = LyricsParser.parse(editorText.text)
+    }
+
+    // Determine if content uses timestamps (for showing line numbers + monospace)
+    val hasSyncedContent = detectedFormat != LyricsFormat.PLAIN && detectedFormat != LyricsFormat.UNKNOWN
 
     val focusRequester = remember { FocusRequester() }
     val verticalScrollState = rememberScrollState()
 
-    // Request focus after composition
-    LaunchedEffect(editorMode) {
+    LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
 
@@ -199,13 +173,7 @@ fun LyricsEditorSheet(
                 Spacer(Modifier.weight(1f))
 
                 IconButton(
-                    onClick = { 
-                        onSave(
-                            currentTextFieldValue.text, 
-                            editorMode != LyricsEditorFormat.Plain, 
-                            editorMode == LyricsEditorFormat.Enhanced
-                        ) 
-                    }
+                    onClick = { onSave(editorText.text) }
                 ) {
                     Icon(
                         imageVector = Icons.Default.Save,
@@ -257,46 +225,7 @@ fun LyricsEditorSheet(
                 }
             }
 
-            // ── Format Toggle Chips ──────────────────────────────
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = GratiaTheme.spacing.mediumLarge)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
-            ) {
-                FormatChip(
-                    label = "Plain",
-                    selected = editorMode == LyricsEditorFormat.Plain,
-                    onClick = { editorMode = LyricsEditorFormat.Plain }
-                )
-                FormatChip(
-                    label = "Synced (LRC)",
-                    selected = editorMode == LyricsEditorFormat.Synced,
-                    onClick = { editorMode = LyricsEditorFormat.Synced }
-                )
-                FormatChip(
-                    label = "Enhanced (ELRC)",
-                    selected = editorMode == LyricsEditorFormat.Enhanced,
-                    onClick = { editorMode = LyricsEditorFormat.Enhanced }
-                )
-            }
-
-            Spacer(Modifier.height(GratiaTheme.spacing.mediumSmall))
-
-            // ── Lyrics Status Banner ──────────────────────────────
-            val isViewingManual = manualFormat == editorMode
-            val isViewingAuto = autoFormat == editorMode
-            
-            val statusMessage = when {
-                isViewingManual -> "You are viewing your own manual lyrics. App automatic lyrics are overridden."
-                isViewingAuto -> "You are viewing App lyrics. Any edits saved will be stored as your own manual lyrics."
-                else -> "No lyrics found for this format. Add your own below."
-            }
-            
-            val statusIcon = if (isViewingManual) Icons.Default.CheckCircle else Icons.Default.Info
-            val statusColor = if (isViewingManual) Color(0xFF4CAF50) else GratiaTheme.colors.textSecondary
-
+            // ── Format Detection Status ──────────────────────────
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -304,37 +233,90 @@ fun LyricsEditorSheet(
                 shape = RoundedCornerShape(12.dp),
                 color = GratiaTheme.colors.surfaceHover
             ) {
-                Row(
+                Column(
                     modifier = Modifier.padding(
                         horizontal = GratiaTheme.spacing.base,
                         vertical = GratiaTheme.spacing.small
-                    ),
-                    verticalAlignment = Alignment.CenterVertically
+                    )
                 ) {
-                    Icon(
-                        imageVector = statusIcon,
-                        contentDescription = null,
-                        tint = statusColor,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(GratiaTheme.spacing.small))
-                    Text(
-                        text = statusMessage,
-                        fontFamily = Inter,
-                        fontSize = 12.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        lineHeight = 16.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (isViewingManual || (activeProvider == "manual" && manualFormat != null)) {
-                        Spacer(Modifier.width(GratiaTheme.spacing.small))
-                        TextButton(
-                            onClick = { onDelete("manual") },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Text("Delete Manual", fontSize = 11.sp, color = GratiaTheme.colors.error)
+                    // Format and quality
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val isValid = editorText.text.isNotBlank() && (
+                            parsedDocument is LyricsDocument.WordSynced ||
+                            parsedDocument is LyricsDocument.LineSynced ||
+                            (parsedDocument is LyricsDocument.Plain && detectedFormat == LyricsFormat.PLAIN)
+                        )
+                        val statusColor = if (isValid) Color(0xFF4CAF50) else GratiaTheme.colors.textSecondary
+                        val statusIcon = if (isValid) Icons.Default.CheckCircle else Icons.Default.Info
+
+                        Icon(
+                            imageVector = statusIcon,
+                            contentDescription = null,
+                            tint = statusColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = if (editorText.text.isBlank()) "No content"
+                                   else detectedFormat.label,
+                            fontFamily = SpaceGrotesk,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+
+                        if (editorText.text.isNotBlank() && parsedDocument.quality != LyricsQuality.PLAIN) {
+                            Text(
+                                text = " · ",
+                                fontSize = 13.sp,
+                                color = GratiaTheme.colors.textSecondary
+                            )
+                            Text(
+                                text = detectedFormat.syncDescription(parsedDocument.quality),
+                                fontFamily = Inter,
+                                fontSize = 13.sp,
+                                color = GratiaTheme.colors.textSecondary
+                            )
                         }
+                    }
+
+                    // Stats line
+                    if (editorText.text.isNotBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = buildString {
+                                    append("$lineCount lines · $wordCount words")
+                                    if (timedWordCount > 0) append(" · $timedWordCount timed")
+                                },
+                                fontFamily = Inter,
+                                fontSize = 11.sp,
+                                color = GratiaTheme.colors.textSecondary.copy(alpha = 0.7f)
+                            )
+
+                            // Manual lyrics management
+                            if (manualLyrics != null) {
+                                Spacer(Modifier.weight(1f))
+                                TextButton(
+                                    onClick = { onDelete("manual") },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                    modifier = Modifier.height(22.dp)
+                                ) {
+                                    Text("Delete Manual", fontSize = 10.sp, color = GratiaTheme.colors.error)
+                                }
+                            }
+                        }
+                    }
+
+                    // Provenance info
+                    if (manualLyrics?.isActiveOverride == true) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Manual lyrics active",
+                            fontFamily = Inter,
+                            fontSize = 11.sp,
+                            color = Color(0xFF4CAF50).copy(alpha = 0.8f)
+                        )
                     }
                 }
             }
@@ -351,55 +333,46 @@ fun LyricsEditorSheet(
                     .background(GratiaTheme.colors.surface)
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    // Line number gutter (only in synced mode)
-                    AnimatedContent(
-                        targetState = editorMode != LyricsEditorFormat.Plain,
-                        transitionSpec = {
-                            fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) togetherWith
-                                fadeOut(spring(stiffness = Spring.StiffnessMediumLow))
-                        },
-                        label = "gutterAnim"
-                    ) { showGutter ->
-                        if (showGutter) {
-                            val lineCount = currentTextFieldValue.text.lines().size.coerceAtLeast(1)
-                            Column(
-                                modifier = Modifier
-                                    .width(40.dp)
-                                    .fillMaxHeight()
-                                    .verticalScroll(verticalScrollState)
-                                    .padding(
-                                        top = GratiaTheme.spacing.base,
-                                        bottom = GratiaTheme.spacing.base
-                                    ),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                for (i in 1..lineCount) {
-                                    Text(
-                                        text = "$i",
-                                        fontFamily = JetBrainsMono,
-                                        fontSize = 11.sp,
-                                        color = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
-                                        lineHeight = 20.sp,
-                                        modifier = Modifier.padding(vertical = 1.dp)
-                                    )
-                                }
+                    // Line number gutter (shown for synced content)
+                    if (hasSyncedContent) {
+                        val rawLineCount = editorText.text.lines().size.coerceAtLeast(1)
+                        Column(
+                            modifier = Modifier
+                                .width(40.dp)
+                                .fillMaxHeight()
+                                .verticalScroll(verticalScrollState)
+                                .padding(
+                                    top = GratiaTheme.spacing.base,
+                                    bottom = GratiaTheme.spacing.base
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            for (i in 1..rawLineCount) {
+                                Text(
+                                    text = "$i",
+                                    fontFamily = JetBrainsMono,
+                                    fontSize = 11.sp,
+                                    color = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f),
+                                    lineHeight = 20.sp,
+                                    modifier = Modifier.padding(vertical = 1.dp)
+                                )
                             }
-                        } else {
-                            Spacer(Modifier.width(GratiaTheme.spacing.mediumSmall))
                         }
+                    } else {
+                        Spacer(Modifier.width(GratiaTheme.spacing.mediumSmall))
                     }
 
                     // Main text field
                     BasicTextField(
-                        value = currentTextFieldValue,
-                        onValueChange = onCurrentTextChanged,
+                        value = editorText,
+                        onValueChange = { editorText = it },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
                             .verticalScroll(verticalScrollState)
                             .padding(GratiaTheme.spacing.base)
                             .focusRequester(focusRequester),
-                        textStyle = if (editorMode != LyricsEditorFormat.Plain) {
+                        textStyle = if (hasSyncedContent) {
                             GratiaTheme.typography.monoMetadata.copy(
                                 fontSize = 13.sp,
                                 lineHeight = 20.sp,
@@ -415,16 +388,11 @@ fun LyricsEditorSheet(
                         cursorBrush = SolidColor(GratiaTheme.colors.accent),
                         decorationBox = { innerTextField ->
                             Box {
-                                if (currentTextFieldValue.text.isEmpty()) {
+                                if (editorText.text.isEmpty()) {
                                     Text(
-                                        text = if (editorMode == LyricsEditorFormat.Enhanced)
-                                            "[00:00.00] <00:00.00> Paste or type enhanced lyrics…"
-                                        else if (editorMode == LyricsEditorFormat.Synced)
-                                            "[00:00.00] Paste or type synced lyrics…"
-                                        else
-                                            "Paste or type lyrics here…",
-                                        fontFamily = if (editorMode != LyricsEditorFormat.Plain) JetBrainsMono else Inter,
-                                        fontSize = if (editorMode != LyricsEditorFormat.Plain) 13.sp else 15.sp,
+                                        text = "Paste or type lyrics here…",
+                                        fontFamily = if (hasSyncedContent) JetBrainsMono else Inter,
+                                        fontSize = if (hasSyncedContent) 13.sp else 15.sp,
                                         color = GratiaTheme.colors.textSecondary.copy(alpha = 0.4f)
                                     )
                                 }
@@ -446,10 +414,10 @@ fun LyricsEditorSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Clear button (Icon only to save space)
+                // Clear button
                 FilledIconButton(
                     onClick = {
-                        onCurrentTextChanged(TextFieldValue(""))
+                        editorText = TextFieldValue("")
                     },
                     modifier = Modifier.size(40.dp),
                     shape = RoundedCornerShape(12.dp),
@@ -465,160 +433,117 @@ fun LyricsEditorSheet(
                     )
                 }
 
-                // Timestamp insert (only in synced mode)
-                if (editorMode != LyricsEditorFormat.Plain) {
-                    val timeTag = remember(currentTimeMs) {
-                        formatLrcTimestamp(currentTimeMs)
-                    }
-                    val enhancedTimeTag = remember(currentTimeMs) {
-                        formatEnhancedTimestamp(currentTimeMs)
-                    }
+                // Timestamp insertion buttons — always available for manual LRC authoring
+                val timeTag = remember(currentTimeMs) {
+                    formatLrcTimestamp(currentTimeMs)
+                }
+                val enhancedTimeTag = remember(currentTimeMs) {
+                    formatEnhancedTimestamp(currentTimeMs)
+                }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Enhanced timestamp <mm:ss.xx>
+                    FilledTonalButton(
+                        onClick = {
+                            val cursor = editorText.selection.start
+                            val currentText = editorText.text
+                            val tag = "$enhancedTimeTag "
+                            val newText = currentText.substring(0, cursor) +
+                                    tag +
+                                    currentText.substring(cursor)
+                            editorText = TextFieldValue(
+                                text = newText,
+                                selection = TextRange(cursor + tag.length)
+                            )
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = GratiaTheme.colors.accent.copy(alpha = 0.15f),
+                            contentColor = GratiaTheme.colors.accent
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
-                        if (editorMode == LyricsEditorFormat.Enhanced) {
-                            FilledTonalButton(
-                                onClick = {
-                                    val cursor = currentTextFieldValue.selection.start
-                                    val currentText = currentTextFieldValue.text
-                                    val tag = "$enhancedTimeTag "
-                                    val newText = currentText.substring(0, cursor) +
-                                            tag +
-                                            currentText.substring(cursor)
-                                    onCurrentTextChanged(TextFieldValue(
-                                        text = newText,
-                                        selection = TextRange(cursor + tag.length)
-                                    ))
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.filledTonalButtonColors(
-                                    containerColor = GratiaTheme.colors.accent.copy(alpha = 0.15f),
-                                    contentColor = GratiaTheme.colors.accent
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Timer,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(Modifier.width(GratiaTheme.spacing.extraSmall))
-                                Text(
-                                    text = enhancedTimeTag,
-                                    fontFamily = JetBrainsMono,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
+                        Icon(
+                            Icons.Default.Timer,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(GratiaTheme.spacing.extraSmall))
+                        Text(
+                            text = enhancedTimeTag,
+                            fontFamily = JetBrainsMono,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
-                        FilledTonalButton(
-                            onClick = {
-                                val cursor = currentTextFieldValue.selection.start
-                                val currentText = currentTextFieldValue.text
-                                val tag = "$timeTag "
-                                val newText = currentText.substring(0, cursor) +
-                                        tag +
-                                        currentText.substring(cursor)
-                                onCurrentTextChanged(TextFieldValue(
-                                    text = newText,
-                                    selection = TextRange(cursor + tag.length)
-                                ))
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = if (editorMode == LyricsEditorFormat.Enhanced) GratiaTheme.colors.surfaceHover else GratiaTheme.colors.accent.copy(alpha = 0.15f),
-                                contentColor = if (editorMode == LyricsEditorFormat.Enhanced) GratiaTheme.colors.textPrimary else GratiaTheme.colors.accent
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Timer,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                    // Line timestamp [mm:ss.xx]
+                    FilledTonalButton(
+                        onClick = {
+                            val cursor = editorText.selection.start
+                            val currentText = editorText.text
+                            val tag = "$timeTag "
+                            val newText = currentText.substring(0, cursor) +
+                                    tag +
+                                    currentText.substring(cursor)
+                            editorText = TextFieldValue(
+                                text = newText,
+                                selection = TextRange(cursor + tag.length)
                             )
-                            Spacer(Modifier.width(GratiaTheme.spacing.extraSmall))
-                            Text(
-                                text = timeTag,
-                                fontFamily = JetBrainsMono,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = GratiaTheme.colors.surfaceHover,
+                            contentColor = GratiaTheme.colors.textPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Timer,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(GratiaTheme.spacing.extraSmall))
+                        Text(
+                            text = timeTag,
+                            fontFamily = JetBrainsMono,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
 
-                        // Insert Gap button
-                        FilledTonalButton(
-                            onClick = {
-                                val cursor = currentTextFieldValue.selection.start
-                                val currentText = currentTextFieldValue.text
-                                val tag = "\n$timeTag \n"
-                                val newText = currentText.substring(0, cursor) +
-                                        tag +
-                                        currentText.substring(cursor)
-                                onCurrentTextChanged(TextFieldValue(
-                                    text = newText,
-                                    selection = TextRange(cursor + tag.length)
-                                ))
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.filledTonalButtonColors(
-                                containerColor = GratiaTheme.colors.surfaceHover,
-                                contentColor = GratiaTheme.colors.textPrimary
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.MoreHoriz,
-                                contentDescription = "Insert Gap",
-                                modifier = Modifier.size(16.dp)
+                    // Insert Gap
+                    FilledTonalButton(
+                        onClick = {
+                            val cursor = editorText.selection.start
+                            val currentText = editorText.text
+                            val tag = "\n$timeTag \n"
+                            val newText = currentText.substring(0, cursor) +
+                                    tag +
+                                    currentText.substring(cursor)
+                            editorText = TextFieldValue(
+                                text = newText,
+                                selection = TextRange(cursor + tag.length)
                             )
-                        }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = GratiaTheme.colors.surfaceHover,
+                            contentColor = GratiaTheme.colors.textPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.MoreHoriz,
+                            contentDescription = "Insert Gap",
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
-        }
-    }
-}
-
-/**
- * Format chip for toggling between Plain and Synced modes.
- */
-@Composable
-private fun FormatChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (selected) GratiaTheme.colors.accent else GratiaTheme.colors.surface,
-        animationSpec = tween(GratiaTheme.motion.normal),
-        label = "chipBg"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) GratiaTheme.colors.background else GratiaTheme.colors.textSecondary,
-        animationSpec = tween(GratiaTheme.motion.normal),
-        label = "chipContent"
-    )
-
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = backgroundColor,
-        modifier = Modifier.height(36.dp)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = GratiaTheme.spacing.base)
-        ) {
-            Text(
-                text = label,
-                fontFamily = Inter,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                fontSize = 13.sp,
-                color = contentColor
-            )
         }
     }
 }
