@@ -18,7 +18,7 @@ object LyricsModeDetector {
             LyricsFormat.LRC -> LyricsMode.LRC
             LyricsFormat.ENHANCED_LRC -> LyricsMode.ELRC
             LyricsFormat.JSON_WORD -> LyricsMode.JSON
-            LyricsFormat.TTML, LyricsFormat.JSON_WRAPPED_TTML -> LyricsMode.TTML
+            LyricsFormat.TTML -> LyricsMode.TTML
             LyricsFormat.UNKNOWN -> LyricsMode.PLAIN
         }
     }

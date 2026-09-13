@@ -26,27 +26,42 @@ object LyricsParser {
             return LyricsDocument.Plain("")
         }
 
-        val format = LyricsFormatDetector.detect(input)
+        var textToParse = input.trim()
+
+        // Globally unwrap PaxSenix/Lyrically JSON payloads if present in DB
+        if (textToParse.startsWith("{") && textToParse.endsWith("}")) {
+            try {
+                val obj = JSONObject(textToParse)
+                if (obj.has("content")) {
+                    textToParse = obj.optString("content", textToParse).trim()
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (textToParse.isBlank()) {
+            return LyricsDocument.Plain(input)
+        }
+
+        val format = LyricsFormatDetector.detect(textToParse)
 
         // Try the detected format first
-        val primary = tryParse(format, input, enableEstimatedTimings)
+        val primary = tryParse(format, textToParse, enableEstimatedTimings)
         if (primary != null) return primary
 
         // Sequential fallback — try every format in quality order
         for (fallback in listOf(
-            LyricsFormat.JSON_WRAPPED_TTML,
             LyricsFormat.TTML,
             LyricsFormat.JSON_WORD,
             LyricsFormat.ENHANCED_LRC,
             LyricsFormat.LRC
         )) {
             if (fallback == format) continue // already tried
-            val result = tryParse(fallback, input, enableEstimatedTimings)
+            val result = tryParse(fallback, textToParse, enableEstimatedTimings)
             if (result != null) return result
         }
 
         // Nothing worked — return as plain text
-        return LyricsDocument.Plain(input)
+        return LyricsDocument.Plain(textToParse)
     }
 
     /**
@@ -70,20 +85,7 @@ object LyricsParser {
                 } catch (_: Exception) { null }
             }
 
-            LyricsFormat.JSON_WRAPPED_TTML -> {
-                try {
-                    val root = JSONObject(input.trim())
-                    val ttmlContent = root.optString("content", "")
-                    if (ttmlContent.isNotEmpty()) {
-                        val lines = TtmlLyrics.parse(ttmlContent)
-                        if (lines.isNotEmpty()) {
-                            val hasWords = lines.any { it.words.isNotEmpty() }
-                            if (hasWords) LyricsDocument.WordSynced(lines, LyricsFormat.JSON_WRAPPED_TTML)
-                            else LyricsDocument.LineSynced(lines, LyricsFormat.JSON_WRAPPED_TTML)
-                        } else null
-                    } else null
-                } catch (_: Exception) { null }
-            }
+
 
             LyricsFormat.JSON_WORD -> {
                 try {

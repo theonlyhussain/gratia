@@ -79,9 +79,9 @@ class LyricallyProvider : LyricsProvider {
                 
                 // Only return if it has word-level content or ttmlContent we can use, else let LRCLIB handle line-level
                 if (isWordLevel && hasContent) {
-                    // We return the raw JSON response as the text, which our parser will consume
+                    // Extract the content from the JSON response to avoid storing JSON in the DB
                     return@withContext LyricsResult(
-                        text = response,
+                        text = json.optString("content", response).trim(),
                         syncLevel = SyncLevel.WORD,
                         providerName = name,
                         matchConfidence = 85, // Title/Artist match

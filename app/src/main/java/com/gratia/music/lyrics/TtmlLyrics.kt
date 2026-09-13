@@ -49,7 +49,12 @@ object TtmlLyrics {
             isNamespaceAware = false
             // Lyrics arrive from a third-party host; refuse to resolve
             // anything the document asks us to go and fetch.
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            try {
+                setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            } catch (e: Exception) {
+                // Android's DocumentBuilderFactory doesn't support this Xerces feature
+                // and throws ParserConfigurationException.
+            }
         }
         val document = factory.newDocumentBuilder().parse(InputSource(StringReader(ttml)))
         val paragraphs = document.getElementsByTagName("p")

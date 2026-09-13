@@ -30,15 +30,9 @@ object LyricsFormatDetector {
             return LyricsFormat.TTML
         }
 
-        // 2. JSON — structured word/syllable timing or JSON-wrapped TTML
+        // 2. JSON — structured word/syllable timing
         if ((trimmed.startsWith("[") && trimmed.endsWith("]")) ||
             (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
-            if ((trimmed.contains("\"type\":\"TTML\"", ignoreCase = true) || 
-                 trimmed.contains("\"type\": \"TTML\"", ignoreCase = true) ||
-                 trimmed.contains("'type':'TTML'", ignoreCase = true)) && 
-                (trimmed.contains("\"content\"") || trimmed.contains("'content'"))) {
-                return LyricsFormat.JSON_WRAPPED_TTML
-            }
             if (trimmed.contains("\"words\"") || trimmed.contains("'words'") ||
                 trimmed.contains("\"syllabus\"") || trimmed.contains("\"lyrics\"") ||
                 trimmed.contains("\"text\"")) {

@@ -11,7 +11,6 @@ enum class LyricsFormat(val label: String) {
     LRC("LRC"),
     ENHANCED_LRC("Enhanced LRC"),
     TTML("TTML"),
-    JSON_WRAPPED_TTML("TTML"),
     JSON_WORD("JSON"),
     UNKNOWN("Unknown");
 
