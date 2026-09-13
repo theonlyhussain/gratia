@@ -136,6 +136,21 @@ fun SyncedLyricsView(
                     onSeek = onSeek
                 )
             }
+            
+            if (!lyricsSource.isNullOrBlank()) {
+                item {
+                    androidx.compose.material3.Text(
+                        text = "Provided by $lyricsSource",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 48.dp, bottom = 16.dp),
+                        style = androidx.compose.material3.MaterialTheme.typography.labelMedium.copy(
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                            textAlign = textAlignment
+                        )
+                    )
+                }
+            }
         }
     }
 }

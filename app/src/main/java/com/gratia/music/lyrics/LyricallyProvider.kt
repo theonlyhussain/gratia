@@ -74,7 +74,7 @@ class LyricallyProvider : LyricsProvider {
                 val json = JSONObject(response)
                 
                 val type = json.optString("type")
-                val isWordLevel = type.equals("Syllable", ignoreCase = true)
+                val isWordLevel = type.equals("Syllable", ignoreCase = true) || type.equals("TTML", ignoreCase = true)
                 val hasContent = json.has("content")
                 
                 // Only return if it has word-level content or ttmlContent we can use, else let LRCLIB handle line-level

@@ -1,5 +1,7 @@
 package com.gratia.music.lyrics
 
+import org.json.JSONObject
+
 /**
  * Unified entry point for parsing raw lyrics into a canonical [LyricsDocument].
  *
@@ -32,6 +34,7 @@ object LyricsParser {
 
         // Sequential fallback — try every format in quality order
         for (fallback in listOf(
+            LyricsFormat.JSON_WRAPPED_TTML,
             LyricsFormat.TTML,
             LyricsFormat.JSON_WORD,
             LyricsFormat.ENHANCED_LRC,
@@ -63,6 +66,21 @@ object LyricsParser {
                         val hasWords = lines.any { it.words.isNotEmpty() }
                         if (hasWords) LyricsDocument.WordSynced(lines, LyricsFormat.TTML)
                         else LyricsDocument.LineSynced(lines, LyricsFormat.TTML)
+                    } else null
+                } catch (_: Exception) { null }
+            }
+
+            LyricsFormat.JSON_WRAPPED_TTML -> {
+                try {
+                    val root = JSONObject(input.trim())
+                    val ttmlContent = root.optString("content", "")
+                    if (ttmlContent.isNotEmpty()) {
+                        val lines = TtmlLyrics.parse(ttmlContent)
+                        if (lines.isNotEmpty()) {
+                            val hasWords = lines.any { it.words.isNotEmpty() }
+                            if (hasWords) LyricsDocument.WordSynced(lines, LyricsFormat.JSON_WRAPPED_TTML)
+                            else LyricsDocument.LineSynced(lines, LyricsFormat.JSON_WRAPPED_TTML)
+                        } else null
                     } else null
                 } catch (_: Exception) { null }
             }

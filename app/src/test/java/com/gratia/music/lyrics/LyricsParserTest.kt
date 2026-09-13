@@ -46,6 +46,12 @@ class LyricsParserTest {
     }
 
     @Test
+    fun testFormatDetection_JSONWrappedTTML() {
+        val json = """{"type":"TTML","content":"<tt><body><p begin=\"10.0\" end=\"15.0\">Hello</p></body></tt>"}"""
+        assertEquals(LyricsFormat.JSON_WRAPPED_TTML, LyricsFormatDetector.detect(json))
+    }
+
+    @Test
     fun testFormatDetection_Null() {
         assertEquals(LyricsFormat.PLAIN, LyricsFormatDetector.detect(null))
     }
@@ -383,6 +389,50 @@ class LyricsParserTest {
         val lines = (doc as LyricsDocument.WordSynced).lines.filter { it.text.isNotBlank() }
         assertTrue("Should have parsed lines with words", lines.isNotEmpty())
         assertTrue("Lines should have timed words", lines.all { it.words.isNotEmpty() })
+    }
+
+    @Test
+    fun testJsonWrappedTtmlParsing() {
+        val json = """
+            {
+              "type": "TTML",
+              "content": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tt xmlns=\"http://www.w3.org/ns/ttml\" xmlns:ttm=\"http://www.w3.org/ns/ttml#metadata\"><body><div><p begin=\"00:00:10.000\" end=\"00:00:15.000\"><span begin=\"00:00:10.000\" end=\"00:00:11.000\">He</span><span begin=\"00:00:11.000\" end=\"00:00:12.000\">llo </span><span begin=\"00:00:12.000\" end=\"00:00:13.000\">world</span></p></div></body></tt>"
+            }
+        """.trimIndent()
+
+        val doc = LyricsParser.parse(json)
+        assertTrue("Expected WordSynced from JSON_WRAPPED_TTML", doc is LyricsDocument.WordSynced)
+        assertEquals(LyricsFormat.JSON_WRAPPED_TTML, doc.format)
+        
+        val wordDoc = doc as LyricsDocument.WordSynced
+        val lines = wordDoc.lines.filter { it.text.isNotBlank() }
+        assertEquals(1, lines.size)
+        val words = lines[0].words
+        
+        assertEquals(2, words.size)
+        assertEquals("Hello", words[0].text)
+        assertEquals(10_000L, words[0].startMs)
+    }
+
+    @Test
+    fun testJsonWrappedTtmlNoTimings() {
+        // A TTML block that has line timings but no word timings
+        val json = """
+            {
+              "type": "TTML",
+              "content": "<tt><body><p begin=\"10.0\" end=\"15.0\">Hello world</p></body></tt>"
+            }
+        """.trimIndent()
+
+        val doc = LyricsParser.parse(json)
+        assertTrue("Expected LineSynced since no spans exist", doc is LyricsDocument.LineSynced)
+        assertEquals(LyricsFormat.JSON_WRAPPED_TTML, doc.format)
+        
+        val lines = (doc as LyricsDocument.LineSynced).lines.filter { it.text.isNotBlank() }
+        assertEquals(1, lines.size)
+        assertEquals("Hello world", lines[0].text)
+        assertEquals(10_000L, lines[0].startMs)
+        assertEquals(0, lines[0].words.size)
     }
 
     // ─── Malformed / Edge Cases ──────────────────────────────────
