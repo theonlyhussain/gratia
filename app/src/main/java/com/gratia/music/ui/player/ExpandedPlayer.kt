@@ -286,21 +286,37 @@ fun ExpandedPlayer(
     var peekVelocity by remember { mutableFloatStateOf(0f) }
 
     // ======================================================================
-    // SMOOTH VISUAL TIME INTERPOLATOR — for silky lyrics sync
+    // SMOOTH VISUAL TIME INTERPOLATOR — strictly monotonic for silky lyrics
     // ======================================================================
     val visualTimeState = remember { mutableLongStateOf(currentTimeMs) }
-    var lastUpdateTime by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+    val latestCurrentTime by rememberUpdatedState(currentTimeMs)
 
-    LaunchedEffect(currentTimeMs, isPlaying) {
-        visualTimeState.longValue = currentTimeMs
-        lastUpdateTime = android.os.SystemClock.elapsedRealtime()
+    LaunchedEffect(isPlaying) {
         if (isPlaying) {
+            var lastRealtime = android.os.SystemClock.elapsedRealtime()
             while (isActive) {
                 androidx.compose.runtime.withFrameNanos {
                     val now = android.os.SystemClock.elapsedRealtime()
-                    visualTimeState.longValue = currentTimeMs + (now - lastUpdateTime)
+                    val delta = (now - lastRealtime).coerceAtLeast(0L)
+                    lastRealtime = now
+                    
+                    val actualTime = latestCurrentTime
+                    val diff = actualTime - visualTimeState.longValue
+                    
+                    // If the time difference is massive (>1000ms), it's a seek. Snap immediately.
+                    if (kotlin.math.abs(diff) > 1000L) {
+                        visualTimeState.longValue = actualTime
+                    } else {
+                        // Phase-Locked Loop: smoothly adjust visual time to match actual time.
+                        // If we are ahead (diff < 0), we slow down our clock, but NEVER go backward.
+                        // If we are behind (diff > 0), we speed up slightly to catch up.
+                        val adjustment = (diff / 10f).toLong().coerceIn(-delta, delta)
+                        visualTimeState.longValue += (delta + adjustment)
+                    }
                 }
             }
+        } else {
+            visualTimeState.longValue = latestCurrentTime
         }
     }
 

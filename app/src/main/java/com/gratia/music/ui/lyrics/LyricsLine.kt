@@ -161,7 +161,7 @@ fun LyricsLine(
                 androidx.compose.material3.Text(
                     text = line.text,
                     fontSize = 28.sp,
-                    fontWeight = if (isActiveLine) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
                     color = androidx.compose.ui.graphics.Color.White,
                     lineHeight = 36.sp
                 )

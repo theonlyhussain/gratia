@@ -61,26 +61,15 @@ fun AnimatedWord(
         label = "WordAlpha"
     )
 
-    // Subtle upward lift on the active word (Apple-style "breathing")
-    val translateY by animateFloatAsState(
-        targetValue = if (isActive) -2f else 0f,
-        animationSpec = tween(
-            durationMillis = 200,
-            easing = androidx.compose.animation.core.FastOutSlowInEasing
-        ),
-        label = "WordLift"
-    )
-
     Text(
         text = word.text,
         fontSize = 28.sp,
-        fontWeight = if (isActive) FontWeight.Bold else FontWeight.ExtraBold,
+        fontWeight = FontWeight.ExtraBold,
         color = Color.White,
         lineHeight = 36.sp,
         modifier = Modifier
             .graphicsLayer {
                 this.alpha = alpha
-                this.translationY = translateY
             }
     )
 }
