@@ -231,6 +231,20 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    // --- Lyrics Animation ---
+    private val ANIMATED_WORD_LYRICS_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("animated_word_lyrics")
+
+    val animatedWordLyricsFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[ANIMATED_WORD_LYRICS_KEY] ?: true // ON by default
+        }
+
+    suspend fun setAnimatedWordLyrics(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[ANIMATED_WORD_LYRICS_KEY] = enabled
+        }
+    }
+
     private val AUDIO_QUALITY_KEY = stringPreferencesKey("audio_quality")
 
     val audioQualityFlow: Flow<String> = context.dataStore.data.map { preferences ->

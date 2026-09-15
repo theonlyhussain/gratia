@@ -142,6 +142,9 @@ fun ExpandedPlayer(
 
     val song = currentSong ?: return
 
+    val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val animateWordFill by settingsDataStore.animatedWordLyricsFlow.collectAsState(initial = true)
+
     val progress = if (durationMs > 0) {
         (currentTimeMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
     } else 0f
@@ -575,6 +578,7 @@ fun ExpandedPlayer(
                         }
                     },
                     syncOffset = currentLyrics?.offsetMs ?: 0L,
+                    animateWordFill = animateWordFill,
                     playerViewModel = playerViewModel
                 )
             }
@@ -1048,6 +1052,7 @@ private fun ContentModeLayout(
     onOpenLyrics: () -> Unit,
     onOpenQueue: () -> Unit,
     syncOffset: Long,
+    animateWordFill: Boolean = true,
     playerViewModel: PlayerViewModel
 ) {
     Column(
@@ -1110,7 +1115,8 @@ private fun ContentModeLayout(
                             onToggleEstimatedTimings = onToggleEstimatedTimings,
                             isFullscreenContent = isFullscreenContent,
                             onSeek = onSeekLyrics,
-                            onInteraction = onUserInteraction
+                            onInteraction = onUserInteraction,
+                            animateWordFill = animateWordFill
                         )
                     }
                     PlayerContentMode.Queue -> {
@@ -1198,7 +1204,8 @@ private fun LyricsContentArea(
     onToggleEstimatedTimings: () -> Unit,
     isFullscreenContent: Boolean,
     onSeek: (Long) -> Unit,
-    onInteraction: () -> Unit
+    onInteraction: () -> Unit,
+    animateWordFill: Boolean = true
 ) {
     Box(
         modifier = Modifier
@@ -1230,6 +1237,7 @@ private fun LyricsContentArea(
                 onTapLyricsView = onInteraction,
                 syncOffset = syncOffset,
                 lyricsSource = currentLyrics?.provider,
+                animateWordFill = animateWordFill,
                 modifier = Modifier.fillMaxSize()
             )
             

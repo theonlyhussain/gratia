@@ -3,9 +3,11 @@ package com.gratia.music.ui.lyrics
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -21,6 +23,12 @@ import com.gratia.music.lyrics.LyricLine
  * - **Inactive line:** 20 % opacity, normal scale.
  * - Transition uses a 250 ms ease-out, matching Apple Music's smooth fade.
  *
+ * When [animateWordFill] is `true` AND the line has word-level timing,
+ * each word uses the premium progressive-fill renderer ([AnimatedWordFill])
+ * that sweeps the highlight left→right through the word as it is sung.
+ * When disabled (or for lines without word timing), the existing
+ * opacity-based [AnimatedWord] is used instead.
+ *
  * Performance:
  * - Uses `graphicsLayer` for opacity/scale so changes are GPU-composited
  *   without triggering Compose layout passes — critical for 120Hz smoothness.
@@ -34,8 +42,15 @@ fun LyricsLine(
     isActiveLine: Boolean,
     nextLineStartMs: Long?,
     currentPositionProvider: () -> Long,
-    onSeek: ((Long) -> Unit)? = null
+    onSeek: ((Long) -> Unit)? = null,
+    animateWordFill: Boolean = true
 ) {
+    // When using the new fill renderer, line-level opacity is handled
+    // INSIDE AnimatedWordFill per-word (so the fill layer can stay bright
+    // while the base layer is subdued). For the old renderer and for
+    // non-word-synced lines, we apply line-level opacity here.
+    val useWordFill = animateWordFill && line.isWordSynced
+
     val opacity by animateFloatAsState(
         targetValue = if (isActiveLine) 1f else 0.2f,
         animationSpec = tween(
@@ -73,12 +88,18 @@ fun LyricsLine(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                this.alpha = opacity
+                // For the fill renderer, line alpha is handled per-word; for legacy
+                // renderer and non-word-synced, apply line-level alpha here.
+                this.alpha = if (useWordFill) 1f else opacity
                 this.scaleX = scale
                 this.scaleY = scale
                 this.transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
             }
-            .clickable(enabled = onSeek != null) { onSeek?.invoke(line.startMs) }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = onSeek != null
+            ) { onSeek?.invoke(line.startMs) }
             .padding(bottom = 32.dp)
     ) {
         @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -88,33 +109,55 @@ fun LyricsLine(
         ) {
             if (line.words.isNotEmpty()) {
                 line.words.forEachIndexed { wordIndex, word ->
-                    val durationMs = if (wordIndex < line.words.size - 1) {
-                        line.words[wordIndex + 1].startMs - word.startMs
-                    } else if (nextLineStartMs != null) {
-                        nextLineStartMs - word.startMs
+                    if (useWordFill) {
+                        // ── Premium progressive fill renderer ──────────
+                        Box(
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                enabled = onSeek != null,
+                                onClick = { onSeek?.invoke(word.startMs) }
+                            )
+                        ) {
+                            AnimatedWordFill(
+                                word = word,
+                                currentPositionProvider = currentPositionProvider,
+                                isLineActive = isActiveLine
+                            )
+                        }
                     } else {
-                        500L
+                        // ── Legacy opacity-based renderer ──────────────
+                        val durationMs = if (wordIndex < line.words.size - 1) {
+                            line.words[wordIndex + 1].startMs - word.startMs
+                        } else if (nextLineStartMs != null) {
+                            nextLineStartMs - word.startMs
+                        } else {
+                            500L
+                        }
+
+                        Box(
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                enabled = onSeek != null,
+                                onClick = { onSeek?.invoke(word.startMs) }
+                            )
+                        ) {
+                            AnimatedWord(
+                                word = word,
+                                durationMs = durationMs.toInt(),
+                                currentPositionProvider = currentPositionProvider
+                            )
+                        }
                     }
 
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.clickable(
-                            enabled = onSeek != null,
-                            onClick = { onSeek?.invoke(word.startMs) }
-                        )
-                    ) {
-                        AnimatedWord(
-                            word = word,
-                            durationMs = durationMs.toInt(),
-                            currentPositionProvider = currentPositionProvider
-                        )
-                    }
-
-                    // Space between words
+                    // Space between words — 6 dp is close to natural space-character width at 28sp
                     if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
-                        Spacer(modifier = Modifier.width(7.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                     }
                 }
             } else {
+                // Line without word timing — render as plain text
                 androidx.compose.material3.Text(
                     text = line.text,
                     fontSize = 28.sp,

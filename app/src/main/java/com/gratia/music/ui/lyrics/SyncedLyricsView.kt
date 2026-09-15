@@ -30,6 +30,8 @@ import kotlinx.coroutines.withContext
  *   so word animations don't cause layout passes.
  * - Stable keys prevent unnecessary item recreation.
  * - Generous padding gives text breathing room and prevents clipping.
+ * - User-scroll detection pauses auto-scroll for 3 seconds to avoid
+ *   fighting with manual gestures.
  *
  * The background is intentionally transparent so it composites properly
  * over the player's existing blurred album art background.
@@ -48,7 +50,8 @@ fun SyncedLyricsView(
     lyricsSource: String? = null,
     textSizeMultiplier: Float = 1.0f,
     textAlignment: androidx.compose.ui.text.style.TextAlign = androidx.compose.ui.text.style.TextAlign.Center,
-    onTapLyricsView: (() -> Unit)? = null
+    onTapLyricsView: (() -> Unit)? = null,
+    animateWordFill: Boolean = true
 ) {
     val adjustedPlaybackTimeProvider = remember(syncOffset) {
         { currentPlaybackTimeProvider() + syncOffset }
@@ -90,10 +93,45 @@ fun SyncedLyricsView(
         }
     }
 
-    // Auto-scroll to the active line with a smooth animation
+    // ── User-scroll guard ──────────────────────────────────────────────
+    // When the user manually scrolls, pause auto-scroll for 3 seconds so
+    // the viewport doesn't fight their finger.
+    var userScrolling by remember { mutableStateOf(false) }
+    var lastUserScrollTime by remember { mutableLongStateOf(0L) }
+
+    // Detect when the user is manually dragging
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            userScrolling = true
+            lastUserScrollTime = System.currentTimeMillis()
+        }
+    }
+
+    // Resume auto-scroll 3 seconds after the user stops scrolling
+    LaunchedEffect(lastUserScrollTime) {
+        if (userScrolling) {
+            kotlinx.coroutines.delay(3000L)
+            userScrolling = false
+        }
+    }
+
+    // Auto-scroll to the active line with a smooth animation.
+    // Uses spring animation for a premium feel, and respects user scroll guard.
     LaunchedEffect(currentLineIndex) {
-        if (currentLineIndex >= 0 && parsedLyrics.isNotEmpty()) {
-            listState.animateScrollToItem(currentLineIndex, scrollOffset = -100)
+        if (currentLineIndex >= 0 && parsedLyrics.isNotEmpty() && !userScrolling) {
+            // Check if the target line is already reasonably visible
+            val visibleItems = listState.layoutInfo.visibleItemsInfo
+            val isAlreadyCentered = visibleItems.any { it.index == currentLineIndex }
+
+            if (!isAlreadyCentered || visibleItems.firstOrNull { it.index == currentLineIndex }?.let {
+                    val viewportCenter = listState.layoutInfo.viewportSize.height / 3
+                    it.offset !in -50..viewportCenter
+                } == true) {
+                listState.animateScrollToItem(
+                    index = currentLineIndex,
+                    scrollOffset = -100
+                )
+            }
         }
     }
 
@@ -107,7 +145,7 @@ fun SyncedLyricsView(
                     available: Offset,
                     source: NestedScrollSource
                 ): Offset {
-                    if (source == NestedScrollSource.Drag) {
+                    if (source == NestedScrollSource.UserInput) {
                         onTapLyricsView?.invoke()
                     }
                     return Offset.Zero
@@ -133,7 +171,8 @@ fun SyncedLyricsView(
                     isActiveLine = index == currentLineIndex,
                     nextLineStartMs = nextStartMs,
                     currentPositionProvider = adjustedPlaybackTimeProvider,
-                    onSeek = onSeek
+                    onSeek = onSeek,
+                    animateWordFill = animateWordFill
                 )
             }
             

@@ -98,5 +98,63 @@ fun SettingsPlaybackScreen(
                 )
             }
         }
+
+        // --- LYRICS ---
+        item {
+            Spacer(Modifier.height(24.dp))
+
+            GratiaText(
+                text = "LYRICS",
+                style = GratiaTheme.typography.caption,
+                color = GratiaTheme.colors.textSecondary,
+                modifier = Modifier.padding(start = 32.dp, bottom = 8.dp)
+            )
+
+            val animatedWordLyrics by settingsDataStore.animatedWordLyricsFlow.collectAsState(initial = true)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GratiaTheme.colors.surface)
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        GratiaText(
+                            text = "Animated word lyrics",
+                            style = GratiaTheme.typography.body,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        GratiaText(
+                            text = "Animate word-synced lyrics as they are sung.",
+                            style = GratiaTheme.typography.caption,
+                            color = GratiaTheme.colors.textSecondary
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = animatedWordLyrics,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                settingsDataStore.setAnimatedWordLyrics(enabled)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = GratiaTheme.colors.background,
+                            checkedTrackColor = GratiaTheme.colors.accent,
+                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
+                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
+                        )
+                    )
+                }
+            }
+        }
     }
 }
