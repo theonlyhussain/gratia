@@ -31,6 +31,7 @@ import android.os.Build
 import androidx.media3.common.TrackSelectionParameters
 // Gratia imports
 import com.gratia.music.audio.EqualizerManager
+import com.gratia.music.player.PlaybackDataSources
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -234,7 +235,12 @@ class GratiaPlayerEngine(
             .setUsage(C.USAGE_MEDIA)
             .build()
 
+        // Every read the player makes goes through the shared chain — ranged
+        // fetches, and the per-request headers of whichever client minted the
+        // URL. Without it a stream resolves fine and then trickles in at
+        // playback speed, which is heard as silence. See [PlaybackDataSources].
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(PlaybackDataSources.create(context))
 
         val trackSelector = DefaultTrackSelector(context)
         val audioOffloadPreferences = AudioOffloadPreferences.Builder()

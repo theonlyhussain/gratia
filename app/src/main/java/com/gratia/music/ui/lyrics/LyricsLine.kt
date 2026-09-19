@@ -1,194 +1,268 @@
 package com.gratia.music.ui.lyrics
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.lyrics.LyricLine
+import com.gratia.music.ui.theme.Inter
+
+/** How long a translation or romanization takes to dissolve into the next one. */
+private const val SUB_LINE_SWAP_MS = 380
 
 /**
  * A single lyrics line within the synced scroll list.
  *
- * Visual behaviour:
- * - **Active line:** full opacity + slight scale-up (1.0 → 1.02) to subtly
- *   draw attention without looking jarring.
- * - **Inactive line:** 20 % opacity, normal scale.
- * - Transition uses a 250 ms ease-out, matching Apple Music's smooth fade.
+ * Visual behaviour, all of it driven off the line's distance from the one being
+ * sung ([focusDistance]) rather than from a binary active/not-active flag:
  *
- * When [animateWordFill] is `true` AND the line has word-level timing,
- * each word uses the premium progressive-fill renderer ([AnimatedWordFill])
- * that sweeps the highlight left→right through the word as it is sung.
- * When disabled (or for lines without word timing), the existing
- * opacity-based [AnimatedWord] is used instead.
+ * - **The line being sung:** full brightness, no blur, sitting fractionally
+ *   forward of the stack.
+ * - **The line either side of it:** still legible, so you can read ahead and
+ *   behind without the page appearing to switch off.
+ * - **Everything past that:** dimmed and very slightly blurred, on a ladder that
+ *   flattens out rather than running to zero.
+ * - **While the list is being scrolled by hand** ([isBrowsing]): the stack
+ *   flattens to one brightness, because reading the page by hand is not
+ *   following along and no row should be pointed at.
+ *
+ * When [animateWordFill] is on and the line carries word-level timing, the text
+ * is drawn by [SweptLyricsLine] — the progressive sweep, the bloom on a carried
+ * note, and the small lift of the word being sung. Lines with no word timings,
+ * and the whole list when the animation is switched off, draw as plain text.
  *
  * Performance:
- * - Uses `graphicsLayer` for opacity/scale so changes are GPU-composited
- *   without triggering Compose layout passes — critical for 120Hz smoothness.
- * - Stable layout dimensions regardless of active/inactive state to prevent jumps.
+ * - Opacity, scale and blur all live on `graphicsLayer` / `Modifier.blur`, so
+ *   changes are GPU-composited without a layout pass.
+ * - Layout dimensions are stable regardless of active state, so nothing jumps as
+ *   the handover moves down the song.
  *
- * Instrumental gaps are delegated to [MusicLine].
+ * Instrumental breaks are delegated to [MusicLine].
  */
 @Composable
 fun LyricsLine(
     line: LyricLine,
     isActiveLine: Boolean,
     nextLineStartMs: Long?,
-    currentPositionProvider: () -> Long,
+    clock: State<Long>,
     onSeek: ((Long) -> Unit)? = null,
-    animateWordFill: Boolean = true
+    focusDistance: Int = 0,
+    isBrowsing: Boolean = false,
+    animateWordFill: Boolean = true,
+    reduceAnimation: Boolean = false,
+    fontScale: Float = 1f,
+    textAlign: TextAlign = TextAlign.Start
 ) {
-    // When using the new fill renderer, line-level opacity is handled
-    // INSIDE AnimatedWordFill per-word (so the fill layer can stay bright
-    // while the base layer is subdued). For the old renderer and for
-    // non-word-synced lines, we apply line-level opacity here.
-    val useWordFill = animateWordFill && line.isWordSynced
-
-    val opacity by animateFloatAsState(
-        targetValue = if (isActiveLine) 1f else 0.2f,
-        animationSpec = tween(
-            durationMillis = 250,
-            easing = androidx.compose.animation.core.FastOutSlowInEasing
-        ),
-        label = "LineOpacity"
-    )
-
-    // Subtle scale effect on the active line for visual emphasis
-    val scale by animateFloatAsState(
-        targetValue = if (isActiveLine) 1.02f else 1f,
-        animationSpec = tween(
-            durationMillis = 300,
-            easing = androidx.compose.animation.core.FastOutSlowInEasing
-        ),
-        label = "LineScale"
-    )
-
-    // Handle instrumental gap logic
-    // A line is ONLY instrumental if it actually contains no sung text.
-    val isInstrumental = line.text.trim().isEmpty() &&
-            (line.words.isEmpty() || (line.words.size == 1 && line.words[0].text.trim().isEmpty()))
-
-    if (isInstrumental) {
-        val duration = (nextLineStartMs ?: (line.startMs + 2000)) - line.startMs
-        MusicLine(isActiveLine = isActiveLine, durationMs = duration.toInt())
+    // A break has no words to sweep and no rows to dim — it counts itself out
+    // instead, so it is handled before any of the focus work below.
+    if (line.isGap) {
+        MusicLine(
+            line = line,
+            nextStartMs = nextLineStartMs,
+            isActiveLine = isActiveLine,
+            clock = clock,
+            reduceAnimation = reduceAnimation
+        )
         return
     }
 
-    // Word-synced content
-    // Using graphicsLayer for alpha/scale to avoid layout invalidation on every frame.
-    // The clickable modifier wraps the entire line so tapping seeks to this line's start.
+    val step = focusDistance.coerceIn(0, LINE_FALLOFF_ALPHA.lastIndex)
+
+    val alpha by animateFloatAsState(
+        targetValue = when {
+            isBrowsing -> BROWSING_ALPHA
+            isActiveLine -> LINE_FALLOFF_ALPHA[0]
+            else -> LINE_FALLOFF_ALPHA[step]
+        },
+        animationSpec = if (reduceAnimation) snap() else tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+        label = "LineAlpha"
+    )
+
+    // Blur follows the same ladder, but only where it can be drawn at all and
+    // only for the rows genuinely out of focus: the playing line is never
+    // blurred, and neither is a page being read by hand.
+    val blurRadius by animateDpAsState(
+        targetValue = when {
+            !CAN_BLUR || reduceAnimation || isBrowsing || isActiveLine -> 0.dp
+            else -> LINE_FALLOFF_BLUR[step]
+        },
+        animationSpec = if (reduceAnimation) snap() else tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+        label = "LineBlur"
+    )
+
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = when {
+            pressed -> PRESSED_SCALE
+            isActiveLine -> 1f
+            else -> INACTIVE_SCALE
+        },
+        animationSpec = if (reduceAnimation) snap() else tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+        label = "LineScale"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                // For the fill renderer, line alpha is handled per-word; for legacy
-                // renderer and non-word-synced, apply line-level alpha here.
-                this.alpha = if (useWordFill) 1f else opacity
+                // Anchored to the left edge so the words don't slide sideways
+                // under the highlight; scaling about the centre would fight the
+                // sweep.
+                this.alpha = alpha
                 this.scaleX = scale
                 this.scaleY = scale
-                this.transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                this.transformOrigin = TransformOrigin(0f, 0.5f)
             }
+            .blur(blurRadius, BlurredEdgeTreatment.Unbounded)
             .clickable(
-                interactionSource = remember { MutableInteractionSource() },
+                interactionSource = interaction,
                 indication = null,
                 enabled = onSeek != null
             ) { onSeek?.invoke(line.startMs) }
             .padding(bottom = 32.dp)
     ) {
-        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            if (line.words.isNotEmpty()) {
-                line.words.forEachIndexed { wordIndex, word ->
-                    if (useWordFill) {
-                        // ── Premium progressive fill renderer ──────────
-                        Box(
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                enabled = onSeek != null,
-                                onClick = { onSeek?.invoke(word.startMs) }
-                            )
-                        ) {
-                            AnimatedWordFill(
-                                word = word,
-                                currentPositionProvider = currentPositionProvider,
-                                isLineActive = isActiveLine
-                            )
-                        }
+        val style = lyricTextStyle(
+            synced = line.isWordSynced,
+            fontScale = fontScale,
+            textAlign = textAlign
+        )
+
+        if (animateWordFill && line.isWordSynced) {
+            SweptLyricsLine(
+                line = line,
+                clock = clock,
+                style = style,
+                dimAlpha = UNSUNG_ALPHA,
+                textAlign = textAlign
+            )
+        } else {
+            Text(
+                text = line.text,
+                style = style,
+                color = Color.White,
+                textAlign = textAlign
+            )
+        }
+
+        // The answering vocal, drawn underneath the lead and a shade behind it,
+        // the way Apple Music hangs a backing line under the one it answers.
+        val backing = line.background
+        if (backing != null && backing.text.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            SweptLyricsLine(
+                line = backing,
+                clock = clock,
+                style = style.copy(
+                    fontSize = (style.fontSize.value * (BACKING_FONT_SIZE / LYRIC_FONT_SIZE)).sp,
+                    lineHeight = (style.lineHeight.value * (BACKING_LINE_HEIGHT / LYRIC_LINE_HEIGHT)).sp
+                ),
+                modifier = Modifier.graphicsLayer { this.alpha = BACKING_ALPHA },
+                dimAlpha = UNSUNG_ALPHA,
+                rise = false,
+                textAlign = textAlign
+            )
+        }
+
+        // Romanization and translation arrive after the line is already on
+        // screen — a translation is fetched while the song plays, a romanization
+        // is toggled on. Both swap the text under the words the reader is
+        // already looking at, so they dissolve rather than cutting.
+        val subLines = remember(line.romanization, line.translation) {
+            SubLines.of(line.romanization, line.translation)
+        }
+        if (subLines.hasContent) {
+            AnimatedContent(
+                targetState = subLines,
+                transitionSpec = {
+                    val spec = if (reduceAnimation) {
+                        snap<Float>()
                     } else {
-                        // ── Legacy opacity-based renderer ──────────────
-                        val durationMs = if (wordIndex < line.words.size - 1) {
-                            line.words[wordIndex + 1].startMs - word.startMs
-                        } else if (nextLineStartMs != null) {
-                            nextLineStartMs - word.startMs
-                        } else {
-                            500L
-                        }
-
-                        Box(
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                enabled = onSeek != null,
-                                onClick = { onSeek?.invoke(word.startMs) }
-                            )
-                        ) {
-                            AnimatedWord(
-                                word = word,
-                                durationMs = durationMs.toInt(),
-                                currentPositionProvider = currentPositionProvider
-                            )
-                        }
+                        tween<Float>(SUB_LINE_SWAP_MS, easing = LYRIC_EASING)
                     }
-
-                    // Space between words — 6 dp is close to natural space-character width at 28sp
-                    if (wordIndex < line.words.size - 1 && !word.text.endsWith(" ")) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                }
-            } else {
-                // Line without word timing — render as plain text
-                androidx.compose.material3.Text(
-                    text = line.text,
-                    fontSize = 28.sp,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
-                    color = androidx.compose.ui.graphics.Color.White,
-                    lineHeight = 36.sp
-                )
+                    (fadeIn(spec) togetherWith fadeOut(spec)).using(SizeTransform(clip = false))
+                },
+                label = "lyricSubLineSwap"
+            ) { rendered ->
+                SubLinesBlock(rendered, textAlign)
             }
         }
+    }
+}
 
-        if (!line.romanization.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            androidx.compose.material3.Text(
-                text = line.romanization!!,
-                fontFamily = com.gratia.music.ui.theme.Inter,
+@Composable
+private fun SubLinesBlock(subLines: SubLines, textAlign: TextAlign) {
+    val alignment = when (textAlign) {
+        TextAlign.Center -> Alignment.CenterHorizontally
+        TextAlign.End -> Alignment.End
+        else -> Alignment.Start
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = alignment
+    ) {
+        subLines.romanization?.let { romanization ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = romanization,
+                fontFamily = Inter,
                 fontSize = 18.sp,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
-                lineHeight = 24.sp
+                lineHeight = 24.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = textAlign
             )
         }
-
-        if (!line.translation.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            androidx.compose.material3.Text(
-                text = line.translation!!,
-                fontFamily = com.gratia.music.ui.theme.Inter,
+        subLines.translation?.let { translation ->
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = translation,
+                fontFamily = Inter,
                 fontSize = 16.sp,
-                color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.5f),
-                lineHeight = 22.sp
+                lineHeight = 22.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                textAlign = textAlign
             )
         }
+    }
+}
+
+/** The pair of secondary lines under a lyric, as one animatable value. */
+private data class SubLines(val romanization: String?, val translation: String?) {
+    val hasContent: Boolean get() = romanization != null || translation != null
+
+    companion object {
+        /** Blank strings read as absent, so the block collapses instead of holding a gap. */
+        fun of(romanization: String?, translation: String?): SubLines = SubLines(
+            romanization = romanization?.takeIf { it.isNotBlank() },
+            translation = translation?.takeIf { it.isNotBlank() }
+        )
     }
 }

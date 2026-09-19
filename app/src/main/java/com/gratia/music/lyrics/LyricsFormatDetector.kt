@@ -24,13 +24,21 @@ object LyricsFormatDetector {
 
         val trimmed = input.trim()
 
-        // 1. TTML — XML containing timing elements
+        // 1. A JSON envelope wrapping the real document. Checked before the
+        //    generic JSON branch below, because a wrapper carries `content`
+        //    rather than any of the keys a word-timing payload would.
+        if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            val wrapped = detectWrappedTtml(trimmed)
+            if (wrapped) return LyricsFormat.JSON_WRAPPED_TTML
+        }
+
+        // 2. TTML — XML containing timing elements
         if (trimmed.startsWith("<") &&
             (trimmed.contains("ttm:") || trimmed.contains("<tt") || trimmed.contains("<body>"))) {
             return LyricsFormat.TTML
         }
 
-        // 2. JSON — structured word/syllable timing
+        // 3. JSON — structured word/syllable timing
         if ((trimmed.startsWith("[") && trimmed.endsWith("]")) ||
             (trimmed.startsWith("{") && trimmed.endsWith("}"))) {
             if (trimmed.contains("\"words\"") || trimmed.contains("'words'") ||
@@ -40,14 +48,32 @@ object LyricsFormatDetector {
             }
         }
 
-        // 3. LRC / ELRC — timestamp tags in brackets
+        // 4. LRC / ELRC — timestamp tags in brackets
         val hasLrcTimestamp = trimmed.contains(LRC_TIMESTAMP_REGEX)
         if (hasLrcTimestamp) {
             val hasWordTimestamp = trimmed.contains(ELRC_TIMESTAMP_REGEX)
             return if (hasWordTimestamp) LyricsFormat.ENHANCED_LRC else LyricsFormat.LRC
         }
 
-        // 4. Plain text fallback
+        // 5. Plain text fallback
         return LyricsFormat.PLAIN
+    }
+
+    /**
+     * Whether a JSON object is an envelope around an XML document.
+     *
+     * Recognised either by an explicit type — `{"type": "TTML", …}` — or, when
+     * the envelope says nothing useful, by its content simply being markup. The
+     * second test is what catches the providers that wrap without labelling.
+     */
+    private fun detectWrappedTtml(json: String): Boolean {
+        return try {
+            val obj = org.json.JSONObject(json)
+            val type = obj.optString("type", "")
+            val content = obj.optString("content", "")
+            type.contains("ttml", ignoreCase = true) || content.trimStart().startsWith("<")
+        } catch (_: Exception) {
+            false
+        }
     }
 }

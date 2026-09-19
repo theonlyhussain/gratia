@@ -64,6 +64,9 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
     val currentTimeMs by playerViewModel.currentTimeMs.collectAsState()
     val durationMs by playerViewModel.durationMs.collectAsState()
     val queue by playerViewModel.queue.collectAsState()
+    // A tapped remote track is a request in flight until the stream is proven:
+    // the bar shows resolving instead of pretending the old position applies.
+    val isResolvingRemote by playerViewModel.isResolvingRemote.collectAsState()
 
     val song = currentSong ?: return
     val progress = if (durationMs > 0) currentTimeMs.toFloat() / durationMs.toFloat() else 0f
@@ -349,6 +352,17 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
             val progressTrackColor = GratiaTheme.colors.progressTrack
             val accentColor = GratiaTheme.colors.accent
 
+            if (isResolvingRemote && pageSong.id == currentSong?.id) {
+                // Stream resolution in flight for this track: indeterminate bar.
+                androidx.compose.material3.LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .padding(horizontal = 14.dp),
+                    color = accentColor,
+                    trackColor = Color.Transparent
+                )
+            } else {
             // Thin progress line at bottom
             Canvas(
                 modifier = Modifier
@@ -377,6 +391,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                         cornerRadius = CornerRadius(cornerR, cornerR)
                     )
                 }
+            }
             }
 
         }

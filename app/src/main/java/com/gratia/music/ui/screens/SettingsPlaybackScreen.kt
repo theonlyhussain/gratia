@@ -111,6 +111,8 @@ fun SettingsPlaybackScreen(
             )
 
             val animatedWordLyrics by settingsDataStore.animatedWordLyricsFlow.collectAsState(initial = true)
+            val reduceAnimation by settingsDataStore.reduceAnimationFlow.collectAsState(initial = false)
+            val lyricsScrollDebug by settingsDataStore.lyricsScrollDebugFlow.collectAsState(initial = false)
 
             Column(
                 modifier = Modifier
@@ -144,6 +146,80 @@ fun SettingsPlaybackScreen(
                         onCheckedChange = { enabled ->
                             scope.launch {
                                 settingsDataStore.setAnimatedWordLyrics(enabled)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = GratiaTheme.colors.background,
+                            checkedTrackColor = GratiaTheme.colors.accent,
+                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
+                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        GratiaText(
+                            text = "Reduce animation",
+                            style = GratiaTheme.typography.body,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        GratiaText(
+                            text = "Hold lyrics still — no sweep, no bloom, and the page jumps to the line being sung.",
+                            style = GratiaTheme.typography.caption,
+                            color = GratiaTheme.colors.textSecondary
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = reduceAnimation,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                settingsDataStore.setReduceAnimation(enabled)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = GratiaTheme.colors.background,
+                            checkedTrackColor = GratiaTheme.colors.accent,
+                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
+                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
+                        )
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        GratiaText(
+                            text = "Lyrics scroll debug",
+                            style = GratiaTheme.typography.body,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        GratiaText(
+                            text = "Overlay the safe band, the lines being sung and the scroll the follow would make.",
+                            style = GratiaTheme.typography.caption,
+                            color = GratiaTheme.colors.textSecondary
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = lyricsScrollDebug,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                settingsDataStore.setLyricsScrollDebug(enabled)
                             }
                         },
                         colors = SwitchDefaults.colors(

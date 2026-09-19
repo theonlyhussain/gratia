@@ -11,6 +11,19 @@ enum class LyricsFormat(val label: String) {
     LRC("LRC"),
     ENHANCED_LRC("Enhanced LRC"),
     TTML("TTML"),
+
+    /**
+     * A TTML document carried inside a JSON envelope.
+     *
+     * Several providers — PaxSenix and Lyrically among them — hand back a
+     * `{"type": "TTML", "content": "<tt>…"}` wrapper rather than the document
+     * itself. The payload is still TTML and is parsed as such; the wrapper is
+     * worth naming separately because it is the only way to tell a provider's
+     * envelope apart from a genuine JSON word-timing document, and because a
+     * stored payload in this shape used to be mislabeled as plain JSON.
+     */
+    JSON_WRAPPED_TTML("JSON-wrapped TTML"),
+
     JSON_WORD("JSON"),
     UNKNOWN("Unknown");
 

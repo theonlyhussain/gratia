@@ -2,7 +2,10 @@ package com.gratia.music.provider.ytmusic.innertube
 
 import com.gratia.music.provider.ytmusic.model.Account
 import com.gratia.music.provider.ytmusic.model.ArtistPage
+import com.gratia.music.provider.ytmusic.model.BrowseCard
+import com.gratia.music.provider.ytmusic.model.BrowseCategoryRef
 import com.gratia.music.provider.ytmusic.model.BrowseItem
+import com.gratia.music.provider.ytmusic.model.BrowseShelf
 import com.gratia.music.provider.ytmusic.model.BrowseType
 import com.gratia.music.provider.ytmusic.model.HomeShelf
 import com.gratia.music.provider.ytmusic.model.LibraryState
@@ -180,6 +183,154 @@ object InnertubeParser {
         }
         walk(root)
         return out
+    }
+
+    // ---- Explore: categories and category pages -----------------------------
+
+    /**
+     * The category tiles on the Explore / Moods & genres landing page.
+     *
+     * They arrive as `musicNavigationButtonRenderer` — a button carrying a
+     * title and a browse endpoint that names both the page (`browseId`) and the
+     * shelf within it (`params`). Both are wanted: the id says which page, the
+     * token says which mood or genre on it.
+     */
+    fun parseCategories(root: JsonElement): List<BrowseCategoryRef> {
+        val seen = HashSet<String>()
+        return collectRenderers(root, "musicNavigationButtonRenderer").mapNotNull { button ->
+            val title = button.o("buttonText").runs()
+                .ifBlank { button.o("buttonText").s("simpleText").orEmpty() }
+            if (title.isBlank()) return@mapNotNull null
+            val endpoint = button.o("clickCommand").o("browseEndpoint")
+                ?: button.o("navigationEndpoint").o("browseEndpoint")
+            val browseId = endpoint.s("browseId") ?: return@mapNotNull null
+            val ref = BrowseCategoryRef(
+                title = title,
+                browseId = browseId,
+                params = endpoint.s("params"),
+            )
+            if (seen.add(ref.id)) ref else null
+        }
+    }
+
+    /**
+     * The shelves behind one Explore category (Hindi, Chill, 1990s, …).
+     *
+     * Walked rather than path-read, for the same reason [parseHomeContinuation]
+     * is: an Explore page, a mood page and a genre page do not share a container
+     * shape, and the renderers themselves are the stable part. Shelves keep the
+     * order they were found in, which is the order YouTube lays them out.
+     */
+    fun parseBrowseShelves(root: JsonElement): List<BrowseShelf> {
+        val out = mutableListOf<BrowseShelf>()
+        fun walk(node: JsonElement) {
+            when (node) {
+                is JsonObject -> {
+                    (node["musicCarouselShelfRenderer"] as? JsonObject)
+                        ?.let(::browseShelf)?.let(out::add)
+                    (node["musicShelfRenderer"] as? JsonObject)
+                        ?.let(::browseShelf)?.let(out::add)
+                    (node["gridRenderer"] as? JsonObject)
+                        ?.let(::browseShelf)?.let(out::add)
+                    node.values.forEach(::walk)
+                }
+                is JsonArray -> node.forEach(::walk)
+                else -> Unit
+            }
+        }
+        walk(root)
+        return out
+    }
+
+    private fun browseShelf(container: JsonObject): BrowseShelf? {
+        val header = container.o("header")
+        val title = header.o("musicCarouselShelfBasicHeaderRenderer").o("title").runs()
+            .ifBlank { header.o("musicHeaderRenderer").o("title").runs() }
+            .ifBlank { container.o("title").runs() }
+        if (VIDEO_WORD.containsMatchIn(title)) return null
+
+        // A carousel and a grid both keep their rows under a differently-named
+        // key while meaning the same thing.
+        val contents = (container["contents"] as? JsonArray)
+            ?: (container["items"] as? JsonArray)
+            ?: emptyList()
+        val cards = contents.mapNotNull { item ->
+            browseCardOf(item.o("musicTwoRowItemRenderer"))
+                ?: browseCardOf(item.o("musicResponsiveListItemRenderer"))
+        }
+        return if (cards.isEmpty()) null else BrowseShelf(title.ifBlank { "Explore" }, cards)
+    }
+
+    /**
+     * Classifies one browse card into the model the UI routes on.
+     *
+     * Reads the row's own `pageType` where YouTube states one, and falls back to
+     * the id prefixes that are stable in practice — `MPRE` is an album, `UC` a
+     * channel — so a slightly older layout still opens the right screen instead
+     * of dropping the row.
+     */
+    private fun browseCardOf(renderer: JsonObject?): BrowseCard? {
+        if (renderer == null) return null
+
+        val endpoint = renderer.o("navigationEndpoint")
+        val browseEndpoint = endpoint.o("browseEndpoint")
+        val pageType = browseEndpoint.o("browseEndpointContextSupportedConfigs")
+            .o("browseEndpointContextMusicConfig").s("pageType").orEmpty()
+        val rawBrowseId = browseEndpoint.s("browseId")
+        val videoId = endpoint.o("watchEndpoint").s("videoId")
+            ?: rawBrowseId?.takeIf { it.startsWith("MPED") }?.removePrefix("MPED")
+        // `MPED<videoId>` addresses a "non-music audio track page", which is a
+        // video id wearing a browse id — not a page anything can open.
+        val browseId = rawBrowseId?.takeUnless { it.startsWith("MPED") }
+
+        val columns = renderer.a("flexColumns").orEmpty()
+        val title = renderer.o("title").runs()
+            .ifBlank {
+                columns.getOrNull(0)
+                    .o("musicResponsiveListItemFlexColumnRenderer").o("text").runs()
+            }
+        if (title.isBlank()) return null
+        val subtitle = renderer.o("subtitle").runs()
+            .ifBlank {
+                columns.getOrNull(1)
+                    .o("musicResponsiveListItemFlexColumnRenderer").o("text").runs()
+            }
+
+        // Two-row cards and responsive-list rows keep their art under different
+        // keys; try both rather than branching on the renderer name.
+        val thumbnails = renderer.o("thumbnailRenderer").o("musicThumbnailRenderer")
+            .o("thumbnail").a("thumbnails")
+            ?: renderer.o("thumbnail").o("musicThumbnailRenderer")
+                .o("thumbnail").a("thumbnails")
+        val artworkUrl = thumbnails.best()
+
+        if (browseId == null) {
+            val playableId = videoId ?: return null
+            // Widescreen art on a playable card means a music-video upload
+            // rather than the catalogue track — same dead end as elsewhere.
+            if (thumbnails.isNotSquare()) return null
+            return BrowseCard.Track(
+                Song(
+                    videoId = playableId,
+                    title = title,
+                    artist = artistFromSubtitle(subtitle).takeIf { it.isNotBlank() }
+                        ?: "Unknown artist",
+                    thumbnailUrl = artworkUrl,
+                    durationText = subtitle.split(" • ").lastOrNull()
+                        ?.takeIf { it.matches(DURATION) },
+                ),
+            )
+        }
+
+        if (VIDEO_WORD.containsMatchIn(title) || VIDEO_WORD.containsMatchIn(subtitle)) return null
+
+        return when {
+            "ARTIST" in pageType || browseId.startsWith("UC") ->
+                BrowseCard.Artist(browseId, name = title, subtitle = subtitle, thumbnailUrl = artworkUrl)
+            "ALBUM" in pageType || browseId.startsWith("MPRE") ->
+                BrowseCard.Album(browseId, title, subtitle, artworkUrl)
+            else -> BrowseCard.Playlist(browseId, title, subtitle, artworkUrl)
+        }
     }
 
     private fun carouselShelf(carousel: JsonObject): HomeShelf? {

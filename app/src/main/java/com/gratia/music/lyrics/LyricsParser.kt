@@ -28,6 +28,12 @@ object LyricsParser {
 
         var textToParse = input.trim()
 
+        // Read the format off the WRAPPER, before unwrapping it. Once the
+        // envelope is gone there is nothing left to say the payload arrived as
+        // JSON, and a provider that ships TTML inside `content` is worth
+        // reporting as exactly that rather than as a bare document.
+        val wrappedTtml = LyricsFormatDetector.detect(textToParse) == LyricsFormat.JSON_WRAPPED_TTML
+
         // Globally unwrap PaxSenix/Lyrically JSON payloads if present in DB
         if (textToParse.startsWith("{") && textToParse.endsWith("}")) {
             try {
@@ -45,23 +51,41 @@ object LyricsParser {
         val format = LyricsFormatDetector.detect(textToParse)
 
         // Try the detected format first
-        val primary = tryParse(format, textToParse, enableEstimatedTimings)
-        if (primary != null) return primary
+        var document: LyricsDocument? = tryParse(format, textToParse, enableEstimatedTimings)
 
         // Sequential fallback — try every format in quality order
-        for (fallback in listOf(
-            LyricsFormat.TTML,
-            LyricsFormat.JSON_WORD,
-            LyricsFormat.ENHANCED_LRC,
-            LyricsFormat.LRC
-        )) {
-            if (fallback == format) continue // already tried
-            val result = tryParse(fallback, textToParse, enableEstimatedTimings)
-            if (result != null) return result
+        if (document == null) {
+            for (fallback in listOf(
+                LyricsFormat.TTML,
+                LyricsFormat.JSON_WORD,
+                LyricsFormat.ENHANCED_LRC,
+                LyricsFormat.LRC
+            )) {
+                if (fallback == format) continue // already tried
+                document = tryParse(fallback, textToParse, enableEstimatedTimings)
+                if (document != null) break
+            }
         }
 
         // Nothing worked — return as plain text
-        return LyricsDocument.Plain(textToParse)
+        val parsed = document ?: LyricsDocument.Plain(textToParse)
+        return if (wrappedTtml) parsed.asJsonWrappedTtml() else parsed
+    }
+
+    /**
+     * Re-labels a document that came out of an envelope as TTML.
+     *
+     * Only where the document really is TTML: if the envelope's content turned
+     * out to be LRC, or the TTML parser fell through to another format, the
+     * format that actually produced the lines is the honest one to report.
+     */
+    private fun LyricsDocument.asJsonWrappedTtml(): LyricsDocument {
+        if (format != LyricsFormat.TTML) return this
+        return when (this) {
+            is LyricsDocument.WordSynced -> copy(format = LyricsFormat.JSON_WRAPPED_TTML)
+            is LyricsDocument.LineSynced -> copy(format = LyricsFormat.JSON_WRAPPED_TTML)
+            is LyricsDocument.Plain -> this
+        }
     }
 
     /**
@@ -86,6 +110,14 @@ object LyricsParser {
             }
 
 
+
+            LyricsFormat.JSON_WRAPPED_TTML -> {
+                // The envelope is stripped by [parse] before a format is chosen,
+                // so this is only reached if a caller dispatches the wrapper
+                // straight at the format table. Treat the payload as the TTML
+                // it is.
+                tryParse(LyricsFormat.TTML, input, enableEstimatedTimings)
+            }
 
             LyricsFormat.JSON_WORD -> {
                 try {

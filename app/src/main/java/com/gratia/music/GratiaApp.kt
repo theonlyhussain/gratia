@@ -45,6 +45,9 @@ class GratiaApp : Application() {
         database = GratiaDatabase.getInstance(this)
         preloadManager = com.gratia.music.player.PreloadManager(this)
         com.gratia.music.data.network.ArtistImageFetcher.init(this)
+        // Before any screen can ask: the remote catalogue's offline handling
+        // reads this on first composition.
+        com.gratia.music.data.network.NetworkMonitor.initialize(this)
         
         providerManager = com.gratia.music.provider.ProviderManager(this)
         val settingsDataStore = com.gratia.music.data.SettingsDataStore(this)

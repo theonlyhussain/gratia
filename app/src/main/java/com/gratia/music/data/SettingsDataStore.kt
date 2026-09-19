@@ -245,6 +245,43 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    // --- Reduce Animation ---
+    // Freezes the lyrics animation for older or slower devices: the sweep and
+    // the bloom stop, lines hand over instantly rather than easing, and the
+    // list jumps to the line being sung instead of scrolling to it.
+    private val REDUCE_ANIMATION_KEY =
+        androidx.datastore.preferences.core.booleanPreferencesKey("reduce_animation")
+
+    val reduceAnimationFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[REDUCE_ANIMATION_KEY] ?: false // OFF by default
+        }
+
+    suspend fun setReduceAnimation(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[REDUCE_ANIMATION_KEY] = enabled
+        }
+    }
+
+    // --- Lyrics Scroll Debug ---
+    // Draws the auto-scroll's own view of the page over the lyrics: the band the
+    // followed group is kept inside, the rows counted as being sung, and the move
+    // the follow would make right now. A development aid for the scroll policy —
+    // it changes nothing about playback or how the list is laid out.
+    private val LYRICS_SCROLL_DEBUG_KEY =
+        androidx.datastore.preferences.core.booleanPreferencesKey("lyrics_scroll_debug")
+
+    val lyricsScrollDebugFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[LYRICS_SCROLL_DEBUG_KEY] ?: false // OFF by default
+        }
+
+    suspend fun setLyricsScrollDebug(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[LYRICS_SCROLL_DEBUG_KEY] = enabled
+        }
+    }
+
     private val AUDIO_QUALITY_KEY = stringPreferencesKey("audio_quality")
 
     val audioQualityFlow: Flow<String> = context.dataStore.data.map { preferences ->

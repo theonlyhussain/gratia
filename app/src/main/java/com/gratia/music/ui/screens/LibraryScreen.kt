@@ -80,6 +80,8 @@ fun LibraryScreen(
                 onNavigateToSongs = { activeSubView = "Songs" },
                 onNavigateToFolders = { activeSubView = "Folders" },
                 onNavigateToDownloads = { activeSubView = "Downloads" },
+                onNavigateToLocalMusic = { activeSubView = "LocalMusic" },
+                onNavigateToAllOnDevice = { activeSubView = "AllOnDevice" },
                 onNavigateToAlbum = onNavigateToAlbum
             )
         } else {
@@ -106,9 +108,19 @@ fun LibraryRootView(
     onNavigateToSongs: () -> Unit,
     onNavigateToFolders: () -> Unit,
     onNavigateToDownloads: () -> Unit,
+    onNavigateToLocalMusic: () -> Unit,
+    onNavigateToAllOnDevice: () -> Unit,
     onNavigateToAlbum: (String) -> Unit
 ) {
     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
+    // The three On Device counts, kept as counts rather than derived per row so
+    // the summary line can say how much is actually there before you tap it.
+    val downloadsCount = remember(allSongs) { allSongs.count { it.isDownloaded } }
+    val localMusicCount = remember(allSongs) {
+        allSongs.count { it.storageProvider == "local" && !it.isDownloaded }
+    }
+    val onDeviceCount = downloadsCount + localMusicCount
 
     LazyColumn(
         modifier = Modifier
@@ -120,6 +132,60 @@ fun LibraryRootView(
         item {
             AppleLargeTitleHeader(title = "Library")
             Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // ── On Device ──────────────────────────────────────────────────────
+        // Three distinct things, deliberately not one list: a Gratia-managed
+        // download is not the same object as an audio file that was already on
+        // the phone, and a user-imported MP3 must never read as a download.
+        item {
+            AppleSectionHeader(title = "On Device")
+        }
+        item {
+            AppleListRow(
+                title = "Downloads",
+                subtitle = countLabel(downloadsCount),
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = "Downloads",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToDownloads
+            )
+        }
+        item {
+            AppleListRow(
+                title = "Local Music",
+                subtitle = countLabel(localMusicCount),
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = "Local Music",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToLocalMusic
+            )
+        }
+        item {
+            AppleListRow(
+                title = "All On Device",
+                subtitle = countLabel(onDeviceCount),
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.LibraryMusic,
+                        contentDescription = "All On Device",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToAllOnDevice,
+                showDivider = false
+            )
         }
 
         // Library Menu Items
@@ -205,21 +271,7 @@ fun LibraryRootView(
                         modifier = Modifier.size(28.dp)
                     )
                 },
-                onClick = onNavigateToFolders
-            )
-        }
-        item {
-            AppleListRow(
-                title = "Downloads",
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = "Downloads",
-                        tint = GratiaTheme.colors.accent,
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                onClick = onNavigateToDownloads,
+                onClick = onNavigateToFolders,
                 showDivider = false
             )
         }
@@ -312,6 +364,25 @@ fun LibrarySubView(
         }
     }
 
+    // What this sub-view actually lists, so selection's "select all" and delete
+    // act on the rows on screen rather than on the whole library.
+    val activeSongs: List<SongEntity> = when (title) {
+        "Favorites" -> allSongs.filter { it.isFavorite }
+        "Downloads" -> allSongs.filter { it.isDownloaded }
+        // A Gratia-managed download is excluded: it is on the device, but it is
+        // not a file the user put there, and the two must not be conflated.
+        "LocalMusic" -> allSongs.filter { it.storageProvider == "local" && !it.isDownloaded }
+        "AllOnDevice" -> allSongs.filter { it.isDownloaded || it.storageProvider == "local" }
+        else -> sortedSongs
+    }
+
+    // Internal ids stay camel-cased for routing; the header shows the label.
+    val displayTitle = when (title) {
+        "LocalMusic" -> "Local Music"
+        "AllOnDevice" -> "All On Device"
+        else -> title
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(GratiaTheme.colors.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Apple-style back header
@@ -329,7 +400,7 @@ fun LibrarySubView(
                     )
                 }
                 GratiaText(
-                    text = title,
+                    text = displayTitle,
                     style = GratiaTheme.typography.title,
                     color = GratiaTheme.colors.textPrimary
                 )
@@ -338,7 +409,7 @@ fun LibrarySubView(
             // Content
             when (title) {
                 "Favorites" -> {
-                    val favoriteSongs = remember(allSongs) { allSongs.filter { it.isFavorite } }
+                    val favoriteSongs = activeSongs
                     if (favoriteSongs.isEmpty()) {
                         EmptyStateView(
                             icon = Icons.Default.FavoriteBorder,
@@ -371,13 +442,28 @@ fun LibrarySubView(
                         }
                     }
                 }
-                "Downloads" -> {
-                    val downloadedSongs = remember(allSongs) { allSongs.filter { it.isDownloaded } }
-                    if (downloadedSongs.isEmpty()) {
+                // Downloads, Local Music and All On Device share one list shape;
+                // what differs is which songs they hold and what an empty one
+                // says. The copy matters: "no downloads" and "no local music"
+                // are different facts, and a shared empty state would blur them.
+                "Downloads", "LocalMusic", "AllOnDevice" -> {
+                    if (activeSongs.isEmpty()) {
                         EmptyStateView(
-                            icon = Icons.Default.Download,
-                            headline = "No downloads yet",
-                            description = "Download songs to listen offline."
+                            icon = when (title) {
+                                "Downloads" -> Icons.Default.Download
+                                "LocalMusic" -> Icons.Default.Folder
+                                else -> Icons.Default.LibraryMusic
+                            },
+                            headline = when (title) {
+                                "Downloads" -> "No downloads yet"
+                                "LocalMusic" -> "No local music found"
+                                else -> "Nothing on this device yet"
+                            },
+                            description = when (title) {
+                                "Downloads" -> "Download songs to listen offline."
+                                "LocalMusic" -> "Audio files already on this device will appear here."
+                                else -> "Downloads and local music will appear here."
+                            }
                         )
                     } else {
                         val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
@@ -386,7 +472,7 @@ fun LibrarySubView(
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.small)
                         ) {
                             itemsIndexed(
-                                items = downloadedSongs,
+                                items = activeSongs,
                                 key = { _, song -> song.id }
                             ) { index, song ->
                                 SelectableSongRow(
@@ -396,7 +482,7 @@ fun LibrarySubView(
                                     isPlaying = currentSong?.id == song.id && isPlaying,
                                     isSelectionMode = isSelectionMode,
                                     isSelected = selectedIds.contains(song.id),
-                                    onPlay = { playerViewModel.playSong(song, downloadedSongs) },
+                                    onPlay = { playerViewModel.playSong(song, activeSongs) },
                                     onLongPress = { selectionManager.startSelection(song.id) },
                                     onToggleSelection = { selectionManager.toggle(song.id) },
                                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
@@ -544,9 +630,9 @@ fun LibrarySubView(
         ) {
             SelectionToolbar(
                 selectedCount = selectedIds.size,
-                totalCount = sortedSongs.size,
+                totalCount = activeSongs.size,
                 onAddToQueue = {
-                    val selectedSongs = sortedSongs.filter { selectedIds.contains(it.id) }
+                    val selectedSongs = activeSongs.filter { selectedIds.contains(it.id) }
                     selectedSongs.forEach { playerViewModel.addToQueue(it) }
                     android.widget.Toast.makeText(context, "${selectedSongs.size} songs added to queue", android.widget.Toast.LENGTH_SHORT).show()
                     selectionManager.clearSelection()
@@ -555,7 +641,7 @@ fun LibrarySubView(
                     selectionManager.clearSelection()
                 },
                 onDelete = {
-                    val selectedSongs = sortedSongs.filter { selectedIds.contains(it.id) }
+                    val selectedSongs = activeSongs.filter { selectedIds.contains(it.id) }
                     selectedSongs.forEach { song ->
                         playerViewModel.deleteSong(song) {
                             try {
@@ -569,10 +655,10 @@ fun LibrarySubView(
                     selectionManager.clearSelection()
                 },
                 onSelectAll = {
-                    if (selectedIds.size == sortedSongs.size) {
+                    if (selectedIds.size == activeSongs.size) {
                         selectionManager.clearSelection()
                     } else {
-                        selectionManager.selectAll(sortedSongs.map { it.id })
+                        selectionManager.selectAll(activeSongs.map { it.id })
                     }
                 },
                 onClose = { selectionManager.clearSelection() }
@@ -580,6 +666,10 @@ fun LibrarySubView(
         }
     }
 }
+
+/** "12 songs" for a row's summary line, or null so an empty row stays a one-liner. */
+private fun countLabel(count: Int): String? =
+    if (count > 0) "$count song${if (count == 1) "" else "s"}" else null
 
 @Composable
 fun ArtistRowImage(artistName: String, fallbackPath: String?, size: androidx.compose.ui.unit.Dp) {

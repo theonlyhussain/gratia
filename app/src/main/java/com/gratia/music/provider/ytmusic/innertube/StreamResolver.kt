@@ -330,6 +330,46 @@ object StreamResolver {
     }
 
     /**
+     * As [resolve], but carrying what the format behind the URL turned out to
+     * be — mime type and bitrate, which playback-only callers don't need but
+     * the provider's [PlaybackSource] records for downloads and metadata.
+     */
+    suspend fun resolveFull(videoId: String): Stream {
+        init
+
+        recent[videoId]
+            ?.takeIf { SystemClock.elapsedRealtime() - it.at < URL_TTL_MS }
+            ?.let { resolved ->
+                // Reconstruct a Stream from the cached URL alone; the format
+                // it was picked under isn't stored, and re-deriving it would
+                // cost the walk the cache exists to spare. The extension is
+                // derived from the URL's own mime parameter when present.
+                val mime = Regex("""mime=([^&]+)""").find(resolved.url)
+                    ?.groupValues?.get(1)
+                    ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+                    ?: "audio/webm"
+                return Stream(resolved.url, kbps = 0, mimeType = mime)
+            }
+
+        unplayableReason(videoId)?.let { throw PermanentlyUnplayableException(it) }
+
+        val stream = coalescedResolve(videoId)
+        remember(videoId, stream.url)
+        return stream
+    }
+
+    /**
+     * Drops any cached URL for [videoId] so the next resolve walks the clients
+     * again. Called when a stream that was proven good is refused mid-play
+     * (HTTP 403): a URL that googlevideo has retired must not be handed back
+     * by the cache that exists to spare the walk — a refresh that replays the
+     * dead URL isn't a refresh.
+     */
+    fun forget(videoId: String) {
+        recent.remove(videoId)
+    }
+
+    /**
      * A track this app cannot play, for a reason that will read the same in ten
      * seconds — an age gate no session gets past, a takedown, a region block.
      *

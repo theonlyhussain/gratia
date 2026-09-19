@@ -13,4 +13,14 @@ interface MusicProvider {
     suspend fun getRelatedTracks(trackId: String): List<RemoteTrack>
     suspend fun getHome(limit: Int = 5): List<RemoteHomeSection>
     suspend fun resolvePlayback(trackId: String): PlaybackSource?
+
+    /**
+     * The Explore / Moods & genres landing categories. Defaults to none so a
+     * provider without a browsable catalogue does not have to pretend.
+     */
+    suspend fun getBrowseCategories(): List<BrowseCategory> = emptyList()
+
+    /** The shelves behind one Explore category. */
+    suspend fun getBrowsePage(category: BrowseCategory): BrowsePage =
+        BrowsePage(category = category)
 }

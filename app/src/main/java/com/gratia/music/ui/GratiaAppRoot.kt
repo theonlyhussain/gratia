@@ -53,7 +53,7 @@ import com.gratia.music.ui.components.liquidGlass
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector, val selectedIcon: ImageVector) {
     data object Home : Screen("home", "Home", Icons.Outlined.Home, Icons.Filled.Home)
-    data object Browse : Screen("browse", "Browse", Icons.Outlined.Explore, Icons.Filled.Explore)
+    data object Browse : Screen("browse", "Explore", Icons.Outlined.Explore, Icons.Filled.Explore)
     data object Library : Screen("library", "Library", Icons.Outlined.LibraryMusic, Icons.Filled.LibraryMusic)
     data object Search : Screen("search", "Search", Icons.Outlined.Search, Icons.Filled.Search)
 }
@@ -84,6 +84,17 @@ fun GratiaAppRoot() {
     val oledThemeEnabled by settingsDataStore.oledThemeEnabledFlow.collectAsState(initial = false)
     val onboardingCompleted by settingsDataStore.onboardingCompletedFlow.collectAsState(initial = null)
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Playback failures surface here once, app-wide. A remote track that fails
+    // to resolve must not read as "nothing happened" — the old song kept
+    // playing, and the listener is owed a line saying why the new one didn't.
+    val playbackError by playerViewModel.playbackError.collectAsState()
+    LaunchedEffect(playbackError) {
+        playbackError?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            playerViewModel.clearError()
+        }
+    }
 
     LaunchedEffect(Unit) {
         val isSmartUpdateEnabled = settingsDataStore.smartUpdateEnabledFlow.first()
@@ -214,7 +225,10 @@ fun GratiaAppRoot() {
                         },
                         onNavigateToUpload = { navController.navigate("upload") },
                         onNavigateToYou = { navController.navigate("you") },
-                        onNavigateToRemotePlaylist = { navController.navigate("remote_playlist/${android.net.Uri.encode(it)}") }
+                        onNavigateToRemotePlaylist = { navController.navigate("remote_playlist/${android.net.Uri.encode(it)}") },
+                        onNavigateToLibraryTab = { tab ->
+                            navController.navigate("library_main?tab=${android.net.Uri.encode(tab)}")
+                        }
                     )
                 }
                 navigation(startDestination = "search_main", route = Screen.Search.route) {
@@ -352,7 +366,48 @@ fun GratiaAppRoot() {
                     UploadScreen(onNavigateBack = { navController.popBackStack() })
                 }
                 composable(Screen.Browse.route) {
-                    BrowseScreen(playerViewModel = playerViewModel)
+                    BrowseScreen(
+                        onNavigateToCategory = { browseId, params, title ->
+                            navController.navigate(
+                                "explore_category/${android.net.Uri.encode(browseId)}" +
+                                    "?params=${android.net.Uri.encode(params ?: "")}" +
+                                    "&title=${android.net.Uri.encode(title)}"
+                            )
+                        }
+                    )
+                }
+
+                // Explore category page (Hindi, Chill, 1990s, …)
+                composable(
+                    "explore_category/{browseId}?params={params}&title={title}",
+                    arguments = listOf(
+                        navArgument("browseId") { type = NavType.StringType },
+                        navArgument("params") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        },
+                        navArgument("title") {
+                            type = NavType.StringType
+                            nullable = true
+                            defaultValue = null
+                        }
+                    )
+                ) { backStackEntry ->
+                    val browseId = backStackEntry.arguments?.getString("browseId") ?: return@composable
+                    val params = backStackEntry.arguments?.getString("params")?.takeIf { it.isNotBlank() }
+                    val title = backStackEntry.arguments?.getString("title")?.takeIf { it.isNotBlank() }
+                        ?: "Explore"
+                    BrowseCategoryScreen(
+                        browseId = browseId,
+                        params = params,
+                        title = title,
+                        playerViewModel = playerViewModel,
+                        onBack = { navController.popBackStack() },
+                        onNavigateToAlbum = { navController.navigate("remote_album/${android.net.Uri.encode(it)}") },
+                        onNavigateToArtist = { navController.navigate("remote_artist/${android.net.Uri.encode(it)}") },
+                        onNavigateToPlaylist = { navController.navigate("remote_playlist/${android.net.Uri.encode(it)}") }
+                    )
                 }
                 composable(
                     "editSong/{songId}",

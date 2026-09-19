@@ -43,6 +43,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val audioFormat = playerManager.audioFormat
     val currentQueueIndex = playerManager.currentQueueIndexFlow
 
+    /** True while a remote stream is being resolved for the current request. */
+    val isResolvingRemote = playerManager.isResolvingRemote
+
     val songCount = songRepository.getSongCount()
     val playlistCount = playlistDao.getPlaylistCount()
 
@@ -301,6 +304,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val currentFavs = _favoriteSongIds.value.toMutableSet()
             if (newFavorite) currentFavs.add(song.id) else currentFavs.remove(song.id)
             _favoriteSongIds.value = currentFavs
+
+            // A remote song has no row in the songs table — it lives in memory
+            // only until something makes it worth keeping. Liking it is that
+            // something: insert it (stable ytm_ id, no localUri) so the
+            // favorite UPDATE lands and the song survives the restart.
+            if (song.storageProvider != "local" && newFavorite) {
+                songRepository.insertSong(song)
+            }
 
             // 1. Persist to database
             songRepository.toggleFavorite(song.id, newFavorite)

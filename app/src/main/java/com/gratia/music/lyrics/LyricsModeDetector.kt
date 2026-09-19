@@ -19,6 +19,9 @@ object LyricsModeDetector {
             LyricsFormat.ENHANCED_LRC -> LyricsMode.ELRC
             LyricsFormat.JSON_WORD -> LyricsMode.JSON
             LyricsFormat.TTML -> LyricsMode.TTML
+            // Deprecated shim with no TTML-wrapped-in-JSON mode of its own;
+            // the payload is TTML, so that is what it reports.
+            LyricsFormat.JSON_WRAPPED_TTML -> LyricsMode.TTML
             LyricsFormat.UNKNOWN -> LyricsMode.PLAIN
         }
     }

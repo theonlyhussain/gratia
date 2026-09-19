@@ -43,6 +43,7 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.graphicsLayer
@@ -71,6 +72,7 @@ fun RemoteArtistScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
+    val scope = rememberCoroutineScope()
     
     val listState = rememberLazyListState()
     var dominantColor by remember { mutableStateOf(Color(0xFF1B1716)) }
@@ -296,7 +298,24 @@ fun RemoteArtistScreen(
                                 ) {
                                     Button(
                                         onClick = {
-                                            playerViewModel.playSong(topSongEntities.first(), topSongEntities)
+                                            // The landing page carries only the top handful
+                                            // of songs; the artist page links the playlist with
+                                            // the complete list. Start with what's here and
+                                            // extend the queue from the catalog endpoint.
+                                            scope.launch {
+                                                val fullList = currentArtist.songsPlaylistId?.let { playlistId ->
+                                                    runCatching {
+                                                        withContext(Dispatchers.IO) {
+                                                            GratiaApp.instance.providerManager.youtubeMusicProvider
+                                                                .getArtistSongs(playlistId)
+                                                        }.items.map { com.gratia.music.provider.RemoteTrackMapper.toSongEntity(it) }
+                                                    }.getOrNull()
+                                                }?.ifEmpty { null } ?: topSongEntities
+                                                val queue = fullList.distinctBy { it.id }
+                                                if (queue.isNotEmpty()) {
+                                                    playerViewModel.playSong(queue.first(), queue)
+                                                }
+                                            }
                                         },
                                         modifier = Modifier
                                             .weight(1f)
@@ -311,8 +330,20 @@ fun RemoteArtistScreen(
 
                                     OutlinedButton(
                                         onClick = {
-                                            val shuffled = topSongEntities.shuffled()
-                                            playerViewModel.playSong(shuffled.first(), shuffled)
+                                            scope.launch {
+                                                val fullList = currentArtist.songsPlaylistId?.let { playlistId ->
+                                                    runCatching {
+                                                        withContext(Dispatchers.IO) {
+                                                            GratiaApp.instance.providerManager.youtubeMusicProvider
+                                                                .getArtistSongs(playlistId)
+                                                        }.items.map { com.gratia.music.provider.RemoteTrackMapper.toSongEntity(it) }
+                                                    }.getOrNull()
+                                                }?.ifEmpty { null } ?: topSongEntities
+                                                val queue = fullList.distinctBy { it.id }.shuffled()
+                                                if (queue.isNotEmpty()) {
+                                                    playerViewModel.playSong(queue.first(), queue)
+                                                }
+                                            }
                                         },
                                         modifier = Modifier
                                             .weight(1f)

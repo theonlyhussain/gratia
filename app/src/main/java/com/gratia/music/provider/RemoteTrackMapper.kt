@@ -1,6 +1,7 @@
 package com.gratia.music.provider
 
 import com.gratia.music.data.model.SongEntity
+import com.gratia.music.provider.ytmusic.model.durationMillis
 
 object RemoteTrackMapper {
     /**
@@ -14,7 +15,11 @@ object RemoteTrackMapper {
             title = remote.title,
             artist = remote.artistDisplay,
             album = remote.album?.name,
-            durationMs = remote.durationMs ?: 0L,
+            // A row's duration is a display string ("3:45") — anything that has
+            // to *reason* about the length (LRCLIB exact lyric lookup keyed on
+            // duration) needs it as a quantity, so convert here rather than
+            // losing it. Zero when the row didn't state one.
+            durationMs = remote.durationMs ?: remote.durationText.durationMillis(),
             storageProvider = MusicProviderType.YOUTUBE_MUSIC.id,
             providerTrackId = videoId,
             providerArtistId = remote.artists.firstOrNull()?.id,

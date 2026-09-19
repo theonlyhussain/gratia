@@ -57,6 +57,7 @@ import com.gratia.music.lyrics.LyricsDocument
 import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.AnimatedText
 import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.lyrics.LyricsSkeleton
 import com.gratia.music.ui.lyrics.SyncedLyricsView
 import com.gratia.music.ui.lyrics.LyricsEditorSheet
 import com.gratia.music.ui.theme.GratiaTheme
@@ -79,6 +80,31 @@ enum class PlayerContentMode {
     /** Queue mode — compact header, inline queue fills the content area */
     Queue
 }
+
+/**
+ * How long the artwork takes to travel between the sleeve and the compact
+ * header.
+ *
+ * A fixed duration rather than a spring, and that is deliberate. This animation
+ * ends in a handover — the screen changes the moment it arrives — so it has to
+ * *arrive*: a spring settles asymptotically and would leave the swap waiting on
+ * a tail that never quite reaches its target. The curve does the work a spring's
+ * damping would have, easing out hard at the end so the square comes to rest
+ * rather than stopping.
+ */
+private const val COLLAPSE_MS = 420
+
+/**
+ * How long the panel — lyrics or queue — takes to fade up once the artwork has
+ * finished moving.
+ *
+ * Held back until then on purpose. Composing the lyrics sheet or the queue list
+ * is the single most expensive thing this screen does, and doing it on the frame
+ * the collapse starts puts that cost on top of the one animation the eye is
+ * following. Deferred, the expense lands where nothing is moving and a dropped
+ * frame is invisible.
+ */
+private const val PANEL_FADE_MS = 200
 
 /**
  * Full-screen expanded player with a unified transformation system.
@@ -126,6 +152,7 @@ fun ExpandedPlayer(
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val currentLyrics by playerViewModel.currentLyrics.collectAsState()
+    val isLyricsLoading by playerViewModel.isLyricsLoading.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentTimeMs by playerViewModel.currentTimeMs.collectAsState()
     val durationMs by playerViewModel.durationMs.collectAsState()
@@ -144,6 +171,7 @@ fun ExpandedPlayer(
 
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val animateWordFill by settingsDataStore.animatedWordLyricsFlow.collectAsState(initial = true)
+    val reduceAnimation by settingsDataStore.reduceAnimationFlow.collectAsState(initial = false)
 
     val progress = if (durationMs > 0) {
         (currentTimeMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
@@ -202,16 +230,44 @@ fun ExpandedPlayer(
     // ======================================================================
     val transitionProgress = remember { Animatable(0f) }
 
-    // Drive the transition based on contentMode
-    LaunchedEffect(contentMode) {
+    // Which screen is actually composed. Held apart from [contentMode] on
+    // purpose, because the artwork is drawn by the *normal* layout throughout
+    // the travel and only handed over once it has arrived.
+    //
+    // Opening, that means staying on the normal layout for the whole collapse
+    // and switching at the end, when the artwork has already become the compact
+    // header and the two screens are the same picture. Switching at the start
+    // instead is what left nothing to animate: the sleeve being collapsed lived
+    // in the screen that had just been thrown away.
+    //
+    // Closing is the mirror, and it has to be immediate rather than deferred,
+    // because there is no collapsed sleeve to expand in the normal layout until
+    // the normal layout is composed. It can afford to be: at the far end of the
+    // travel both layouts draw the identical square, so the swap is invisible
+    // either way round. What differs is only which of the two owns the artwork
+    // while it moves.
+    var renderedMode by remember { mutableStateOf(PlayerContentMode.Normal) }
+
+    LaunchedEffect(contentMode, reduceAnimation) {
         val target = if (contentMode == PlayerContentMode.Normal) 0f else 1f
+        // Reduce Animation takes the travel at face value: no collapse to watch,
+        // so there is nothing to hand over at the end of, and the switch and the
+        // position both happen at once.
+        if (reduceAnimation) {
+            renderedMode = contentMode
+            transitionProgress.snapTo(target)
+            return@LaunchedEffect
+        }
+        if (target == 0f) renderedMode = PlayerContentMode.Normal
         transitionProgress.animateTo(
             targetValue = target,
-            animationSpec = spring(
-                dampingRatio = 0.85f,
-                stiffness = 300f
+            animationSpec = tween(
+                durationMillis = COLLAPSE_MS,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
             )
         )
+        // Arrived. Only now does the panel's screen take over.
+        renderedMode = contentMode
     }
 
     // ======================================================================
@@ -440,12 +496,18 @@ fun ExpandedPlayer(
 
         val tp = transitionProgress.value // shorthand
 
+        // How far the sleeve has travelled toward being the compact header.
+        // Only ever read by the normal layout, which is the one that owns the
+        // artwork while it moves — so it is the raw progress and nothing else.
+        val collapse = tp
+
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
             // ===== NORMAL MODE (transitionProgress ≈ 0f) =====
-            if (tp < 0.01f && contentMode == PlayerContentMode.Normal) {
+            if (renderedMode == PlayerContentMode.Normal) {
                 NormalModeContent(
+                    collapse = collapse,
                     song = song,
                     coverColors = coverColors,
                     isPlaying = isPlaying,
@@ -455,6 +517,7 @@ fun ExpandedPlayer(
                     currentTimeMs = currentTimeMs,
                     durationMs = durationMs,
                     currentLyrics = currentLyrics,
+                    isLyricsLoading = isLyricsLoading,
                     contentMode = contentMode,
                     artistInfos = artistInfos,
                     trackCredits = trackCredits,
@@ -514,7 +577,7 @@ fun ExpandedPlayer(
             }
 
             // ===== LYRICS / QUEUE MODE (transitionProgress ≈ 1f) =====
-            if (tp > 0.01f || contentMode != PlayerContentMode.Normal) {
+            if (renderedMode != PlayerContentMode.Normal) {
                 ContentModeLayout(
                     song = song,
                     contentMode = contentMode,
@@ -525,6 +588,7 @@ fun ExpandedPlayer(
                     currentTimeMs = currentTimeMs,
                     durationMs = durationMs,
                     currentLyrics = currentLyrics,
+                    isLyricsLoading = isLyricsLoading,
                     controlsAlpha = controlsAlpha,
                     headerAlpha = headerAlpha,
                     isFullscreenContent = isFullscreenContent,
@@ -581,7 +645,7 @@ fun ExpandedPlayer(
                         onUserInteraction()
                         if (contentMode == PlayerContentMode.Lyrics) {
                             contentMode = PlayerContentMode.Normal
-                        } else if (currentLyrics != null) {
+                        } else if (currentLyrics != null || isLyricsLoading) {
                             contentMode = PlayerContentMode.Lyrics
                         }
                     },
@@ -595,6 +659,7 @@ fun ExpandedPlayer(
                     },
                     syncOffset = currentLyrics?.offsetMs ?: 0L,
                     animateWordFill = animateWordFill,
+                    reduceAnimation = reduceAnimation,
                     playerViewModel = playerViewModel
                 )
             }
@@ -803,6 +868,7 @@ fun ExpandedPlayer(
 
 @Composable
 private fun NormalModeContent(
+    collapse: Float,
     song: com.gratia.music.data.model.SongEntity,
     coverColors: CoverColorCache.CoverColors,
     isPlaying: Boolean,
@@ -812,6 +878,7 @@ private fun NormalModeContent(
     currentTimeMs: Long,
     durationMs: Long,
     currentLyrics: com.gratia.music.data.model.LyricsEntity?,
+    isLyricsLoading: Boolean,
     contentMode: PlayerContentMode,
     artistInfos: Map<String, com.gratia.music.data.repository.ArtistInfo?>,
     trackCredits: List<com.gratia.music.data.repository.ContributorInfo>,
@@ -901,8 +968,20 @@ private fun NormalModeContent(
                 androidx.compose.foundation.pager.HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 24.dp),
-                    pageSpacing = 12.dp
+                    // The pager insets every page, and this inset is inside the
+                    // box the artwork is measured against. Left in place it
+                    // would put the collapsed square a pager inset to the right
+                    // of the header it is handing over to — a visible sideways
+                    // jump on the last frame of the collapse. Spent as the
+                    // artwork travels, so the sleeve keeps the geometry it has
+                    // always had and the square arrives where the header is.
+                    contentPadding = PaddingValues(horizontal = 24.dp * (1f - collapse)),
+                    pageSpacing = 12.dp * (1f - collapse),
+                    // A swipe is the one other thing that moves this artwork, and
+                    // mid-collapse it would be fighting the same square for the
+                    // same pixels. The gesture is worth nothing for the 420ms it
+                    // is unavailable.
+                    userScrollEnabled = collapse < 0.01f
                 ) { page ->
                     val pageSong = queue.getOrNull(page) ?: song
                     val isCurrentPage = page == pagerState.currentPage
@@ -923,17 +1002,37 @@ private fun NormalModeContent(
                             }
                     ) {
                         Spacer(Modifier.statusBarsPadding())
-                        ArtworkView(
+                        // The sleeve, driven by the same fraction that collapses
+                        // it into the compact header. Only the current page is
+                        // asked to travel: the neighbours sit at the edges at a
+                        // fraction of their scale, and shrinking those toward
+                        // the top-left corner as well would read as the whole
+                        // carousel folding rather than one piece of artwork
+                        // leaving.
+                        CollapsingArtwork(
                             coverArtPath = pageSong.coverArtPath,
                             title = pageSong.title,
                             artist = pageSong.artist,
                             isPlaying = isCurrentPage && isPlaying,
-                            glowColor = if (isCurrentPage) coverColors.dominant else androidx.compose.ui.graphics.Color.Transparent,
-                            isDragging = isDragging
+                            isDragging = isDragging,
+                            collapse = if (isCurrentPage) collapse else 0f,
+                            isFavorite = isFavorite && isCurrentPage,
+                            onToggleFavorite = onToggleFavorite,
+                            onMoreClick = onMoreClick
                         )
                     }
                 }
             }
+
+            // Everything below the artwork leaves as it collapses: the panel that
+            // replaces it is already drawing its own copy of the credits and its
+            // own controls, and two of each on screen at once — however faint —
+            // is the seam the handover exists to hide.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = 1f - collapse }
+            ) {
 
             // --- Song Info + Favorite + Menu ---
             PlayerHeader(
@@ -977,7 +1076,11 @@ private fun NormalModeContent(
 
             // --- Secondary Actions: Lyrics, Device, Queue ---
             SecondaryActionRow(
-                hasLyrics = currentLyrics != null,
+                // Openable while a lookup is in flight, too. The lyrics page
+                // has something to show for that stretch now — see
+                // [LyricsSkeleton] — and a button that stayed inert until the
+                // answer came back would put the skeleton out of reach.
+                hasLyrics = currentLyrics != null || isLyricsLoading,
                 onOpenLyrics = onOpenLyrics,
                 onOpenQueue = onOpenQueue,
                 isLyricsActive = false,
@@ -985,6 +1088,7 @@ private fun NormalModeContent(
             )
             Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge))
             Spacer(Modifier.navigationBarsPadding())
+            }
         }
 
         // --- About the Artist (scrollable below player) ---
@@ -1044,6 +1148,7 @@ private fun ContentModeLayout(
     currentTimeMs: Long,
     durationMs: Long,
     currentLyrics: com.gratia.music.data.model.LyricsEntity?,
+    isLyricsLoading: Boolean,
     controlsAlpha: Float,
     headerAlpha: Float,
     isFullscreenContent: Boolean,
@@ -1069,8 +1174,27 @@ private fun ContentModeLayout(
     onOpenQueue: () -> Unit,
     syncOffset: Long,
     animateWordFill: Boolean = true,
+    reduceAnimation: Boolean = false,
     playerViewModel: PlayerViewModel
 ) {
+    // This screen is only composed once the artwork has finished collapsing, so
+    // "arrived" is simply "mounted" — and the fade it drives is what stops the
+    // panel from appearing fully formed the instant the collapse ends.
+    var panelsSettled by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { panelsSettled = true }
+    val panelAlpha by animateFloatAsState(
+        targetValue = if (panelsSettled) 1f else 0f,
+        animationSpec = if (reduceAnimation) {
+            androidx.compose.animation.core.snap()
+        } else {
+            tween(
+                durationMillis = PANEL_FADE_MS,
+                easing = androidx.compose.animation.core.FastOutSlowInEasing
+            )
+        },
+        label = "panelFade"
+    )
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -1099,6 +1223,7 @@ private fun ContentModeLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                .graphicsLayer { alpha = panelAlpha }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -1125,6 +1250,7 @@ private fun ContentModeLayout(
                             parsedLines = parsedLines,
                             parsedDocument = parsedDocument,
                             currentLyrics = currentLyrics,
+                            isLyricsLoading = isLyricsLoading,
                             visualTimeProvider = visualTimeProvider,
                             syncOffset = syncOffset,
                             enableEstimatedTimings = enableEstimatedTimings,
@@ -1190,7 +1316,7 @@ private fun ContentModeLayout(
 
                 // Action Row
                 SecondaryActionRow(
-                    hasLyrics = currentLyrics != null,
+                    hasLyrics = currentLyrics != null || isLyricsLoading,
                     onOpenLyrics = onOpenLyrics,
                     onOpenQueue = onOpenQueue,
                     isLyricsActive = contentMode == PlayerContentMode.Lyrics,
@@ -1214,6 +1340,7 @@ private fun LyricsContentArea(
     parsedLines: List<com.gratia.music.lyrics.LyricLine>,
     parsedDocument: LyricsDocument?,
     currentLyrics: com.gratia.music.data.model.LyricsEntity?,
+    isLyricsLoading: Boolean,
     visualTimeProvider: () -> Long,
     syncOffset: Long,
     enableEstimatedTimings: Boolean,
@@ -1287,15 +1414,27 @@ private fun LyricsContentArea(
                     }
                 }
             }
+        } else if (isLyricsLoading) {
+            // A lookup is still in flight — several providers are tried in turn,
+            // so stand in for the page being fetched rather than showing an
+            // empty state that is only going to be replaced.
+            LyricsSkeleton(modifier = Modifier.fillMaxSize())
         } else {
-            // No synced lyrics — show a clean empty state
+            // Nothing came back. Say so, rather than leaving the page blank.
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Two different absences, and they are worth telling
+                    // apart: nothing came back at all, or something did and it
+                    // carries no timings to follow along with.
                     GratiaText(
-                        text = "No synced lyrics available",
+                        text = if (currentLyrics == null) {
+                            "No lyrics for this song"
+                        } else {
+                            "No synced lyrics available"
+                        },
                         style = GratiaTheme.typography.body,
                         color = Color.White.copy(alpha = 0.5f)
                     )

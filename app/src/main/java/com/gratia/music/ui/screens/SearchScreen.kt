@@ -536,10 +536,7 @@ fun SearchScreen(
                                                 }
                                         ) {
                                             AsyncImage(
-                                                model = ImageRequest.Builder(context)
-                                                    .data(album.artworkUrl)
-                                                    .crossfade(true)
-                                                    .build(),
+                                                model = rememberArtworkRequest(album.artworkUrl, LARGE_ARTWORK_PX, crossfadeMs = 0),
                                                 contentDescription = album.title,
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier
@@ -595,10 +592,7 @@ fun SearchScreen(
                                                 }
                                         ) {
                                             AsyncImage(
-                                                model = ImageRequest.Builder(context)
-                                                    .data(playlist.artworkUrl)
-                                                    .crossfade(true)
-                                                    .build(),
+                                                model = rememberArtworkRequest(playlist.artworkUrl, LARGE_ARTWORK_PX, crossfadeMs = 0),
                                                 contentDescription = playlist.title,
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier

@@ -6,134 +6,208 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
-import com.gratia.music.data.repository.SongRepository
-import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.provider.BrowseCategory
 import com.gratia.music.ui.components.AppleLargeTitleHeader
-import com.gratia.music.ui.components.AppleSectionHeader
-import com.gratia.music.ui.components.EmptyStateView
-import com.gratia.music.ui.components.MusicCard
+import com.gratia.music.ui.components.GratiaLoadingState
+import com.gratia.music.ui.components.GratiaText
+import com.gratia.music.ui.components.bounceClick
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.ui.theme.SpaceGrotesk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
+/**
+ * Explore — the online discovery surface.
+ *
+ * Deliberately not a local genre screen: the categories are YouTube Music's own
+ * Moods & genres taxonomy, fetched rather than hard-coded, and tapping one opens
+ * a real catalogue page. Local music browsing lives in the Library, where it
+ * belongs (the rebuild's Phase 37).
+ */
 @Composable
-fun BrowseScreen(playerViewModel: PlayerViewModel) {
-    val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
-    val allSongs by songRepo.getAllSongs().collectAsState(initial = emptyList())
-    val currentSong by playerViewModel.currentSong.collectAsState()
-    val isPlaying by playerViewModel.isPlaying.collectAsState()
-
-    val discoverSongs = remember(allSongs) {
-        if (allSongs.isNotEmpty()) {
-            allSongs.sortedWith(compareBy({ it.playCount }, { it.id })).take(10)
-        } else emptyList()
+fun BrowseScreen(
+    onNavigateToCategory: (browseId: String, params: String?, title: String) -> Unit = { _, _, _ -> }
+) {
+    var categories by remember {
+        mutableStateOf(GratiaApp.instance.providerManager.cachedBrowseCategories().orEmpty())
     }
+    var isLoading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var isOffline by remember { mutableStateOf(false) }
+    var refreshNonce by remember { mutableStateOf(0) }
 
-    val featuredAlbums = remember(allSongs) {
-        allSongs.filter { it.album != null }.distinctBy { it.album }.sortedBy { it.id }.take(5)
-    }
+    // Re-keyed on connectivity so Explore fills itself in again as soon as the
+    // network returns.
+    val isOnline by com.gratia.music.data.network.NetworkMonitor.isOnline.collectAsState()
 
-    if (allSongs.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(GratiaTheme.colors.background),
-            contentAlignment = Alignment.Center
-        ) {
-            EmptyStateView(
-                icon = Icons.Default.Explore,
-                headline = "Nothing to explore",
-                description = "Add some music to your library first."
-            )
+    LaunchedEffect(refreshNonce, isOnline) {
+        if (!isOnline) {
+            // Explore is entirely remote, so with no network there is nothing
+            // to draw — and a spinner would be a lie. Only surfaced when there
+            // is no cached taxonomy to keep showing.
+            isOffline = categories.isEmpty()
+            isLoading = false
+            return@LaunchedEffect
         }
-        return
+
+        isLoading = true
+        error = null
+        isOffline = false
+        val fetched = withContext(Dispatchers.IO) {
+            GratiaApp.instance.providerManager.getBrowseCategoriesCached(forceRefresh = refreshNonce > 0)
+        }
+        if (fetched.isEmpty()) {
+            // An empty Explore is an endpoint problem, not an empty catalogue —
+            // saying so is the difference between "offline" and "broken".
+            error = "Couldn't reach YouTube Music. Check your connection and try again."
+        } else {
+            categories = fetched
+        }
+        isLoading = false
     }
 
     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
-    val topInset = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(150.dp),
+        columns = GridCells.Adaptive(160.dp),
         modifier = Modifier
             .fillMaxSize()
             .background(GratiaTheme.colors.background),
         contentPadding = PaddingValues(
-            start = 24.dp, 
-            end = 24.dp, 
-            top = topInset,
+            start = 24.dp,
+            end = 24.dp,
             bottom = bottomInset + GratiaTheme.spacing.heroLarge
         ),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            AppleLargeTitleHeader(title = "Browse")
+            Column {
+                AppleLargeTitleHeader(title = "Explore")
+                if (categories.isNotEmpty()) {
+                    Text(
+                        text = "Moods, genres, eras and moments",
+                        fontFamily = com.gratia.music.ui.theme.Inter,
+                        fontSize = 14.sp,
+                        color = GratiaTheme.colors.textSecondary
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
 
-        if (featuredAlbums.isNotEmpty()) {
+        if (isLoading && categories.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                AppleSectionHeader(title = "Featured Albums")
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    items(featuredAlbums) { song ->
-                        MusicCard(
-                            song = song,
-                            isActive = currentSong?.id == song.id,
-                            isPlaying = currentSong?.id == song.id && isPlaying,
-                            onClick = { playerViewModel.playSong(song, allSongs) }
+                    GratiaLoadingState(message = "Loading categories…")
+                }
+            }
+        }
+
+        if (categories.isEmpty() && (isOffline || error != null)) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    GratiaText(
+                        text = if (isOffline) "You're offline" else error ?: "Couldn't load Explore",
+                        style = GratiaTheme.typography.body,
+                        color = GratiaTheme.colors.textPrimary
+                    )
+                    if (isOffline) {
+                        Spacer(Modifier.height(4.dp))
+                        GratiaText(
+                            text = "Explore needs a connection. Your library and downloads still work.",
+                            style = GratiaTheme.typography.caption,
+                            color = GratiaTheme.colors.textSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(onClick = { refreshNonce++ }) {
+                        Text(
+                            text = "Retry",
+                            color = GratiaTheme.colors.accent,
+                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
             }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
         }
 
-        if (discoverSongs.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                AppleSectionHeader(title = "Rediscover")
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(discoverSongs) { song ->
-                        MusicCard(
-                            song = song,
-                            isActive = currentSong?.id == song.id,
-                            isPlaying = currentSong?.id == song.id && isPlaying,
-                            onClick = { playerViewModel.playSong(song, allSongs) }
-                        )
-                    }
+        items(categories, key = { it.id }) { category ->
+            CategoryTile(
+                category = category,
+                onClick = {
+                    onNavigateToCategory(category.browseId, category.params, category.title)
                 }
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
-
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            AppleSectionHeader(title = "All Songs")
-        }
-
-        items(allSongs) { song ->
-            MusicCard(
-                song = song,
-                isActive = currentSong?.id == song.id,
-                isPlaying = currentSong?.id == song.id && isPlaying,
-                onClick = { playerViewModel.playSong(song, allSongs) }
             )
         }
     }
 }
+
+/** A coloured tile standing in for a category's cover — YouTube ships no art for these. */
+@Composable
+private fun CategoryTile(
+    category: BrowseCategory,
+    onClick: () -> Unit
+) {
+    val hash = kotlin.math.abs(category.id.hashCode())
+    val accent = CATEGORY_PALETTE[hash % CATEGORY_PALETTE.size]
+    val second = CATEGORY_PALETTE[(hash / CATEGORY_PALETTE.size) % CATEGORY_PALETTE.size]
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(112.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                Brush.linearGradient(listOf(accent, second))
+            )
+            .bounceClick(onClick = onClick),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        Text(
+            text = category.title,
+            fontFamily = SpaceGrotesk,
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = Color.White,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(14.dp)
+        )
+    }
+}
+
+/** Warm, album-cover-ish tones that read against white text. */
+private val CATEGORY_PALETTE = listOf(
+    Color(0xFF810100), // cherry red
+    Color(0xFF630102), // maroon
+    Color(0xFFA65D03), // warm amber
+    Color(0xFF8B4513), // saddle brown
+    Color(0xFF4A2020), // dark wine
+    Color(0xFF7A3B1E), // copper
+    Color(0xFF1F4E5F), // deep teal
+    Color(0xFF3B2A5A), // dusk violet
+)

@@ -154,6 +154,57 @@ data class ShelfItem(
     val browseId: String?,
 )
 
+/**
+ * A card on a browsed page, classified so the UI knows where it goes.
+ *
+ * Browse responses mix tracks with albums, artists and playlists under the
+ * same renderers, and the only thing that says which is which is the row's own
+ * page type — so the classification happens here, next to the parsing, rather
+ * than being re-guessed from id prefixes further up.
+ */
+sealed interface BrowseCard {
+    data class Track(val song: Song) : BrowseCard
+
+    data class Album(
+        val browseId: String,
+        val title: String,
+        val subtitle: String,
+        val thumbnailUrl: String?,
+    ) : BrowseCard
+
+    data class Artist(
+        val browseId: String,
+        val name: String,
+        val subtitle: String,
+        val thumbnailUrl: String?,
+    ) : BrowseCard
+
+    data class Playlist(
+        val browseId: String,
+        val title: String,
+        val subtitle: String,
+        val thumbnailUrl: String?,
+    ) : BrowseCard
+}
+
+/** One horizontal shelf of a browsed category page. */
+data class BrowseShelf(val title: String, val cards: List<BrowseCard>)
+
+/**
+ * A tappable category on the Explore / Moods & genres landing page.
+ *
+ * [params] is not optional decoration: the same `FEmusic_moods_and_genres`
+ * browse id answers a different section list per params token, and the token is
+ * the only thing that says *which* mood or genre was tapped.
+ */
+data class BrowseCategoryRef(
+    val title: String,
+    val browseId: String,
+    val params: String?,
+) {
+    val id: String get() = if (params.isNullOrBlank()) browseId else "$browseId:$params"
+}
+
 /** The signed-in Google account, as YouTube Music reports it. */
 data class Account(
     val name: String,

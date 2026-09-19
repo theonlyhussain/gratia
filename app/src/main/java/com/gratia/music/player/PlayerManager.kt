@@ -56,6 +56,16 @@ class PlayerManager(private val context: Context) {
 
     companion object {
         private const val TAG = "GratiaPlayer"
+
+        /**
+         * Stream refresh attempts allowed per track before its failure is
+         * declared final and surfaced. Two: one covers the URL-was-retired
+         * case (403 refresh genuinely fixes it), the second covers a
+         * resolution that came back stale. Beyond that the failure is not a
+         * stream problem but a network or playability one, and no amount of
+         * re-resolution changes that.
+         */
+        private const val MAX_STREAM_REFRESHES = 2
     }
 
     private var mediaController: MediaController? = null
@@ -113,6 +123,15 @@ class PlayerManager(private val context: Context) {
     private val _playbackError = MutableStateFlow<String?>(null)
     val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
 
+    /**
+     * True while a remote stream is being resolved for the current request.
+     * Surfaced so the UI can show "Resolving…" instead of looking dead while
+     * the network walk runs — and so it doesn't claim the new track is playing
+     * before playback has actually been accepted.
+     */
+    private val _isResolvingRemote = MutableStateFlow(false)
+    val isResolvingRemote: StateFlow<Boolean> = _isResolvingRemote.asStateFlow()
+
     private val _audioFormat = MutableStateFlow<AudioFormatInfo?>(null)
     val audioFormat: StateFlow<AudioFormatInfo?> = _audioFormat.asStateFlow()
 
@@ -125,6 +144,16 @@ class PlayerManager(private val context: Context) {
     private var pendingPlay: PendingPlayRequest? = null
     private var isRetryingPlayback = false
 
+    /**
+     * Refresh attempts spent per videoId since it last played. A stream that
+     * fails twice in a row after a fresh resolution is not going to improve
+     * by asking a third time — the third cycle just burns data while the
+     * listener stares at a stalled bar — so the budget is spent, the real
+     * error is surfaced and the UI rolls back to what is actually playable.
+     * Cleared on a new play request for the track and on STATE_READY.
+     */
+    private val streamRefreshBudget = mutableMapOf<String, Int>()
+
     private val playerListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
             Log.d(TAG, "onPlaybackStateChanged: state=$playbackState (IDLE=1, BUFFERING=2, READY=3, ENDED=4)")
@@ -135,6 +164,7 @@ class PlayerManager(private val context: Context) {
                     Log.d(TAG, "STATE_READY: duration=${dur}ms")
                     _durationMs.value = dur
                     _playbackError.value = null
+                    _currentSong.value?.let { streamRefreshBudget.remove(it.id) }
                 }
                 Player.STATE_ENDED -> {
                     Log.d(TAG, "STATE_ENDED: handling song end")
@@ -175,17 +205,33 @@ class PlayerManager(private val context: Context) {
             Log.e(TAG, "onPlayerError: ${error.errorCodeName} — ${error.message}")
             val current = _currentSong.value
             if (current != null && current.storageProvider != "local" && !isRetryingPlayback) {
-                Log.w(TAG, "Remote stream failed. Invalidate cache and attempt fresh resolution once.")
+                val spent = streamRefreshBudget.getOrDefault(current.id, 0)
+                if (spent >= MAX_STREAM_REFRESHES) {
+                    Log.e(TAG, "REMOTE_PLAY_FAILED reason=refresh_budget_spent videoId=${current.providerTrackId} attempts=$spent")
+                    _playbackError.value = "Couldn't play this song. Check your connection and try again."
+                    restoreUiAfterFailedRemoteRequest(current.id)
+                    return
+                }
+                Log.w(TAG, "Remote stream failed. Invalidate cache and attempt fresh resolution (${spent + 1}/$MAX_STREAM_REFRESHES).")
                 isRetryingPlayback = true
+                // Name the reason so the refresh of a 403 (googlevideo retiring
+                // the URL) reads differently from any other stream failure.
+                val refreshReason = if (error.errorCodeName.contains("HTTP", ignoreCase = true)) "403" else "stream_error"
+                Log.w(TAG, "STREAM_REFRESH reason=$refreshReason videoId=${current.providerTrackId}")
                 scope.launch {
                     val freshSource = withContext(Dispatchers.IO) {
-                        GratiaApp.instance.providerManager.resolvePlayback(current, forceFresh = true)
+                        GratiaApp.instance.providerManager.resolvePlayback(current, forceFresh = true, reason = refreshReason)
                     }
+                    // Bounded by isRetryingPlayback and the budget above: at most
+                    // MAX_STREAM_REFRESHES re-resolutions per track, each resumed
+                    // at the position the listener was at. No loop.
                     if (freshSource != null && freshSource.streamUrl.isNotBlank()) {
-                        Log.d(TAG, "Re-resolution succeeded, resuming playback")
+                        Log.d(TAG, "STREAM_RESOLVE_SUCCESS (refresh) videoId=${current.providerTrackId} — resuming at ${_currentTimeMs.value}ms")
                         playResolvedMediaItem(current, freshSource.streamUrl, playImmediately = true, seekPosition = _currentTimeMs.value)
                     } else {
+                        Log.e(TAG, "REMOTE_PLAY_FAILED reason=refresh_failed videoId=${current.providerTrackId}")
                         _playbackError.value = "Couldn't play this song. Try again."
+                        restoreUiAfterFailedRemoteRequest(current.id)
                     }
                     isRetryingPlayback = false
                 }
@@ -416,6 +462,7 @@ class PlayerManager(private val context: Context) {
     fun playSong(song: SongEntity, list: List<SongEntity>, playImmediately: Boolean = true) {
         val oldCurrent = _currentSong.value
         Log.d(TAG, "playSong: '${song.title}' from list of size ${list.size}")
+        streamRefreshBudget.remove(song.id)
         
         baseQueue = list
         if (_shuffleEnabled.value) {
@@ -493,27 +540,55 @@ class PlayerManager(private val context: Context) {
 
         if (isRemote) {
             // Asynchronously resolve stream from remote provider
+            Log.d(TAG, "REMOTE_PLAY_REQUEST videoId=${song.providerTrackId} title='${song.title}'")
+            _isResolvingRemote.value = true
             scope.launch {
                 try {
                     val source = withContext(Dispatchers.IO) {
+                        Log.d(TAG, "STREAM_RESOLVE_START videoId=${song.providerTrackId}")
                         GratiaApp.instance.providerManager.resolvePlayback(song, forceFresh = false)
                     }
                     if (source == null || source.streamUrl.isBlank()) {
-                        Log.e(TAG, "Failed to resolve remote playback for '${song.title}' (videoId=${song.providerTrackId})")
+                        Log.e(TAG, "REMOTE_PLAY_FAILED reason=resolve_empty videoId=${song.providerTrackId}")
                         _playbackError.value = "Couldn't resolve stream for this song. Try again."
+                        restoreUiAfterFailedRemoteRequest(song.id)
+                        return@launch
+                    }
+
+                    // Phase 27 — never play a stream minted for a different
+                    // video than the one asked for. A resolver that answered
+                    // with a fallback id is a resolver that has already lost
+                    // the track it was given.
+                    if (source.videoId != song.providerTrackId) {
+                        Log.e(
+                            TAG,
+                            "REMOTE_PLAY_FAILED reason=video_id_mismatch " +
+                                "videoId=${song.providerTrackId} resolved=${source.videoId}",
+                        )
+                        _playbackError.value = "Couldn't play this song. Try again."
+                        restoreUiAfterFailedRemoteRequest(song.id)
                         return@launch
                     }
 
                     // Only proceed if user hasn't switched to another track while resolving
                     if (_currentSong.value?.id != song.id) {
                         Log.d(TAG, "User moved to another song while resolving '${song.title}', aborting play")
+                        _isResolvingRemote.value = false
                         return@launch
                     }
 
+                    Log.d(
+                        TAG,
+                        "STREAM_RESOLVE_SUCCESS videoId=${song.providerTrackId} " +
+                            "bitrate=${source.bitrate ?: "?"}kbps expiry=${source.expiresAtMs ?: "unknown"}",
+                    )
                     playResolvedMediaItem(song, source.streamUrl, playImmediately, seekPosition)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    Log.e(TAG, "Exception resolving remote playback for '${song.title}'", e)
+                    Log.e(TAG, "REMOTE_PLAY_FAILED reason=exception videoId=${song.providerTrackId}: ${e.message}")
                     _playbackError.value = "Couldn't play this song. Check network connection."
+                    restoreUiAfterFailedRemoteRequest(song.id)
                 }
             }
         } else {
@@ -531,6 +606,9 @@ class PlayerManager(private val context: Context) {
         val controller = mediaController ?: return
 
         try {
+            if (song.storageProvider != "local") {
+                Log.d(TAG, "MEDIA_ITEM_CREATED uri=${mediaUri.take(48)}… videoId=${song.providerTrackId}")
+            }
             val metadataBuilder = MediaMetadata.Builder()
                 .setTitle(song.title)
                 .setArtist(song.artist)
@@ -563,17 +641,41 @@ class PlayerManager(private val context: Context) {
             }
             if (playImmediately) {
                 controller.play()
+                if (song.storageProvider != "local") {
+                    Log.d(TAG, "REMOTE_PLAY_STARTED videoId=${song.providerTrackId}")
+                }
                 // Instantly log it to Recent Played history
                 scope.launch(Dispatchers.IO) {
                     GratiaApp.instance.database.songDao().updateLastPlayedAt(song.id, System.currentTimeMillis())
                 }
             }
             Log.d(TAG, "playResolvedMediaItem: commands sent to controller for '${song.title}'")
+            _isResolvingRemote.value = false
             saveStateToDataStore()
             
         } catch (e: Exception) {
             Log.e(TAG, "playResolvedMediaItem: exception — ${e.message}")
             _playbackError.value = "Couldn't play this song. Try another file or check permission."
+        }
+    }
+
+    /**
+     * Rolls the visible state back to what the player is actually playing after
+     * a remote request failed before reaching the player. The old song kept
+     * playing through the failed resolution — destroying it was never the deal
+     * — so the UI is put back in step with it and the error is raised on top.
+     * Without this, the mini player claims a song that will never play.
+     */
+    private fun restoreUiAfterFailedRemoteRequest(failedSongId: String) {
+        _isResolvingRemote.value = false
+        val playingId = mediaController?.currentMediaItem?.mediaId
+        if (playingId != null && playingId != failedSongId) {
+            val stillPlaying = _queue.value.firstOrNull { it.id == playingId }
+            if (stillPlaying != null) {
+                Log.d(TAG, "Playback UI restored to '${stillPlaying.title}' after failed remote request")
+                _currentSong.value = stillPlaying
+                currentQueueIndex = _queue.value.indexOfFirst { it.id == playingId }
+            }
         }
     }
 

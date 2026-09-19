@@ -38,6 +38,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import com.gratia.music.ui.components.IosBounce
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,9 +123,16 @@ fun InlineQueueContent(
         }
     }
 
+    // The page gives when it is pulled past its end — see [IosBounce]. Dragging
+    // a row to reorder is a press-and-hold gesture rather than a scroll, so it
+    // never reaches this connection.
+    IosBounce(
+        state = listState,
+        modifier = modifier.fillMaxSize()
+    ) {
     LazyColumn(
         state = reorderableState.listState,
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .reorderable(reorderableState),
         contentPadding = PaddingValues(bottom = 200.dp)
@@ -339,6 +347,7 @@ fun InlineQueueContent(
                 )
             }
         }
+    }
     }
 
     // Clear history dialog

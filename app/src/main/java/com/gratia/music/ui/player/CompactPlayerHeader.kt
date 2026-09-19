@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -77,43 +78,70 @@ fun CompactPlayerHeader(
 
         Spacer(Modifier.width(GratiaTheme.spacing.mediumSmall))
 
-        // Song title + artist
-        Column(modifier = Modifier.weight(1f)) {
-            AnimatedText(
-                text = title,
-                style = GratiaTheme.typography.body.copy(
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
-                ),
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fadeDurationMs = GratiaTheme.motion.normal,
-                isMarquee = true
-            )
-            AnimatedText(
-                text = artist,
-                style = GratiaTheme.typography.caption,
-                color = Color.White.copy(alpha = 0.55f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fadeDurationMs = GratiaTheme.motion.normal,
-                isMarquee = false
-            )
-        }
-
-        Spacer(Modifier.width(GratiaTheme.spacing.small))
-
-        // Favorite star
-        CompactFavoriteButton(
+        CompactHeaderCredits(
+            title = title,
+            artist = artist,
             isFavorite = isFavorite,
-            onToggle = onToggleFavorite
+            onToggleFavorite = onToggleFavorite,
+            onMoreClick = onMoreClick
         )
-
-        Spacer(Modifier.width(GratiaTheme.spacing.small))
-
-        // More button
-        CompactMoreButton(onClick = onMoreClick)
     }
+}
+
+/**
+ * Everything in the header to the right of the artwork: the title and artist,
+ * and the two buttons after them.
+ *
+ * Split out so the collapsing sleeve can put the very same row beside its own
+ * square as it settles — see [CollapsingArtwork]. Written once, the two cannot
+ * drift: the row the sleeve hands over to *is* the row, not a copy of it held in
+ * step by hand. It is a [RowScope] extension for that reason and no other, since
+ * the title's `weight` only means anything inside the header's own row.
+ */
+@Composable
+internal fun RowScope.CompactHeaderCredits(
+    title: String,
+    artist: String,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onMoreClick: () -> Unit
+) {
+    // Song title + artist
+    Column(modifier = Modifier.weight(1f)) {
+        AnimatedText(
+            text = title,
+            style = GratiaTheme.typography.body.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            ),
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fadeDurationMs = GratiaTheme.motion.normal,
+            isMarquee = true
+        )
+        AnimatedText(
+            text = artist,
+            style = GratiaTheme.typography.caption,
+            color = Color.White.copy(alpha = 0.55f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fadeDurationMs = GratiaTheme.motion.normal,
+            isMarquee = false
+        )
+    }
+
+    Spacer(Modifier.width(GratiaTheme.spacing.small))
+
+    // Favorite star
+    CompactFavoriteButton(
+        isFavorite = isFavorite,
+        onToggle = onToggleFavorite
+    )
+
+    Spacer(Modifier.width(GratiaTheme.spacing.small))
+
+    // More button
+    CompactMoreButton(onClick = onMoreClick)
 }
 
 @Composable
