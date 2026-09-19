@@ -293,4 +293,41 @@ class SettingsDataStore(private val context: Context) {
             preferences[AUDIO_QUALITY_KEY] = quality
         }
     }
+
+    // --- Per-network streaming quality -----------------------------------
+    // the original model: the ceiling depends on the connection in hand, not on
+    // a single global switch. The Wi-Fi setting is "whatever the sources can
+    // do"; mobile data defaults one step down to protect a data plan. The
+    // effective answer is derived per request — see PlayerManager.
+    private val WIFI_QUALITY_KEY = stringPreferencesKey("streaming_quality_wifi")
+    private val MOBILE_QUALITY_KEY = stringPreferencesKey("streaming_quality_mobile")
+    private val JIOSAAVN_ENABLED_KEY =
+        androidx.datastore.preferences.core.booleanPreferencesKey("source_jiosaavn_enabled")
+
+    /** LOW, NORMAL, HIGH, BEST, LOSSLESS. LOSSLESS is only honoured when a lossless source is enabled. */
+    val wifiQualityFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[WIFI_QUALITY_KEY] ?: "BEST"
+    }
+
+    val mobileQualityFlow: Flow<String> = context.dataStore.data.map { preferences ->
+        preferences[MOBILE_QUALITY_KEY] ?: "NORMAL"
+    }
+
+    suspend fun setWifiQuality(quality: String) {
+        context.dataStore.edit { preferences -> preferences[WIFI_QUALITY_KEY] = quality }
+    }
+
+    suspend fun setMobileQuality(quality: String) {
+        context.dataStore.edit { preferences -> preferences[MOBILE_QUALITY_KEY] = quality }
+    }
+
+    /** Whether the better-rendition source (JioSaavn) may be contacted at all. */
+    val jioSaavnEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[JIOSAAVN_ENABLED_KEY] ?: false
+    }
+
+    suspend fun setJioSaavnEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences -> preferences[JIOSAAVN_ENABLED_KEY] = enabled }
+    }
 }
+

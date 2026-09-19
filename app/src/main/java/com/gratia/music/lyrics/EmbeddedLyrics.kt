@@ -21,7 +21,7 @@ import java.io.InputStream
  *
  * Two fields are read, in this order:
  *
- *  - `BITCHORD_LYRICS`, this app's own, holding the "enhanced" A2 form with the
+ *  - `Gratia_LYRICS`, this app's own, holding the "enhanced" A2 form with the
  *    word timings intact — see [toEnhancedLrc].
  *  - the container's standard lyrics field, holding plain `[mm:ss.xx]` LRC.
  *
@@ -35,7 +35,7 @@ import java.io.InputStream
  */
 object EmbeddedLyrics {
 
-    private const val TAG = "BitChord"
+    private const val TAG = "Gratia"
 
     /**
      * Most bytes worth pulling to find a tag.
@@ -354,3 +354,4 @@ object EmbeddedLyrics {
     private val ID_TAGNAME = byteArrayOf(0x45, 0xA3.toByte())
     private val ID_TAGSTRING = byteArrayOf(0x44, 0x87.toByte())
 }
+

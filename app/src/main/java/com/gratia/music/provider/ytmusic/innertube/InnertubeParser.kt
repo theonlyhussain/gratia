@@ -786,7 +786,7 @@ object InnertubeParser {
      * Every other way into a detail page comes from a card that already carried
      * the name and the cover, so nothing used to have to ask. A YouTube Music
      * link tapped outside the app carries a browse id and nothing else — see
-     * [com.music.bitchord.playback.MusicLink] — and a page with a blank title
+     * [com.music.Gratia.playback.MusicLink] — and a page with a blank title
      * over a track list reads as the app having half-loaded.
      */
     fun parseBrowseHeader(root: JsonElement): BrowseHeader? {
@@ -1236,3 +1236,4 @@ private fun JsonArray?.isNotSquare(): Boolean {
     if (width <= 0 || height <= 0) return false
     return width / height !in 0.85..1.15
 }
+

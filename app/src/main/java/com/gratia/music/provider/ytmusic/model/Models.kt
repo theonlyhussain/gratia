@@ -35,7 +35,7 @@ data class Song(
     /**
      * Real filesystem path backing [localUri], when MediaStore exposes one.
      * Lets playback swap a content:// row for a raw file:// path on formats
-     * that need it — see [com.music.bitchord.playback.toMediaItem].
+     * that need it — see [com.music.Gratia.playback.toMediaItem].
      */
     val localPath: String? = null,
     /**
@@ -251,7 +251,7 @@ data class DetailPage(
     val sections: List<HomeShelf> = emptyList(),
     /**
      * Tracks YouTube offers to round out a playlist but that were never
-     * added — see [com.music.bitchord.data.innertube.InnertubeParser.parsePlaylistShelf].
+     * added — see [com.music.Gratia.data.innertube.InnertubeParser.parsePlaylistShelf].
      * Shown as their own section with a button to actually add them, rather
      * than folded into [songs] where they'd read as the user's own picks.
      */
@@ -366,3 +366,4 @@ sealed interface UiState<out T> {
     data class Success<T>(val data: T) : UiState<T>
     data class Error(val message: String) : UiState<Nothing>
 }
+

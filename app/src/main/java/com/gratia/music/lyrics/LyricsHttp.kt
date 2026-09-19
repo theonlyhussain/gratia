@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
  */
 private const val LYRICS_TIMEOUT_SECONDS = 6L
 
-internal const val LYRICS_AGENT = "BitChord (https://github.com/bitchord)"
+internal const val LYRICS_AGENT = "Gratia (https://github.com/Gratia)"
 
 internal val lyricsJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -54,3 +54,4 @@ internal fun lyricsGetAuthorized(url: String, bearer: String): String? = runCatc
         if (response.isSuccessful) response.body?.string() else null
     }
 }.getOrNull()
+

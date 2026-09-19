@@ -79,6 +79,18 @@ object NetworkMonitor {
     fun isCurrentlyOnline(): Boolean =
         connectivityManager?.let(::currentlyOnline) ?: true
 
+    /**
+     * Whether the connection in hand is metered — the per-network quality
+     * settings read this. Optimistic (false) when uninitialized, so nothing is
+     * capped by accident.
+     */
+    fun isMetered(): Boolean {
+        val manager = connectivityManager ?: return false
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+    }
+
     private fun currentlyOnline(manager: ConnectivityManager): Boolean {
         val network = manager.activeNetwork ?: return false
         val capabilities = manager.getNetworkCapabilities(network) ?: return false

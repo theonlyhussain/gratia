@@ -161,6 +161,10 @@ dependencies {
     // WorkManager (Background Sync)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
+    // Haze for UI blur effects
+    implementation("dev.chrisbanes.haze:haze:1.3.1")
+    implementation("dev.chrisbanes.haze:haze-materials:1.3.1")
+
     // Debug tools
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -75,7 +75,7 @@ import java.util.Locale
  */
 object StreamResolver {
 
-    private const val TAG = "BitChord"
+    private const val TAG = "Gratia"
     private val httpClient = okhttp3.OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -377,7 +377,7 @@ object StreamResolver {
      * it apart from a failure worth retrying, and the layers in between are
      * ExoPlayer's: a load error carries whatever exception it was given and
      * nothing else, so the distinction has to travel in the type. See
-     * [PlaybackService][com.music.bitchord.playback.PlaybackService]'s load-error
+     * [PlaybackService][com.music.Gratia.playback.PlaybackService]'s load-error
      * policy and `recoverFrom`.
      */
     class PermanentlyUnplayableException(reason: String) : IOException(reason)
@@ -454,7 +454,7 @@ object StreamResolver {
      *
      * Parented to [resolverScope] rather than the caller's own coroutine, so
      * that a caller giving up on its own timeout — see
-     * [PlaybackService][com.music.bitchord.playback.PlaybackService] —
+     * [PlaybackService][com.music.Gratia.playback.PlaybackService] —
      * cancels only its own wait, not the walk a second caller may still be
      * waiting on. Being parented elsewhere is also why the walk has to be told
      * whose it is — [TrackLog.about] — rather than inheriting it: this is the
@@ -726,7 +726,7 @@ object StreamResolver {
      *   [DownloadQuality][com.gratia.music.provider.ytmusic.settings.DownloadQuality].
      *   Passed in rather than read here so that one download resolves at one
      *   bitrate: a setting changed mid-fetch, or a re-resolve after a refusal
-     *   (see [Downloader.fetch][com.music.bitchord.download.Downloader.fetch]),
+     *   (see [Downloader.fetch][com.music.Gratia.download.Downloader.fetch]),
      *   must not splice two different renditions into one file.
      */
     suspend fun resolveForDownload(videoId: String, maxKbps: Int): Stream {
@@ -1237,7 +1237,7 @@ object StreamResolver {
      * even a *failed* parse's exception — lives in static fields with no
      * synchronization, shared by the whole process. This app resolves more
      * than one track at once by design (a track playing while its successor
-     * pre-caches — see [AudioCache][com.music.bitchord.playback.AudioCache]),
+     * pre-caches — see [AudioCache][com.music.Gratia.playback.AudioCache]),
      * so two resolves can enter these calls together; the library was never
      * written for that, and serializing access is what keeps concurrent
      * resolves from corrupting that shared state.
@@ -1522,7 +1522,7 @@ object StreamResolver {
      * the top of [CLIENTS] rather than from the client that just failed.
      *
      * Called from the playback path — see
-     * [ChunkedDataSource][com.music.bitchord.playback.ChunkedDataSource].
+     * [ChunkedDataSource][com.music.Gratia.playback.ChunkedDataSource].
      */
     fun onPlaybackRefused(url: String, responseCode: Int) {
         if (responseCode !in REFUSAL_CODES) return
@@ -1700,7 +1700,7 @@ object StreamResolver {
      * collapses — measured on-device at 1.8s alone, 16.2s with two in flight
      * (both finishing within 35ms of each other, which is the tell), and 30.3s
      * with three. Read-ahead is what puts three or four in flight: the track
-     * being waited on plus [AudioCache][com.music.bitchord.playback.AudioCache]'s
+     * being waited on plus [AudioCache][com.music.Gratia.playback.AudioCache]'s
      * queue warm-up, every one of them an extraction now that no player client
      * is being served.
      *
@@ -1824,3 +1824,4 @@ object StreamResolver {
         recent[videoId] = Resolved(url, SystemClock.elapsedRealtime())
     }
 }
+

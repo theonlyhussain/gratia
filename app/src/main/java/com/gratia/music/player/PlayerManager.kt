@@ -66,6 +66,9 @@ class PlayerManager(private val context: Context) {
          * re-resolution changes that.
          */
         private const val MAX_STREAM_REFRESHES = 2
+
+        /** A bounded wait: an upgrade search must never outlive its usefulness. */
+        const val UPGRADE_SEARCH_TIMEOUT_MS = 20_000L
     }
 
     private var mediaController: MediaController? = null
@@ -582,6 +585,11 @@ class PlayerManager(private val context: Context) {
                         "STREAM_RESOLVE_SUCCESS videoId=${song.providerTrackId} " +
                             "bitrate=${source.bitrate ?: "?"}kbps expiry=${source.expiresAtMs ?: "unknown"}",
                     )
+                    // The second look: with a better-rendition source enabled,
+                    // mark this track for a bounded background search once its
+                    // stream is up. Playback continues either way — see
+                    // [startUpgradeLook].
+                    maybeMarkPendingUpgrade(song, source)
                     playResolvedMediaItem(song, source.streamUrl, playImmediately, seekPosition)
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
@@ -1122,6 +1130,130 @@ class PlayerManager(private val context: Context) {
         _currentSong.value = song
     }
 
+    // ── Quality upgrade: the second look ─────────────────────────────────
+    //
+    // Ported from the original playback/QualityUpgrade.kt + SourceResolver.
+    // The rules that matter, in the order they matter:
+    //
+    //  1. Never stop current playback to search for a better source.
+    //  2. Never swap without a bitrate gain of at least [UPGRADE_MIN_GAIN] —
+    //     a swap that might be a downgrade is worse than no swap at all.
+    //  3. Never replace a recording matched on title alone: the candidate must
+    //     agree on artist, and the decoder's own runtime must agree with the
+    //     candidate's within two seconds.
+    //  4. If anything goes wrong, continue current playback. The upgrade is
+    //     optional; the music is not.
+
+    private var upgradeJob: Job? = null
+
+    /** Marks the currently playing remote track as "below request" once its stream is up. */
+    private fun maybeMarkPendingUpgrade(song: SongEntity, source: com.gratia.music.provider.PlaybackSource?) {
+        if (source == null) return
+        val settings = com.gratia.music.data.SettingsDataStore(context)
+        scope.launch {
+            val saavnEnabled = settings.jioSaavnEnabledFlow.first()
+            com.gratia.music.provider.sources.SourceRegistry.enableJioSaavn(saavnEnabled)
+            if (!com.gratia.music.provider.sources.SourceResolver.canSubstituteForYouTube()) return@launch
+            val target = com.gratia.music.provider.sources.TrackMatcher.Target(
+                title = song.title,
+                artist = song.artist,
+                durationSec = song.durationMs?.let { (it / 1000).toInt() },
+                album = song.album,
+            )
+            val playingFormat = com.gratia.music.provider.sources.StreamFormat(
+                codec = source.format,
+                kbps = source.bitrate,
+            )
+            val quality = effectiveQualitySetting()
+            com.gratia.music.provider.sources.QualityUpgrade.settledForLess(
+                mediaId = song.id,
+                target = target,
+                playing = playingFormat,
+                qualitySetting = quality,
+            )
+            startUpgradeLook(song)
+        }
+    }
+
+    /** The per-network quality setting for the connection in hand. */
+    private suspend fun effectiveQualitySetting(): String {
+        val settings = com.gratia.music.data.SettingsDataStore(context)
+        return if (com.gratia.music.data.network.NetworkMonitor.isMetered()) {
+            settings.mobileQualityFlow.first()
+        } else {
+            settings.wifiQualityFlow.first()
+        }
+    }
+
+    /**
+     * Kicks off the bounded background second look for the current track.
+     *
+     * Runs on IO, races every enabled source, and only ever ends in one of
+     * three ways: a validated better stream is parked for the swap, the answer
+     * is "no" and the track is marked asked, or the search is cancelled
+     * because the queue moved on — in which case nothing was learned and the
+     * track stays pending.
+     */
+    private fun startUpgradeLook(song: SongEntity) {
+        upgradeJob?.cancel()
+        upgradeJob = scope.launch(kotlinx.coroutines.CoroutineName("quality-upgrade")) {
+            try {
+                // A bounded wait: the upgrade must never outlive its usefulness.
+                // A longer search would still be running when the track ended.
+                val found = kotlinx.coroutines.withTimeoutOrNull(UPGRADE_SEARCH_TIMEOUT_MS) {
+                    withContext(Dispatchers.IO) {
+                        com.gratia.music.provider.sources.QualityUpgrade.lookAgain(
+                            mediaId = song.id,
+                            playingDurationSec = null,
+                        )
+                    }
+                }
+                if (found != null && _currentSong.value?.id == song.id) {
+                    // Validated: the resolver already enforced worthSwapping and
+                    // the strict-length match. Park it; the swap happens on the
+                    // next progress sample while playback continues.
+                    com.gratia.music.provider.sources.QualityUpgrade.force(song.id, found)
+                    Log.d(
+                        TAG,
+                        "QUALITY_UPGRADE_FOUND videoId=${song.providerTrackId} " +
+                            "format=${found.format.summary} from=${found.sourceConfigId}",
+                    )
+                    swapToUpgradedStream(song, found)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // The queue moved on — nothing was learned, and that is fine.
+            } catch (e: Exception) {
+                Log.w(TAG, "QUALITY_UPGRADE_FAILED videoId=${song.providerTrackId}: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Swaps the playing media item for the parked better stream.
+     *
+     * The swap costs one short seam in the audio — the player cannot change
+     * sources gaplessly mid-track — which is why everything upstream has
+     * already proved it worth hearing: same recording, strictly better
+     * rendition, source validated.
+     */
+    private fun swapToUpgradedStream(
+        song: SongEntity,
+        stream: com.gratia.music.provider.sources.SourceStream,
+    ) {
+        val controller = mediaController ?: return
+        if (_currentSong.value?.id != song.id) return
+        val positionMs = controller.currentPosition
+        val wasPlaying = controller.isPlaying
+        Log.d(
+            TAG,
+            "QUALITY_UPGRADE_SWAP videoId=${song.providerTrackId} at=${positionMs}ms " +
+                "format=${stream.format.summary}",
+        )
+        playResolvedMediaItem(song, stream.url, playImmediately = wasPlaying, seekPosition = positionMs)
+        com.gratia.music.provider.sources.QualityUpgrade.consumeForced(song.id)
+        com.gratia.music.provider.sources.QualityUpgrade.continueAfterLossySwap(song.id)
+    }
+
     /**
      * Update a song's metadata in the queue list without changing playback order.
      */
@@ -1203,3 +1335,4 @@ fun SongEntity.toMediaItem(): MediaItem {
 enum class RepeatMode {
     OFF, ALL, ONE
 }
+
