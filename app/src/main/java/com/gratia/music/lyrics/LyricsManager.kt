@@ -38,8 +38,19 @@ class LyricsManager(
         scope.launch {
             playerManager.currentSong.collectLatest { song ->
                 if (song != null) {
-                    // Instantly clear old lyrics to prevent stale data
-                    _currentLyrics.value = null
+                    // Show whatever is already stored for *this* song before
+                    // asking any provider for it.
+                    //
+                    // The previous behaviour was to clear the lyrics outright and
+                    // then go to the network, so opening the lyrics pane right
+                    // after a track change showed a spinner for words Gratia had
+                    // already saved. This reads the same song's cached lyrics — so
+                    // there is still no chance of the previous track's words
+                    // showing — and the provider lookup then refines or replaces
+                    // them in the background. The UI appears at once either way.
+                    _currentLyrics.value = runCatching {
+                        lyricsRepository.getLyricsOnce(song.id)
+                    }.getOrNull()
                     fetchLyricsForSong(song, forceRefresh = false)
                     prefetchNextSongLyrics(song)
                 } else {
@@ -57,19 +68,38 @@ class LyricsManager(
         
         try {
             val lyrics = lyricsRepository.getLyrics(song, forceRefresh)
-            _currentLyrics.value = lyrics
-            if (lyrics == null) {
-                _error.value = "No lyrics found"
+            // State writes are keyed to the song that is current NOW. A slow
+            // fetch for the previous track can finish (or fail) after the
+            // listener has already moved on, and its answer must not replace
+            // the new song's lyrics (lyrics spec 27).
+            if (playerManager.currentSong.value?.id == song.id) {
+                _currentLyrics.value = lyrics
+                if (lyrics == null) {
+                    _error.value = "No lyrics found"
+                }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // collectLatest superseded this fetch with the next song's. Let the
+            // cancellation propagate — swallowing it would let this coroutine
+            // keep running and write the OLD song's lyrics (or an old-song
+            // error) over the new one, because assignments after the catch do
+            // not suspend and therefore never observe the cancellation.
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching lyrics", e)
-            _error.value = "Failed to fetch lyrics"
-            // If it failed to fetch, keep whatever is in cache or null
-            if (_currentLyrics.value == null) {
-                _currentLyrics.value = lyricsRepository.getLyricsOnce(song.id)
+            if (playerManager.currentSong.value?.id == song.id) {
+                _error.value = "Failed to fetch lyrics"
+                // If it failed to fetch, keep whatever is in cache or null
+                if (_currentLyrics.value == null) {
+                    _currentLyrics.value = runCatching {
+                        lyricsRepository.getLyricsOnce(song.id)
+                    }.getOrNull()
+                }
             }
         } finally {
-            _isLoading.value = false
+            if (playerManager.currentSong.value?.id == song.id) {
+                _isLoading.value = false
+            }
         }
     }
 

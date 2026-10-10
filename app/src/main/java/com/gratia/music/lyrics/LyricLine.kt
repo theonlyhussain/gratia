@@ -11,8 +11,10 @@ package com.gratia.music.lyrics
 data class LyricWord(val startMs: Long, val endMs: Long, val text: String)
 
 /**
- * One synced line. [timeMs] is when it starts; a blank [text] is an
- * instrumental stretch — LRC files mark those with a bare timestamp.
+ * One synced line. [timeMs] is when it starts; a line that is not sung is an
+ * instrumental stretch — LRC files mark those with a bare timestamp, and files
+ * with no stamp to spare name the stretch in the text instead. Both read the
+ * same way here; see [isGap].
  *
  * [words] is populated only by the providers that carry word-level timing
  * (BetterLyrics, LyricsPlus, SimpMusic's rich sync). LRCLIB has none, so a
@@ -42,7 +44,18 @@ data class LyricLine(
     val voiceTag: String? = null
 ) {
     val timeMs: Long get() = startMs
-    val isGap: Boolean get() = text.isEmpty()
+
+    /**
+     * Whether this row is a break rather than something sung — either nothing
+     * written after the stamp, or the stretch named in place of the words (see
+     * [isBreakText]).
+     *
+     * The two arrive from different places and are the same row by the time it
+     * is drawn: the break, counting itself out. Anything deciding what to do
+     * with a line — sweep it, split a backing vocal off it, follow it — asks
+     * this rather than looking at [text].
+     */
+    val isGap: Boolean get() = text.isEmpty() || text.isBreakText()
 
     val isWordSynced: Boolean get() = words.isNotEmpty()
 
@@ -140,6 +153,46 @@ data class LyricLine(
         return (GLOW_FLOOR + (1f - GLOW_FLOOR) * pace) * envelope.coerceIn(0f, 1f)
     }
 }
+
+/**
+ * Whether a line names a break instead of singing one.
+ *
+ * Files that have no empty stamp to spare still say "instrumental here", and
+ * they say it with the line's own text: a glyph standing in for the music, or a
+ * bracketed note naming the stretch. Unrecognised, such a line is drawn as a
+ * lyric and read as one — "(instrumental)" scrolling past in the verse's own
+ * type as though it were sung.
+ *
+ * It has to be the whole line, and nothing but it. A lyric that mentions the
+ * word, or carries a note glyph in the middle of the phrase, is a lyric, so
+ * this errs towards leaving text alone.
+ *
+ * Empty text is not a break *here*: [LyricLine.isGap] handles the file that
+ * wrote a bare stamp, and the two are read separately so neither has to know
+ * about the other.
+ */
+internal fun String.isBreakText(): Boolean {
+    val trimmed = trim()
+    if (trimmed.isEmpty()) return false
+    return MUSIC_GLYPHS_ONLY.matches(trimmed) || NAMED_BREAK.matches(trimmed)
+}
+
+/** A line that is nothing but note glyphs — `♪`, `♪ ♪`, `♫♫♫`. */
+private val MUSIC_GLYPHS_ONLY = Regex("""^[\s♪♫♩♬𝄞🎵🎶🎼]+$""")
+
+/**
+ * A line that is nothing but a bracketed note naming the stretch.
+ *
+ * Square and round brackets, and the full-width forms of both, because the CJK
+ * files write `（間奏）`. Only the names that mean the break and nothing else,
+ * and only on their own: a note with a word after it — `(guitar solo, fade
+ * out)`, `(instrumental x2)` — is left as text, because a file that wrote that
+ * much about the stretch wrote a line about it.
+ */
+private val NAMED_BREAK = Regex(
+    """^[\[(（【]\s*(instrumental|instrumental\s+break|music|music\s+break|interlude|solo|guitar\s+solo|間奏|间奏)\s*[)\]）】]$""",
+    RegexOption.IGNORE_CASE
+)
 
 /** A word this short is patter; it gets [GLOW_FLOOR] and no more. */
 private const val GLOW_FAST_MS = 130L

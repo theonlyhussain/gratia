@@ -103,6 +103,18 @@ fun AddToPlaylistSheet(
                             .fillMaxWidth()
                             .clickable {
                                 scope.launch {
+                                    // A remote track has no row in the songs table
+                                    // until something persists it — and the
+                                    // playlist cross-ref is foreign-keyed to one.
+                                    // Inserting the cross-ref alone silently
+                                    // failed for everything streamed from the
+                                    // catalogue, which is the "Add to playlist
+                                    // doesn't work for online songs" bug. The
+                                    // song row (stable ytm_ id, full artwork and
+                                    // remote identity) is ensured first.
+                                    if (playlistDao.getSongByIdOnce(song.id) == null) {
+                                        playlistDao.insertPlaylistSong(song)
+                                    }
                                     val count = songs.size
                                     playlistDao.addSongToPlaylist(
                                         PlaylistSongCrossRef(
@@ -159,6 +171,11 @@ fun AddToPlaylistSheet(
                     val newPlaylist = PlaylistEntity(id = newId, name = name, createdAt = now, updatedAt = now)
                     playlistDao.insertPlaylist(newPlaylist)
                     
+                    // Same rule as the list above: the song row must exist
+                    // before the cross-ref can. Remote tracks included.
+                    if (playlistDao.getSongByIdOnce(song.id) == null) {
+                        playlistDao.insertPlaylistSong(song)
+                    }
                     // Add song immediately to new playlist
                     playlistDao.addSongToPlaylist(
                         PlaylistSongCrossRef(

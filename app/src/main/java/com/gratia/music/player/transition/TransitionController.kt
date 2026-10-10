@@ -267,37 +267,42 @@ class TransitionController(
                 setState(TransitionState.IDLE)
                 return@launch
             }
-            
-            // Use ExoPlayer's timeline to get the next track correctly (respects shuffle mode)
-            val currentWindowIndex = player.currentMediaItemIndex
-            val timeline = player.currentTimeline
-            
-            if (timeline.isEmpty || currentWindowIndex == C.INDEX_UNSET) {
-                Log.d(TAG, "Timeline is empty or current index is unset. No transition.")
+
+            // Crossfade switched off: stop here, before anything is resolved.
+            // Preparing a stream that will never be overlapped is a network
+            // round trip spent on nothing.
+            if (crossfadeDurationMs <= 0) {
+                Log.d(TAG, "CROSSFADE_DISABLED by settings")
                 engine.cancelNext()
+                engine.setPauseAtEndOfMediaItems(false)
+                setState(TransitionState.IDLE)
                 return@launch
             }
-            
-            val nextIndex = timeline.getNextWindowIndex(
-                currentWindowIndex,
-                repeatMode,
-                player.shuffleModeEnabled
-            )
-            
-            Log.d(TAG, "Current index: $currentWindowIndex, Next index (shuffle-aware): $nextIndex, Shuffle enabled: ${player.shuffleModeEnabled}")
 
-            // Resolve the next media item based on repeat mode and timeline
-            val nextMediaItem = when {
-                repeatMode == Player.REPEAT_MODE_ONE -> currentMediaItem
-                nextIndex != C.INDEX_UNSET -> player.getMediaItemAt(nextIndex)
-                else -> null
+            // Where the next track comes from.
+            //
+            // Not the player's timeline. Gratia keeps one MediaItem in the
+            // player at a time — PlayerManager resolves each stream as the track
+            // starts — so `timeline.getNextWindowIndex` always answered
+            // INDEX_UNSET here, `nextMediaItem` was always null, and this method
+            // returned at the branch below on every single track. That is the
+            // whole of why crossfade produced no audible transition: it never
+            // ran. The next track is a question about the queue, so it is asked
+            // of the queue.
+            Log.d(TAG, "CROSSFADE_NEXT_PREPARE current=${currentMediaItem.mediaId}")
+            val nextMediaItem = try {
+                engine.resolveNextMediaItem(currentMediaItem.mediaId)
+            } catch (e: Exception) {
+                Log.w(TAG, "CROSSFADE_ERROR stage=resolve_next ${e.message}")
+                null
             }
 
             if (nextMediaItem == null) {
-                Log.d(TAG, "No next track (repeat=$repeatMode). No transition.")
+                Log.d(TAG, "CROSSFADE_CANCEL reason=no_next_track repeat=$repeatMode")
                 if (currentState != TransitionState.TRANSITIONING) {
                     engine.cancelNext()
                 }
+                engine.setPauseAtEndOfMediaItems(false)
                 setState(TransitionState.IDLE)
                 return@launch
             }
@@ -324,13 +329,6 @@ class TransitionController(
             Log.d(TAG, "Preparing next track: ${nextMediaItem.mediaId}")
             setState(TransitionState.PREPARING)
             engine.prepareNext(nextMediaItem)
-
-            if (crossfadeDurationMs <= 0) {
-                Log.d(TAG, "Crossfade disabled by user settings.")
-                engine.setPauseAtEndOfMediaItems(false)
-                setState(TransitionState.IDLE)
-                return@launch
-            }
 
             // Wait for track duration to become available
             var duration = player.duration

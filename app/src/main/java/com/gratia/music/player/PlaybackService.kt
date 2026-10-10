@@ -95,6 +95,24 @@ class PlaybackService : MediaSessionService() {
             }
         }
         
+        // Crossfade's next track comes from Gratia's own queue.
+        //
+        // The engine cannot see the queue — it holds one MediaItem at a time —
+        // and a timeline lookup for "what follows" has always answered nothing.
+        // This is the seam that makes the transition possible at all.
+        engine.setNextItemProvider { currentMediaId ->
+            runCatching {
+                GratiaApp.instance.playerManager.resolveNextMediaItemForCrossfade(currentMediaId)
+            }.getOrNull()
+        }
+
+        // A crossfade changes track without the app asking it to, so the app
+        // state is told what happened rather than left describing the song that
+        // just faded out.
+        engine.addTrackTransitionedListener { mediaId ->
+            GratiaApp.instance.playerManager.adoptEngineTrack(mediaId)
+        }
+
         transitionController = TransitionController(engine)
         transitionController?.initialize()
         

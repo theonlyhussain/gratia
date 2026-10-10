@@ -58,6 +58,9 @@ fun PlayerHeader(
     onToggleFavorite: () -> Unit = {},
     onMoreClick: () -> Unit = {},
     audioFormatInfo: com.gratia.music.player.AudioFormatInfo? = null,
+    isUpgradedStream: Boolean = false,
+    isUpgradeOptimizing: Boolean = false,
+    sourceLabel: String? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -96,58 +99,92 @@ fun PlayerHeader(
                 modifier = Modifier.clickable { onClickArtist() }
             )
 
-            // Audio Format Badge
+            // Audio Format Badge — the honesty layer.
+            //
+            // Everything shown here is measured (decoder-reported codec, sample
+            // rate, bit depth) or a fact already proven elsewhere (the upgrade
+            // flag is set only after the player actually swapped streams). What
+            // is deliberately absent: any bitrate or source string that comes
+            // from a resolve response rather than from bytes being decoded —
+            // a resolver that claims 320kbps and delivers 128kbps would
+            // otherwise be printed on the screen as truth.
             if (audioFormatInfo != null) {
                 Spacer(Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    val isLossless = when (audioFormatInfo.mimeType) {
-                        "audio/flac", "audio/alac", "audio/x-wav", "audio/raw", "audio/x-aiff" -> true
-                        else -> false
-                    }
-                    val formatName = when (audioFormatInfo.mimeType) {
-                        "audio/flac" -> "FLAC"
-                        "audio/alac" -> "ALAC"
-                        "audio/mp4a-latm" -> "AAC"
-                        "audio/mpeg" -> "MP3"
-                        "audio/ogg", "audio/vorbis" -> "OGG"
-                        "audio/x-wav" -> "WAV"
-                        else -> audioFormatInfo.mimeType?.substringAfter("audio/")?.uppercase() ?: "AUDIO"
-                    }
-                    val sampleRateKhz = audioFormatInfo.sampleRate / 1000f
-                    val sampleRateStr = if (sampleRateKhz % 1 == 0f) "${sampleRateKhz.toInt()}" else "$sampleRateKhz"
-                    
-                    val text = buildString {
-                        append(formatName)
-                        if (audioFormatInfo.bitDepth > 0 && isLossless) {
-                            append(" • ${audioFormatInfo.bitDepth}-bit")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val isLossless = when (audioFormatInfo.mimeType) {
+                            "audio/flac", "audio/alac", "audio/x-wav", "audio/raw", "audio/x-aiff" -> true
+                            else -> false
                         }
-                        if (audioFormatInfo.sampleRate > 0) {
-                            append(" / $sampleRateStr kHz")
+                        val formatName = when (audioFormatInfo.mimeType) {
+                            "audio/flac" -> "FLAC"
+                            "audio/alac" -> "ALAC"
+                            "audio/mp4a-latm" -> "AAC"
+                            "audio/mpeg" -> "MP3"
+                            "audio/ogg", "audio/vorbis" -> "OGG"
+                            "audio/opus" -> "Opus"
+                            "audio/x-wav" -> "WAV"
+                            else -> audioFormatInfo.mimeType?.substringAfter("audio/")?.uppercase() ?: "AUDIO"
+                        }
+                        val sampleRateKhz = audioFormatInfo.sampleRate / 1000f
+                        val sampleRateStr = if (sampleRateKhz % 1 == 0f) "${sampleRateKhz.toInt()}" else "$sampleRateKhz"
+                        
+                        val text = buildString {
+                            sourceLabel?.let { append("$it · ") }
+                            append(formatName)
+                            if (audioFormatInfo.bitDepth > 0 && isLossless) {
+                                append(" • ${audioFormatInfo.bitDepth}-bit")
+                            }
+                            if (audioFormatInfo.sampleRate > 0) {
+                                append(" / $sampleRateStr kHz")
+                            }
+                        }
+
+                        androidx.compose.material3.Text(
+                            text = text,
+                            style = GratiaTheme.typography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                            color = Color.White.copy(alpha = 0.4f)
+                        )
+
+                        if (isLossless) {
+                            Box(
+                                modifier = Modifier
+                                    .background(Color.White.copy(alpha = 0.15f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                val hiRes = audioFormatInfo.bitDepth > 16 || audioFormatInfo.sampleRate > 48000
+                                androidx.compose.material3.Text(
+                                    text = if (hiRes) "Hi-Res Lossless" else "Lossless",
+                                    style = GratiaTheme.typography.caption.copy(fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                    color = Color.White.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
 
-                    androidx.compose.material3.Text(
-                        text = text,
-                        style = GratiaTheme.typography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
-                        color = Color.White.copy(alpha = 0.4f)
-                    )
-
-                    if (isLossless) {
-                        Box(
-                            modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.15f), androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        ) {
-                            val hiRes = audioFormatInfo.bitDepth > 16 || audioFormatInfo.sampleRate > 48000
-                            androidx.compose.material3.Text(
-                                text = if (hiRes) "Hi-Res Lossless" else "Lossless",
-                                style = GratiaTheme.typography.caption.copy(fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
-                                color = Color.White.copy(alpha = 0.8f)
-                            )
-                        }
+                    // The quality story as a second metadata line, not a
+                    // sticker. It reads in the same rhythm as the line above —
+                    // "Quality optimizing…" only while the better-rendition
+                    // search is actually running, and "Quality upgraded" only
+                    // after the player really swapped streams. No claim ahead of
+                    // its event, no badge, no box, no layout jump (spec 49–51).
+                    if (isUpgradedStream) {
+                        androidx.compose.material3.Text(
+                            text = "Quality upgraded",
+                            style = GratiaTheme.typography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                            color = GratiaTheme.colors.accent
+                        )
+                    } else if (isUpgradeOptimizing) {
+                        androidx.compose.material3.Text(
+                            text = "Quality optimizing…",
+                            style = GratiaTheme.typography.caption,
+                            color = Color.White.copy(alpha = 0.4f)
+                        )
                     }
                 }
             }

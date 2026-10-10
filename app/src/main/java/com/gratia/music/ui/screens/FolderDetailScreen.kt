@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.theme.GratiaTheme
@@ -106,7 +107,7 @@ fun FolderDetailScreen(
                     
                     // Play Button
                     Button(
-                        onClick = { if (folderSongs.isNotEmpty()) playerViewModel.playSong(folderSongs.first(), folderSongs) },
+                        onClick = { if (folderSongs.isNotEmpty()) playerViewModel.playSong(folderSongs.first(), folderSongs, PlaybackOrigin.LIBRARY) },
                         modifier = Modifier.fillMaxWidth(0.6f).height(48.dp),
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = GratiaTheme.colors.accent, contentColor = GratiaTheme.colors.background)
@@ -125,7 +126,7 @@ fun FolderDetailScreen(
                     index = index,
                     isActive = currentSong?.id == song.id,
                     isPlaying = currentSong?.id == song.id && isPlaying,
-                    onClick = { playerViewModel.playSong(song, folderSongs) },
+                    onClick = { playerViewModel.playSong(song, folderSongs, PlaybackOrigin.LIBRARY) },
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
             }

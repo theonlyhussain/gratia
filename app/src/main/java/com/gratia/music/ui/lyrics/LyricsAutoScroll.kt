@@ -1,23 +1,38 @@
 package com.gratia.music.ui.lyrics
 
 import com.gratia.music.lyrics.LyricLine
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 // =============================================================================
 // FOLLOWING THE SINGER
 // =============================================================================
 //
-// The lyrics page does not advance by lines. It follows what is *being sung* —
-// every line whose timing straddles the playhead — and only moves when that
-// content would otherwise run out of room. A line ending, or a new one
-// starting, is not on its own a reason to scroll: the page asks whether what is
-// currently being sung still sits comfortably in the viewport, and moves only
-// if the answer is no.
+// The lyrics page is a document that travels upward under the line being sung.
+// That line is held at a fixed reading position in the upper part of the page —
+// the anchor — and everything else moves past it: the lines just sung leave
+// through the top of the viewport, and the lines still to come fill the space
+// beneath. That is the whole of the motion, and it is why the page never walks
+// down the screen as a song goes on.
 //
-// That split matters for overlap. A song where a second voice enters over a
-// line that is still going has two lines being sung at once; they are one
-// group, they stay on screen together, and the older of the two ending does not
-// tug the page away from the one still holding.
+// What is being *sung* is not one line but a group of them: every line whose
+// timing straddles the playhead. A song where a second voice enters over a line
+// that is still going has two lines being sung at once, and they stay lit
+// together. The page follows the oldest of that group — the row the voice
+// started on — so a backing vocal entering over a line does not tug the page
+// away from it, while the handover when the lead line ends lands on the voice
+// still singing.
+
+/**
+ * Where a row sits relative to what is being sung.
+ *
+ * The page is told apart this way rather than by a single brightness ladder,
+ * because the two sides are read differently. A row already sung has been read
+ * and is where an eye that lost its place goes back to, so it wants to stay
+ * legible; a row not yet reached has not been read and wants to be held well
+ * back, so that nothing near the playing line shares its brightness.
+ */
+internal enum class LyricFocusSide { Active, Sung, Upcoming }
 
 /**
  * The stretch of the lyrics list being sung at one moment.
@@ -27,6 +42,20 @@ import kotlin.math.roundToInt
  * the run-in before the first line.
  */
 internal data class ActiveLyricGroup(val first: Int, val last: Int) {
+
+    /**
+     * Which side of the singing [index] is on.
+     *
+     * Before anything has been reached — the intro, where [isEmpty] — every row
+     * is still ahead of the voice, so the whole page reads as upcoming and the
+     * anchor row at distance 0 is the one the singing will start on.
+     */
+    fun focusSide(index: Int): LyricFocusSide = when {
+        contains(index) -> LyricFocusSide.Active
+        isEmpty -> LyricFocusSide.Upcoming
+        index < first -> LyricFocusSide.Sung
+        else -> LyricFocusSide.Upcoming
+    }
 
     val isEmpty: Boolean get() = first < 0
 
@@ -38,9 +67,18 @@ internal data class ActiveLyricGroup(val first: Int, val last: Int) {
      * Feeds the brightness ladder, so two overlapping vocals read as one bright
      * block rather than the newer line being bright and the line it answers
      * dimming one step at a time as the group grows.
+     *
+     * Nothing reached yet — the run-in before the first line, which is the intro
+     * of every song and the better part of a minute of some — has no group to
+     * measure against, so the ladder is anchored on the line the singing starts
+     * on and runs down the list from there. Measuring from nothing instead put
+     * every line on the far rung at once: the whole page arrived dimmed and
+     * blurred, and cleared only when the first stamp finally landed on it.
+     * Nothing is being *sung* in that state — [contains] is still false for every
+     * line — so this is the ladder's anchor and no more.
      */
     fun distanceTo(index: Int): Int = when {
-        isEmpty -> Int.MAX_VALUE
+        isEmpty -> index.coerceAtLeast(0)
         index < first -> first - index
         index > last -> index - last
         else -> 0
@@ -100,10 +138,15 @@ internal fun activeLyricGroup(lines: List<LyricLine>, positionMs: Long): ActiveL
 // =============================================================================
 
 /**
- * Where one lyric row was measured to sit, relative to the top of the viewport.
+ * Where one lyric row was measured to sit, in the list's own layout space.
  *
- * [top] is negative for a row scrolled past the top and beyond the viewport
- * height for one still below it.
+ * That space begins at the top of the content area — below the list's leading
+ * content padding — so a row at 0 is drawn exactly `beforeContentPadding` pixels
+ * down the lyrics viewport, and the rows a real list reports as visible are the
+ * ones between `-beforeContentPadding` and the viewport height less that. This
+ * is the space `LazyListItemInfo.offset` reports in, and the space
+ * `LazyListState.scrollToItem`'s offset argument sets, negated: a row asked to
+ * land at `-offset` reports `offset` afterwards.
  */
 internal class LyricItemBounds(val index: Int, val top: Int, val height: Int) {
     val bottom: Int get() = top + height
@@ -112,89 +155,114 @@ internal class LyricItemBounds(val index: Int, val top: Int, val height: Int) {
 /** What the auto-scroll wants to do with the list. */
 internal sealed interface LyricScrollTarget {
 
-    /** The group already sits comfortably; leave the page alone. */
+    /** The row being sung already sits at the anchor; leave the page alone. */
     object None : LyricScrollTarget
 
     /**
-     * Put [index]'s top [topFromViewport] pixels below the top of the viewport.
-     * The caller converts this to a list scroll offset.
+     * Put [index]'s top at [anchorOffset] in the list's own layout space. The
+     * caller negates it into a list scroll offset.
      */
-    data class Item(val index: Int, val topFromViewport: Int) : LyricScrollTarget
+    data class Item(val index: Int, val anchorOffset: Int) : LyricScrollTarget
 }
 
 /**
- * The band of the lyrics viewport the group being sung is kept inside, as a
- * share of its measured height.
+ * How far down the lyrics viewport the row being sung is held, as a share of
+ * that viewport's own height.
  *
- * Taken from the measured viewport rather than a fixed pixel value, because the
- * lyrics area is not the screen: it is whatever is left between the header and
- * the transport controls, and that differs by device. The band keeps the
- * content clear of the faded top and bottom edges, so a followed line is never
- * parked under the fade.
+ * Measured against the lyrics area and not the screen: the area is whatever is
+ * left between the track header above it, the transport controls below it and
+ * the system insets around them, and all of those are outside this list, so its
+ * own height is already the usable measurement.
+ *
+ * Just under a quarter of the way down it. The line being sung is read from the
+ * upper part of the page — below the header, clear of the fade — with the lines
+ * still to come filling the space beneath it, which is what makes the document
+ * travel upward through the viewport as the song goes on.
  */
-internal const val LYRIC_SAFE_TOP_FRACTION = 0.15f
-internal const val LYRIC_SAFE_BOTTOM_FRACTION = 0.82f
+internal const val LYRIC_ANCHOR_FRACTION = 0.22f
 
 /**
- * The smallest move that puts the group being sung back inside the safe band —
- * or [LyricScrollTarget.None] when it never left it.
+ * How far the row being sung may sit from the anchor before the page is moved.
  *
- * This is the whole of the scroll policy. It knows nothing about line indices
- * changing; it is handed a group and the rows currently on screen and answers
- * only whether that group fits. A newly begun overlapping vocal that is already
- * visible therefore moves nothing, and a page where one line hands over to the
- * next with room to spare stays exactly where it is.
+ * Small, and only there to absorb the pixel the layout lands on. It is what
+ * makes asking the same question twice — the same line, the same page — a no-op
+ * rather than a fresh animation shoving the list by a pixel.
+ */
+internal const val LYRIC_ANCHOR_TOLERANCE_PX = 6
+
+/**
+ * The offset in the list's layout space that puts a row's top at the anchor.
+ *
+ * [beforeContentPadding] is the list's leading content padding in pixels, and it
+ * comes off because the layout space begins *below* it. The list is given a
+ * leading padding equal to the anchor itself — see [SyncedLyricsView] — so this
+ * answers 0 for every row, and 0 is the one position a lazy list can always
+ * reach: the anchor is enforced by the list's own layout rather than by a number
+ * carried around in the scroll code, and no row, first or last, ever needs a
+ * negative or a clamped scroll position to be read at it.
+ */
+internal fun lyricAnchorOffset(viewportHeight: Int, beforeContentPadding: Int): Int =
+    (viewportHeight * LYRIC_ANCHOR_FRACTION).roundToInt() - beforeContentPadding
+
+/**
+ * Where the row being sung belongs — or [LyricScrollTarget.None] when it is
+ * already there.
+ *
+ * This is the whole of the scroll policy. It is handed the row being sung and
+ * the rows the list currently reports, and answers only where that row's top
+ * goes. It knows nothing about the playback position, the word being sung,
+ * which row is first on screen, or how many ticks have passed: the caller asks
+ * it when the line being sung has changed, and never on a tick.
+ *
+ * A row already at the anchor is left alone, so an animation that has just
+ * finished cannot be launched again behind itself, and a page read by hand that
+ * happens to be sitting right is not nudged. A row that is not on screen at all
+ * is answered with the same move — the target is still the anchor, and the list
+ * works out how far away it is — which is what makes a forward seek a jump
+ * rather than a scroll through every line the song skipped.
  */
 internal fun decideLyricScroll(
-    groupFirst: Int,
-    groupLast: Int,
+    anchorIndex: Int,
     visible: List<LyricItemBounds>,
-    viewportHeight: Int
+    viewportHeight: Int,
+    beforeContentPadding: Int
 ): LyricScrollTarget {
-    if (groupFirst < 0 || groupLast < groupFirst) return LyricScrollTarget.None
-    if (viewportHeight <= 0 || visible.isEmpty()) return LyricScrollTarget.None
+    if (anchorIndex < 0 || visible.isEmpty()) return LyricScrollTarget.None
 
-    val safeTop = (viewportHeight * LYRIC_SAFE_TOP_FRACTION).roundToInt()
-    val safeBottom = (viewportHeight * LYRIC_SAFE_BOTTOM_FRACTION).roundToInt()
-    if (safeBottom <= safeTop) return LyricScrollTarget.None
-
-    val head = visible.firstOrNull { it.index == groupFirst }
-    val tail = visible.firstOrNull { it.index == groupLast }
-
-    // The head has scrolled up out of the viewport — a large jump, or a page
-    // left behind by hand. Bring the group back down so its start can be read.
-    if (head == null) return LyricScrollTarget.Item(groupFirst, safeTop)
-
-    // The tail runs off the bottom: reveal it, resting it just inside the safe
-    // band. Its height cannot be measured while it is off screen, so the lowest
-    // row on screen stands in for it.
-    if (tail == null) {
-        val estimatedHeight = visible.last().height
-        return LyricScrollTarget.Item(groupLast, (safeBottom - estimatedHeight).coerceAtLeast(0))
+    val anchor = lyricAnchorOffset(viewportHeight, beforeContentPadding)
+    val row = visible.firstOrNull { it.index == anchorIndex }
+    if (row != null && abs(row.top - anchor) <= LYRIC_ANCHOR_TOLERANCE_PX) {
+        return LyricScrollTarget.None
     }
-
-    val groupTop = head.top
-    val groupBottom = tail.bottom
-    val safeHeight = safeBottom - safeTop
-
-    return when {
-        // Taller than the band. Hold its head at the safe top and follow from
-        // there, rather than fighting to fit what cannot fit: a new overlapping
-        // line joining an already-tall group then changes nothing on screen.
-        groupBottom - groupTop > safeHeight ->
-            if (groupTop == safeTop) LyricScrollTarget.None
-            else LyricScrollTarget.Item(groupFirst, safeTop)
-
-        // Reached past the top of the band: ease it back down.
-        groupTop < safeTop -> LyricScrollTarget.Item(groupFirst, safeTop)
-
-        // Reached past the bottom: move just far enough to reveal the newest
-        // line, no further.
-        groupBottom > safeBottom ->
-            LyricScrollTarget.Item(groupLast, (safeBottom - tail.height).coerceAtLeast(0))
-
-        // Comfortably inside. This is the case that keeps a line handover with
-        // room to spare from touching the page at all.
-        else -> LyricScrollTarget.None
-    }
+    return LyricScrollTarget.Item(index = anchorIndex, anchorOffset = anchor)
 }
+
+/**
+ * Whether that move should be animated, or landed at once.
+ *
+ * Only a row already on screen is animated: that is a line handing over to the
+ * next one, one row's worth of movement, and it should read as the page moving.
+ * A row that is not on screen is a seek — a scrub, a tap on a lyric further
+ * down, a jump backward — and animating the page across it would show every line
+ * in between sliding past as though it were being sung. Those land where the
+ * song is.
+ */
+internal fun animateLyricScroll(targetOnScreen: Boolean, reduceAnimation: Boolean): Boolean =
+    targetOnScreen && !reduceAnimation
+
+/**
+ * Where the last row's top sits, in pixels from the top of the lyrics viewport,
+ * when the list is scrolled as far as it will go.
+ *
+ * The leading padding does not appear here: it moves the whole page down and the
+ * end of the list with it, so whether the *last* line can be read at the anchor
+ * is decided by the space below it and nothing else. That space is the trailing
+ * content padding [SyncedLyricsView] gives the list — the viewport less the
+ * anchor — which leaves the end of a song sitting exactly where the rest of it
+ * was read instead of stranded at the foot of the page.
+ */
+internal fun lastRowTopAtEnd(
+    viewportHeight: Int,
+    afterContentPadding: Int,
+    rowHeight: Int
+): Int = viewportHeight - afterContentPadding - rowHeight

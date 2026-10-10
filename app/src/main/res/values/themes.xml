@@ -8,7 +8,13 @@
 
     <style name="Theme.Gratia.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/logo_red_bg</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!-- The system splash drew the stock template foreground (the Android
+             robot) because ic_launcher_foreground.xml is the unmodified AML
+             starter asset. The launcher icon mipmap is Gratia's own art, and
+             the SplashScreen API accepts any drawable: point the window at
+             the real logo so cold start shows Gratia, not Android. -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/logo_red_bg</item>
         <item name="postSplashScreenTheme">@style/Theme.Gratia</item>
     </style>
 </resources>

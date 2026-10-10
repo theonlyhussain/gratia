@@ -32,12 +32,17 @@ import java.util.UUID
 import java.io.File
 
 @Composable
-fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
+fun PlaylistsScreen(
+    autoOpenCreate: Boolean = false,
+    onNavigateToPlaylist: (String) -> Unit,
+    /** Create-flow continuation: opens the new playlist with Add Music showing (playlist spec 16). */
+    onNavigateToAddMusic: (String) -> Unit = onNavigateToPlaylist
+) {
     val playlistDao = remember { GratiaApp.instance.database.playlistDao() }
     val playlists by playlistDao.getAllPlaylists().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
-    var showCreateDialog by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(autoOpenCreate) }
 
     Box(
         modifier = Modifier
@@ -59,11 +64,16 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
             )
 
             if (playlists.isEmpty()) {
+                // An intentional empty state (playlist spec 15): the section is
+                // named, its emptiness is said plainly, and the one action that
+                // matters is offered in place — not left to a floating button.
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     EmptyStateView(
                         icon = Icons.AutoMirrored.Filled.QueueMusic,
                         headline = "No playlists yet",
-                        description = "Create your first playlist to organize your favorite songs"
+                        description = "Create your first playlist to save the songs you love.",
+                        actionLabel = "Create Playlist",
+                        onActionClick = { showCreateDialog = true }
                     )
                 }
             } else {
@@ -72,7 +82,7 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                         start = GratiaTheme.spacing.large,
                         end = GratiaTheme.spacing.large,
                         top = GratiaTheme.spacing.medium,
-                        bottom = GratiaTheme.spacing.heroLarge
+                        bottom = com.gratia.music.ui.LocalBottomPadding.current + GratiaTheme.spacing.heroLarge
                     ),
                     verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                 ) {
@@ -89,7 +99,11 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp, end = GratiaTheme.spacing.large)
+                // Computed, not hardcoded (insets spec 24/25): the shared inset
+                // already contains the navigation bar plus the mini player when
+                // one is showing, so the button stays reachable in both
+                // navigation modes and at every screen height.
+                .padding(bottom = com.gratia.music.ui.LocalBottomPadding.current + 24.dp, end = GratiaTheme.spacing.large)
                 .size(56.dp)
                 .clip(GratiaTheme.shapes.extraLarge)
                 .background(GratiaTheme.colors.accent)
@@ -125,7 +139,9 @@ fun PlaylistsScreen(onNavigateToPlaylist: (String) -> Unit) {
                         )
                         showCreateDialog = false
                         android.widget.Toast.makeText(context, "Playlist '$name' created", android.widget.Toast.LENGTH_SHORT).show()
-                        onNavigateToPlaylist(newId)
+                        // Straight into Add Music for the new playlist — no
+                        // ambiguous blank page in between (playlist spec 16/27).
+                        onNavigateToAddMusic(newId)
                     }
                 }
             )

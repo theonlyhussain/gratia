@@ -21,14 +21,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.roundToInt
 
 /**
  * Draws the auto-scroll's own view of the page over the lyrics.
  *
- * Three things, so the follow can be watched rather than inferred: the safe band
- * the group being sung is kept inside, the rows currently counted as being sung,
- * and the move [decideLyricScroll] would make against the layout as it stands.
+ * Three things, so the follow can be watched rather than inferred: the reading
+ * anchor the row being sung is held at, the rows currently counted as being
+ * sung, and the move [decideLyricScroll] would make against the layout as it
+ * stands.
  *
  * Read-only: it measures the same list the follow measures and changes nothing.
  * It does recompose every frame of playback, though — the position is read here
@@ -36,13 +36,17 @@ import kotlin.math.roundToInt
  * than always on.
  *
  * Expected on screen:
- * - The amber lines are the safe band's top and bottom. A line sitting inside
- *   them is being followed; a group crossing one is what makes the page move.
+ * - The amber line is the reading anchor: the row being sung should have its top
+ *   on it, in the upper part of the page. It is drawn at the same place the
+ *   list's leading content padding puts the first row of the list.
+ * - The blue band is where the row being sung actually is, measured from the
+ *   live layout. The gap between the amber line and the blue band is the follow's
+ *   error, and should be nothing at all while a song plays.
  * - The green bands mark every row in the active group. More than one at once
  *   means overlapping vocals, which is the case the group exists for.
  * - `target` names the move the follow would make right now: `— (no move)` when
- *   the group already fits, otherwise the row and the distance from the top of
- *   the viewport it would be placed at.
+ *   the row is already at the anchor, otherwise the row and the offset in the
+ *   list's own layout space it would be put at.
  * - `browsing` shows the manual-scroll stand-down, which suppresses the move
  *   regardless of what `target` says.
  */
@@ -52,6 +56,7 @@ internal fun LyricsScrollDebugOverlay(
     activeGroup: ActiveLyricGroup,
     clock: State<Long>,
     isBrowsing: Boolean,
+    beforeContentPadding: Int,
     modifier: Modifier = Modifier
 ) {
     // Read in composition, not in a draw lambda: `layoutInfo` is snapshot-backed
@@ -61,32 +66,47 @@ internal fun LyricsScrollDebugOverlay(
     val viewportHeight = layout.viewportSize.height
     if (viewportHeight <= 0) return
 
-    val safeTop = (viewportHeight * LYRIC_SAFE_TOP_FRACTION).roundToInt()
-    val safeBottom = (viewportHeight * LYRIC_SAFE_BOTTOM_FRACTION).roundToInt()
+    // The anchor in the list's own space, and the same line on screen: that
+    // space begins *below* the leading content padding, so a row at
+    // [anchorOffset] is drawn this far down the lyrics viewport.
+    val anchorOffset = lyricAnchorOffset(viewportHeight, beforeContentPadding)
+    val anchorOnScreen = anchorOffset + beforeContentPadding
     val visible = layout.visibleItemsInfo.map {
         LyricItemBounds(index = it.index, top = it.offset, height = it.size)
     }
-    val target = decideLyricScroll(activeGroup.first, activeGroup.last, visible, viewportHeight)
+    val target = decideLyricScroll(
+        anchorIndex = activeGroup.first,
+        visible = visible,
+        viewportHeight = viewportHeight,
+        beforeContentPadding = beforeContentPadding
+    )
+    val anchorRow = visible.firstOrNull { it.index == activeGroup.first }
     val positionMs = clock.value
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .drawBehind {
-                drawRect(
-                    color = SAFE_BAND_FILL,
-                    topLeft = Offset(0f, safeTop.toFloat()),
-                    size = Size(size.width, (safeBottom - safeTop).toFloat())
+                val anchorY = anchorOnScreen.toFloat()
+                drawLine(
+                    ANCHOR_EDGE,
+                    Offset(0f, anchorY),
+                    Offset(size.width, anchorY),
+                    strokeWidth = EDGE_STROKE
                 )
-                val topY = safeTop.toFloat()
-                val bottomY = safeBottom.toFloat()
-                drawLine(SAFE_EDGE, Offset(0f, topY), Offset(size.width, topY), strokeWidth = EDGE_STROKE)
-                drawLine(SAFE_EDGE, Offset(0f, bottomY), Offset(size.width, bottomY), strokeWidth = EDGE_STROKE)
 
                 visible.forEach { row ->
+                    // Rows are reported in the list's own space, which starts
+                    // below the leading padding; on screen they sit that much
+                    // further down.
+                    val top = (row.top + beforeContentPadding).toFloat()
+                    val topLeft = Offset(0f, top)
+                    val rowSize = Size(size.width, row.height.toFloat())
+                    if (row.index == activeGroup.first) {
+                        drawRect(ANCHOR_ROW_FILL, topLeft, rowSize)
+                        drawRect(ANCHOR_ROW_EDGE, topLeft, rowSize, style = Stroke(width = EDGE_STROKE))
+                    }
                     if (row.index in activeGroup) {
-                        val topLeft = Offset(0f, row.top.toFloat())
-                        val rowSize = Size(size.width, row.height.toFloat())
                         drawRect(ACTIVE_ROW_FILL, topLeft, rowSize)
                         drawRect(ACTIVE_ROW_EDGE, topLeft, rowSize, style = Stroke(width = EDGE_STROKE))
                     }
@@ -100,7 +120,7 @@ internal fun LyricsScrollDebugOverlay(
                 // fade out under the parent's mask.
                 .padding(start = 12.dp, top = 80.dp)
                 .background(PANEL_FILL, RoundedCornerShape(8.dp))
-                .border(1.dp, SAFE_EDGE.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .border(1.dp, ANCHOR_EDGE.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
             val group = if (activeGroup.isEmpty) {
@@ -115,16 +135,18 @@ internal fun LyricsScrollDebugOverlay(
                 "${visible.first().index}..${visible.last().index}"
             }
             val move = when (target) {
-                is LyricScrollTarget.Item ->
-                    "→ item ${target.index} @ ${target.topFromViewport}"
+                is LyricScrollTarget.Item -> "→ item ${target.index} @ ${target.anchorOffset}"
                 LyricScrollTarget.None -> "— (no move)"
             }
+            val where = if (anchorRow == null) "—" else "${anchorRow.top}"
 
             DebugRow("pos", "${positionMs}ms")
             DebugRow("group", group)
             DebugRow("rows", rows)
             DebugRow("viewport", "$viewportHeight px")
-            DebugRow("safe", "$safeTop .. $safeBottom")
+            DebugRow("padding", "$beforeContentPadding px")
+            DebugRow("anchor", "$anchorOffset (on screen $anchorOnScreen)")
+            DebugRow("active", where)
             DebugRow("target", move)
             DebugRow("browsing", isBrowsing.toString())
         }
@@ -142,11 +164,12 @@ private fun DebugRow(label: String, value: String) {
     )
 }
 
-/** The band the followed group is kept inside. */
-private val SAFE_BAND_FILL = Color(0x1400E676)
+/** The reading anchor the row being sung is held at. */
+private val ANCHOR_EDGE = Color(0xCCFFB300)
 
-/** Its top and bottom edges. */
-private val SAFE_EDGE = Color(0xCCFFB300)
+/** Where that row actually sits, measured from the live layout. */
+private val ANCHOR_ROW_FILL = Color(0x223D7BFF)
+private val ANCHOR_ROW_EDGE = Color(0x993D7BFF)
 
 /** Rows counted as being sung. */
 private val ACTIVE_ROW_FILL = Color(0x3300E676)

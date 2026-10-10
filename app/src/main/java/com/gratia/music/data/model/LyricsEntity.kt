@@ -13,7 +13,15 @@ data class LyricsEntity(
     val songId: String,
     val text: String,
     val isSynced: Boolean,
-    val provider: String, // e.g. "LRCLIB", "manual"
+    val provider: String, // slot: "automatic" (provider-chosen) or "manual"
+    /**
+     * The provider that actually produced the chosen result — "BetterLyrics",
+     * "BiniLyrics", "LRCLIB", … Kept apart from [provider] because the slot
+     * answers "is this the auto pick or the user's edit?" while this answers
+     * "who gets the credit?", and the credit used to be lost when the result
+     * was written into the fixed "automatic" slot.
+     */
+    val providerName: String? = null,
     val offsetMs: Long = 0L,
     val isManuallyEdited: Boolean = false,
     val downloadDate: Long = System.currentTimeMillis(),

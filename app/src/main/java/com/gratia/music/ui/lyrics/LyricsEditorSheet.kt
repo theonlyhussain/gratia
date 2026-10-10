@@ -38,6 +38,8 @@ import com.gratia.music.lyrics.LyricsParser
 import com.gratia.music.lyrics.LyricsDocument
 import com.gratia.music.lyrics.LyricsQuality
 import com.gratia.music.ui.components.CoverArtImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.JetBrainsMono
@@ -87,7 +89,21 @@ fun LyricsEditorSheet(
 
     // Live format detection — debounced to avoid lag while typing
     var detectedFormat by remember { mutableStateOf(LyricsFormatDetector.detect(initialText)) }
-    var parsedDocument by remember { mutableStateOf(LyricsParser.parse(initialText)) }
+    // Parsed off the main thread: the editor opens with whatever is already
+    // typed, and a word-synced document is thousands of timed spans — parsing
+    // one during composition was a visible stall on sheet open.
+    var parsedDocument by remember { mutableStateOf<LyricsDocument>(LyricsDocument.Plain("")) }
+
+    // Parse on open (no debounce) and on every edit (debounced). One effect so
+    // the editor never has two competing parses racing to update the stats.
+    LaunchedEffect(editorText.text) {
+        val text = editorText.text
+        if (text != initialText) delay(300)
+        detectedFormat = LyricsFormatDetector.detect(text)
+        parsedDocument = withContext(Dispatchers.Default) {
+            LyricsParser.parse(text)
+        }
+    }
 
     // Stats derived from parsed document
     val lineCount = remember(parsedDocument) {
@@ -111,13 +127,6 @@ fun LyricsEditorSheet(
             is LyricsDocument.WordSynced -> (parsedDocument as LyricsDocument.WordSynced).lines.sumOf { it.words.size }
             else -> 0
         }
-    }
-
-    // Debounced re-detection when text changes
-    LaunchedEffect(editorText.text) {
-        delay(300) // debounce 300ms
-        detectedFormat = LyricsFormatDetector.detect(editorText.text)
-        parsedDocument = LyricsParser.parse(editorText.text)
     }
 
     // Determine if content uses timestamps (for showing line numbers + monospace)

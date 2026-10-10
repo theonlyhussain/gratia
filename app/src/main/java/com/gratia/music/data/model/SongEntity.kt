@@ -2,12 +2,19 @@ package com.gratia.music.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
  * Core song entity stored in Room.
  * Supports local device storage and future cloud providers.
+ *
+ * The entity is also [Serializable]: the persisted playback snapshot carries
+ * whole rows (not just ids), so a cold start can restore a track — with its
+ * source type, local URI, artwork and remote identity — without depending on
+ * the row still existing in Room.
  */
+@Serializable
 @Entity(tableName = "songs")
 data class SongEntity(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),

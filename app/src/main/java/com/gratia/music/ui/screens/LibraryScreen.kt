@@ -22,16 +22,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
+import com.gratia.music.data.model.musicSource
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.LocalNavController
 import com.gratia.music.ui.components.*
 import com.gratia.music.ui.selection.SelectableSongRow
 import com.gratia.music.ui.selection.SelectionManager
 import com.gratia.music.ui.selection.SelectionToolbar
 import com.gratia.music.ui.theme.GratiaTheme
+import com.gratia.music.ui.theme.Inter
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -40,6 +44,9 @@ fun LibraryScreen(
     onNavigateToAlbum: (String) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {},
     onNavigateToFolder: (String) -> Unit = {},
+    onNavigateToRemoteArtist: (String) -> Unit = {},
+    onNavigateToRemoteAlbum: (String) -> Unit = {},
+    onNavigateToStats: () -> Unit = {},
     initialTab: String? = null
 ) {
     val songRepo = remember { SongRepository(GratiaApp.instance.database.songDao()) }
@@ -74,14 +81,14 @@ fun LibraryScreen(
             LibraryRootView(
                 allSongs = allSongs,
                 onNavigateToPlaylists = { navController.navigate("playlists") },
+                onNavigateToNewPlaylist = { navController.navigate("playlists?create=true") },
                 onNavigateToFavorites = { activeSubView = "Favorites" },
                 onNavigateToArtists = { activeSubView = "Artists" },
                 onNavigateToAlbums = { activeSubView = "Albums" },
                 onNavigateToSongs = { activeSubView = "Songs" },
-                onNavigateToFolders = { activeSubView = "Folders" },
                 onNavigateToDownloads = { activeSubView = "Downloads" },
-                onNavigateToLocalMusic = { activeSubView = "LocalMusic" },
-                onNavigateToAllOnDevice = { activeSubView = "AllOnDevice" },
+                onNavigateToLocalMusic = { navController.navigate("local_music") },
+                onNavigateToStats = onNavigateToStats,
                 onNavigateToAlbum = onNavigateToAlbum
             )
         } else {
@@ -92,6 +99,8 @@ fun LibraryScreen(
                 onBack = { activeSubView = null },
                 onNavigateToAlbum = onNavigateToAlbum,
                 onNavigateToArtist = onNavigateToArtist,
+                onNavigateToRemoteArtist = onNavigateToRemoteArtist,
+                onNavigateToRemoteAlbum = onNavigateToRemoteAlbum,
                 onNavigateToFolder = onNavigateToFolder
             )
         }
@@ -102,25 +111,35 @@ fun LibraryScreen(
 fun LibraryRootView(
     allSongs: List<SongEntity>,
     onNavigateToPlaylists: () -> Unit,
+    onNavigateToNewPlaylist: () -> Unit = {},
     onNavigateToFavorites: () -> Unit,
     onNavigateToArtists: () -> Unit,
+    onNavigateToRemoteArtist: (String) -> Unit = {},
     onNavigateToAlbums: () -> Unit,
     onNavigateToSongs: () -> Unit,
-    onNavigateToFolders: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToLocalMusic: () -> Unit,
-    onNavigateToAllOnDevice: () -> Unit,
+    onNavigateToStats: () -> Unit = {},
     onNavigateToAlbum: (String) -> Unit
 ) {
     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
 
-    // The three On Device counts, kept as counts rather than derived per row so
+    // The two On Device counts, kept as counts rather than derived per row so
     // the summary line can say how much is actually there before you tap it.
     val downloadsCount = remember(allSongs) { allSongs.count { it.isDownloaded } }
     val localMusicCount = remember(allSongs) {
         allSongs.count { it.storageProvider == "local" && !it.isDownloaded }
     }
-    val onDeviceCount = downloadsCount + localMusicCount
+
+    // Computed here rather than inside the lazy scope: a lazy list's content
+    // lambda is not a composable context, so a `remember` cannot live there.
+    val recentAlbums = remember(allSongs) {
+        allSongs
+            .filter { it.album != null }
+            .sortedByDescending { it.createdAt }
+            .distinctBy { it.album }
+            .take(10)
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -134,11 +153,37 @@ fun LibraryRootView(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
+        // ── Your Replay ────────────────────────────────────────────────────
+        // First on the page and above the shelves: the summary of what the
+        // listener has actually played, and the way into the full Listening
+        // Stats page. It sits here rather than in Settings because it is
+        // library content, not a preference.
+        item {
+            AppleListRow(
+                title = "Listening Stats",
+                subtitle = "Your Replay",
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.BarChart,
+                        contentDescription = "Listening Stats",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToStats,
+                showDivider = false
+            )
+        }
+
         // ── On Device ──────────────────────────────────────────────────────
-        // Three distinct things, deliberately not one list: a Gratia-managed
+        // Two distinct things, deliberately not one list: a Gratia-managed
         // download is not the same object as an audio file that was already on
         // the phone, and a user-imported MP3 must never read as a download.
+        // A combined "All On Device" row used to sit here; it was a third view
+        // of the same two populations with no question of its own to answer,
+        // so the two real ones remain and the alias is gone.
         item {
+            Spacer(modifier = Modifier.height(12.dp))
             AppleSectionHeader(title = "On Device")
         }
         item {
@@ -168,27 +213,18 @@ fun LibraryRootView(
                         modifier = Modifier.size(28.dp)
                     )
                 },
-                onClick = onNavigateToLocalMusic
-            )
-        }
-        item {
-            AppleListRow(
-                title = "All On Device",
-                subtitle = countLabel(onDeviceCount),
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.LibraryMusic,
-                        contentDescription = "All On Device",
-                        tint = GratiaTheme.colors.accent,
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                onClick = onNavigateToAllOnDevice,
+                onClick = onNavigateToLocalMusic,
                 showDivider = false
             )
         }
 
-        // Library Menu Items
+        // ── Your Library ───────────────────────────────────────────────────
+        // Collections the listener built by hand: playlists they made, tracks
+        // they liked, artists and albums they saved from the remote catalogue.
+        item {
+            Spacer(modifier = Modifier.height(12.dp))
+            AppleSectionHeader(title = "Your Library")
+        }
         item {
             AppleListRow(
                 title = "Playlists",
@@ -201,6 +237,20 @@ fun LibraryRootView(
                     )
                 },
                 onClick = onNavigateToPlaylists
+            )
+        }
+        item {
+            AppleListRow(
+                title = "New Playlist",
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Create a new playlist",
+                        tint = GratiaTheme.colors.accent,
+                        modifier = Modifier.size(28.dp)
+                    )
+                },
+                onClick = onNavigateToNewPlaylist
             )
         }
         item {
@@ -242,95 +292,74 @@ fun LibraryRootView(
                         modifier = Modifier.size(28.dp)
                     )
                 },
-                onClick = onNavigateToAlbums
-            )
-        }
-        item {
-            AppleListRow(
-                title = "Songs",
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.LibraryMusic,
-                        contentDescription = "Songs",
-                        tint = GratiaTheme.colors.accent,
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                onClick = onNavigateToSongs
-            )
-        }
-
-        item {
-            AppleListRow(
-                title = "Folders",
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = "Folders",
-                        tint = GratiaTheme.colors.accent,
-                        modifier = Modifier.size(28.dp)
-                    )
-                },
-                onClick = onNavigateToFolders,
+                onClick = onNavigateToAlbums,
                 showDivider = false
             )
         }
+        // "Songs" and "Folders" are deliberately absent from the top level
+        // (spec 7): Local Music is the management space for files on the phone
+        // and already offers Songs / Artists / Albums, so a second Songs entry
+        // point duplicated it while Folders is purely a local-file concern.
+        // Both stay reachable inside Local Music and by deep link.
 
-        // Recently Added Section
-        item {
-            Spacer(modifier = Modifier.height(24.dp))
-            AppleSectionHeader(title = "Recently Added")
-        }
+        // ── Recently Added ────────────────────────────────────────────────
+        // Only content Gratia itself brought into the library: a download it
+        // fetched, or a file it indexed into its own tables. The heading says
+        // "to Library" because that is what actually happened — the user did
+        // not necessarily add these, and a bare "Recently Added" claimed they
+        // did. The section is omitted entirely when there is nothing to show
+        // rather than rendering an empty shelf.
+        if (recentAlbums.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                AppleSectionHeader(title = "Recently Added to Library")
+            }
 
-        // We can display the latest albums as a grid, or just the latest songs. Apple shows albums/playlists usually.
-        // Let's show recent albums.
-        val recentAlbums = allSongs.filter { it.album != null }.sortedByDescending { it.createdAt }.distinctBy { it.album }.take(10)
-        
-        // Grid display using chunked list
-        val columns = 2
-        val chunkedAlbums = recentAlbums.chunked(columns)
-        
-        items(chunkedAlbums) { rowAlbums ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                rowAlbums.forEach { song ->
-                    Box(modifier = Modifier.weight(1f)) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickableWithScale { song.album?.let { onNavigateToAlbum(it) } }
-                        ) {
-                            CoverArtImage(
-                                coverArtPath = song.coverArtPath,
-                                title = song.album ?: "Unknown",
-                                size = 160.dp,
-                                cornerRadius = 8.dp,
-                                modifier = Modifier.fillMaxWidth().aspectRatio(1f)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            GratiaText(
-                                text = song.album ?: "Unknown",
-                                style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Medium),
-                                maxLines = 1,
-                                color = GratiaTheme.colors.textPrimary
-                            )
-                            GratiaText(
-                                text = song.artist,
-                                style = GratiaTheme.typography.caption,
-                                maxLines = 1,
-                                color = GratiaTheme.colors.textSecondary
-                            )
+            val columns = 2
+            val chunkedAlbums = recentAlbums.chunked(columns)
+
+            items(chunkedAlbums) { rowAlbums ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    rowAlbums.forEach { song ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickableWithScale { song.album?.let { onNavigateToAlbum(it) } }
+                            ) {
+                                CoverArtImage(
+                                    coverArtPath = song.coverArtPath,
+                                    title = song.album ?: "Unknown",
+                                    size = 160.dp,
+                                    cornerRadius = 8.dp,
+                                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                GratiaText(
+                                    text = song.album ?: "Unknown",
+                                    style = GratiaTheme.typography.body.copy(fontWeight = FontWeight.Medium),
+                                    maxLines = 1,
+                                    color = GratiaTheme.colors.textPrimary
+                                )
+                                GratiaText(
+                                    text = song.artist,
+                                    style = GratiaTheme.typography.caption,
+                                    maxLines = 1,
+                                    color = GratiaTheme.colors.textSecondary
+                                )
+                            }
                         }
                     }
-                }
-                // Fill empty spots if any
-                val emptySpots = columns - rowAlbums.size
-                for (i in 0 until emptySpots) {
-                    Spacer(modifier = Modifier.weight(1f))
+                    // Fill empty spots if any
+                    val emptySpots = columns - rowAlbums.size
+                    for (i in 0 until emptySpots) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -345,6 +374,8 @@ fun LibrarySubView(
     onBack: () -> Unit,
     onNavigateToAlbum: (String) -> Unit,
     onNavigateToArtist: (String) -> Unit,
+    onNavigateToRemoteArtist: (String) -> Unit = {},
+    onNavigateToRemoteAlbum: (String) -> Unit = {},
     onNavigateToFolder: (String) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -366,29 +397,32 @@ fun LibrarySubView(
 
     // What this sub-view actually lists, so selection's "select all" and delete
     // act on the rows on screen rather than on the whole library.
-    val activeSongs: List<SongEntity> = when (title) {
-        "Favorites" -> allSongs.filter { it.isFavorite }
-        "Downloads" -> allSongs.filter { it.isDownloaded }
-        // A Gratia-managed download is excluded: it is on the device, but it is
-        // not a file the user put there, and the two must not be conflated.
-        "LocalMusic" -> allSongs.filter { it.storageProvider == "local" && !it.isDownloaded }
-        "AllOnDevice" -> allSongs.filter { it.isDownloaded || it.storageProvider == "local" }
+    val activeSongs: List<SongEntity> = when (title) {                "Favorites" -> allSongs.filter { it.isFavorite }
+                "Downloads" -> allSongs.filter { it.isDownloaded }
+                // A Gratia-managed download is excluded: it is on the device, but it is
+                // not a file the user put there, and the two must not be conflated.
+                // (The dedicated Local Music screen lives at "local_music"; this
+                // sub-view remains for direct tab navigation.)
+                "LocalMusic" -> allSongs.filter { it.musicSource == com.gratia.music.data.model.MusicSource.LOCAL }
         else -> sortedSongs
     }
 
     // Internal ids stay camel-cased for routing; the header shows the label.
     val displayTitle = when (title) {
         "LocalMusic" -> "Local Music"
-        "AllOnDevice" -> "All On Device"
         else -> title
     }
 
     Box(modifier = Modifier.fillMaxSize().background(GratiaTheme.colors.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Apple-style back header
+            // Apple-style back header. The sub-view is drawn edge-to-edge like
+            // every other full-screen destination, so the row clears the
+            // status bar itself — without this the back arrow sat in the clock
+            // and battery readout (spec 24/26).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -433,7 +467,7 @@ fun LibrarySubView(
                                     isPlaying = currentSong?.id == song.id && isPlaying,
                                     isSelectionMode = isSelectionMode,
                                     isSelected = selectedIds.contains(song.id),
-                                    onPlay = { playerViewModel.playSong(song, favoriteSongs) },
+                                    onPlay = { playerViewModel.playSong(song, favoriteSongs, PlaybackOrigin.FAVORITES) },
                                     onLongPress = { selectionManager.startSelection(song.id) },
                                     onToggleSelection = { selectionManager.toggle(song.id) },
                                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
@@ -446,23 +480,20 @@ fun LibrarySubView(
                 // what differs is which songs they hold and what an empty one
                 // says. The copy matters: "no downloads" and "no local music"
                 // are different facts, and a shared empty state would blur them.
-                "Downloads", "LocalMusic", "AllOnDevice" -> {
+                "Downloads", "LocalMusic" -> {
                     if (activeSongs.isEmpty()) {
                         EmptyStateView(
                             icon = when (title) {
                                 "Downloads" -> Icons.Default.Download
-                                "LocalMusic" -> Icons.Default.Folder
-                                else -> Icons.Default.LibraryMusic
+                                else -> Icons.Default.Folder
                             },
                             headline = when (title) {
                                 "Downloads" -> "No downloads yet"
-                                "LocalMusic" -> "No local music found"
-                                else -> "Nothing on this device yet"
+                                else -> "No local music found"
                             },
                             description = when (title) {
                                 "Downloads" -> "Download songs to listen offline."
-                                "LocalMusic" -> "Audio files already on this device will appear here."
-                                else -> "Downloads and local music will appear here."
+                                else -> "Audio files already on this device will appear here."
                             }
                         )
                     } else {
@@ -482,7 +513,17 @@ fun LibrarySubView(
                                     isPlaying = currentSong?.id == song.id && isPlaying,
                                     isSelectionMode = isSelectionMode,
                                     isSelected = selectedIds.contains(song.id),
-                                    onPlay = { playerViewModel.playSong(song, activeSongs) },
+                                    // The origin a track inherits from this screen,
+                                    // told apart by which on-device view it was played
+                                    // from — Downloads and Local Music are different
+                                    // facts, and the player must say which it was.
+                                    onPlay = {
+                                        playerViewModel.playSong(song, activeSongs, when (title) {
+                                            "Downloads" -> PlaybackOrigin.DOWNLOADS
+                                            "LocalMusic" -> PlaybackOrigin.LOCAL_MUSIC
+                                            else -> PlaybackOrigin.LIBRARY
+                                        })
+                                    },
                                     onLongPress = { selectionManager.startSelection(song.id) },
                                     onToggleSelection = { selectionManager.toggle(song.id) },
                                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
@@ -515,7 +556,7 @@ fun LibrarySubView(
                                     isPlaying = currentSong?.id == song.id && isPlaying,
                                     isSelectionMode = isSelectionMode,
                                     isSelected = selectedIds.contains(song.id),
-                                    onPlay = { playerViewModel.playSong(song, sortedSongs) },
+                                    onPlay = { playerViewModel.playSong(song, sortedSongs, PlaybackOrigin.LIBRARY) },
                                     onLongPress = { selectionManager.startSelection(song.id) },
                                     onToggleSelection = { selectionManager.toggle(song.id) },
                                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.mediumSmall)
@@ -525,12 +566,23 @@ fun LibrarySubView(
                     }
                 }
                 "Albums" -> {
-                    val albums = remember(allSongs) { allSongs.mapNotNull { it.album }.distinct().sorted() }
-                    if (albums.isEmpty()) {
+                    // Saved remote albums only. A local album is a folder of
+                    // files and belongs under Local Music → Albums; listing it
+                    // here as well would present two different objects under one
+                    // heading, and an album the listener actually bookmarked
+                    // would be buried among folders they merely own (spec 16/19).
+                    val albumRepo = remember {
+                        com.gratia.music.data.repository.SavedAlbumRepository(
+                            GratiaApp.instance.database.savedAlbumDao()
+                        )
+                    }
+                    val savedAlbums by albumRepo.savedAlbums.collectAsState(initial = emptyList())
+
+                    if (savedAlbums.isEmpty()) {
                         EmptyStateView(
                             icon = Icons.Default.Album,
-                            headline = "No albums found",
-                            description = "Albums will appear here automatically."
+                            headline = "No saved albums yet",
+                            description = "Save an album from its page to keep it here. Albums on this device are under Local Music."
                         )
                     } else {
                         val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
@@ -538,28 +590,58 @@ fun LibrarySubView(
                             contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                         ) {
-                            items(albums) { album ->
-                                val coverArtPath = allSongs.firstOrNull { it.album == album && it.coverArtPath != null }?.coverArtPath
+                            items(savedAlbums, key = { it.remoteId }) { album ->
                                 AppleListRow(
-                                    title = album,
+                                    title = album.title,
+                                    subtitle = listOfNotNull(album.artistName, album.year)
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.joinToString(" · "),
                                     leadingContent = {
-                                        CoverArtImage(coverArtPath = coverArtPath, title = album, size = 56.dp, cornerRadius = 6.dp)
+                                        if (album.artworkUrl != null) {
+                                            coil.compose.SubcomposeAsyncImage(
+                                                model = com.gratia.music.ui.components.rememberArtworkRequest(
+                                                    album.artworkUrl,
+                                                    sizePx = 240,
+                                                    crossfadeMs = 200
+                                                ),
+                                                contentDescription = album.title,
+                                                modifier = Modifier
+                                                    .size(56.dp)
+                                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                            )
+                                        } else {
+                                            CoverArtImage(
+                                                coverArtPath = null,
+                                                title = album.title,
+                                                size = 56.dp,
+                                                cornerRadius = 6.dp
+                                            )
+                                        }
                                     },
-                                    onClick = { onNavigateToAlbum(album) }
+                                    onClick = { onNavigateToRemoteAlbum(album.remoteId) }
                                 )
                             }
                         }
                     }
                 }
                 "Artists" -> {
-                    val artists = remember(allSongs) { 
-                        allSongs.flatMap { com.gratia.music.utils.ArtistParser.parseArtists(it.artist) }.distinct().sorted() 
+                    // Saved remote artists only, read from the actual saved state
+                    // — never from "this artist was viewed recently", and never
+                    // from the scanned local collection (spec 15/18). An artist
+                    // derived off the phone's files is a different object from a
+                    // remote channel the listener bookmarked, and Local Music →
+                    // Artists is where the former lives.
+                    val savedRepo = remember {
+                        com.gratia.music.data.repository.SavedArtistRepository(GratiaApp.instance.database.savedArtistDao())
                     }
-                    if (artists.isEmpty()) {
+                    val savedArtists by savedRepo.savedArtists.collectAsState(initial = emptyList())
+
+                    if (savedArtists.isEmpty()) {
                         EmptyStateView(
                             icon = Icons.Default.Person,
-                            headline = "No artists found",
-                            description = "Artists will appear here automatically."
+                            headline = "No saved artists yet",
+                            description = "Save an artist from their page to keep it here. Artists on this device are under Local Music."
                         )
                     } else {
                         val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
@@ -567,14 +649,28 @@ fun LibrarySubView(
                             contentPadding = PaddingValues(bottom = bottomInset + GratiaTheme.spacing.heroLarge, top = GratiaTheme.spacing.small, start = GratiaTheme.spacing.large, end = GratiaTheme.spacing.large),
                             verticalArrangement = Arrangement.spacedBy(GratiaTheme.spacing.mediumSmall)
                         ) {
-                            items(artists) { artist ->
-                                val coverArtPath = allSongs.firstOrNull { com.gratia.music.utils.ArtistParser.parseArtists(it.artist).contains(artist) && it.coverArtPath != null }?.coverArtPath
+                            items(savedArtists, key = { it.remoteId }) { saved ->
                                 AppleListRow(
-                                    title = artist,
+                                    title = saved.name,
                                     leadingContent = {
-                                        ArtistRowImage(artistName = artist, fallbackPath = coverArtPath, size = 56.dp)
+                                        if (saved.artworkUrl != null) {
+                                            coil.compose.SubcomposeAsyncImage(
+                                                model = com.gratia.music.ui.components.rememberArtworkRequest(
+                                                    saved.artworkUrl,
+                                                    sizePx = 240,
+                                                    crossfadeMs = 200
+                                                ),
+                                                contentDescription = saved.name,
+                                                modifier = Modifier
+                                                    .size(56.dp)
+                                                    .clip(androidx.compose.foundation.shape.CircleShape),
+                                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                            )
+                                        } else {
+                                            ArtistRowImage(artistName = saved.name, fallbackPath = null, size = 56.dp)
+                                        }
                                     },
-                                    onClick = { onNavigateToArtist(artist) }
+                                    onClick = { onNavigateToRemoteArtist(saved.remoteId) }
                                 )
                             }
                         }

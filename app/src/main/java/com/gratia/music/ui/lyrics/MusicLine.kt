@@ -48,18 +48,11 @@ fun MusicLine(
     clock: State<Long>,
     reduceAnimation: Boolean = false
 ) {
-    val swell by animateFloatAsState(
-        targetValue = if (isActiveLine) 1f else 0f,
-        animationSpec = if (reduceAnimation) {
-            snap()
-        } else {
-            tween(
-                durationMillis = if (isActiveLine) 400 else 350,
-                easing = LYRIC_EASING
-            )
-        },
-        label = "GapSwell"
-    )
+    // The shared temporary-event entrance/exit (see [rememberTransientSwell]).
+    // Deliberately the same call the backing-vocal overlay makes, so a break and
+    // an answering vocal animate identically rather than merely similarly
+    // (spec 5/23).
+    val swell = rememberTransientSwell(isActiveLine, reduceAnimation, "GapSwell")
 
     val until = nextStartMs ?: (line.timeMs + GAP_FALLBACK_MS)
     val span = (until - line.timeMs).coerceAtLeast(1L)

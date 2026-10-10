@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.components.CoverArtImage
 import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.components.GratiaText
@@ -112,7 +113,7 @@ fun AlbumDetailScreen(
                         GratiaButton(
                             text = "Play",
                             icon = Icons.Default.PlayArrow,
-                            onClick = { if (albumSongs.isNotEmpty()) playerViewModel.playSong(albumSongs.first(), albumSongs) },
+                            onClick = { if (albumSongs.isNotEmpty()) playerViewModel.playSong(albumSongs.first(), albumSongs, PlaybackOrigin.ALBUM) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -126,7 +127,7 @@ fun AlbumDetailScreen(
                     index = index,
                     isActive = currentSong?.id == song.id,
                     isPlaying = currentSong?.id == song.id && isPlaying,
-                    onClick = { playerViewModel.playSong(song, albumSongs) },
+                    onClick = { playerViewModel.playSong(song, albumSongs, PlaybackOrigin.ALBUM) },
                     onMoreClick = {},
                     modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
                 )

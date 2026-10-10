@@ -96,7 +96,9 @@ class SourceLayerTest {
     fun `album agreement beats a one-second-nearer runtime`() {
         val albumCut = track("Song", "Artist", "4:00", album = "The Album")
         val otherCut = track("Song", "Artist", "3:59", album = "Compilation")
-        val wanted = target("Song", "Artist", 240)
+        // The target must name the release for "album agreement" to mean
+        // anything — without it neither candidate has an album to agree with.
+        val wanted = target("Song", "Artist", 240, album = "The Album")
         val ranked = TrackMatcher.ranked(listOf(otherCut, albumCut), wanted)
         assertTrue(ranked.first() === albumCut)
     }

@@ -43,7 +43,7 @@ fun rememberArtworkRequest(
     return remember(coverArtPath, sizePx, crossfadeMs) {
         val isHttp = coverArtPath?.startsWith("http") == true
         val data: Any? = when {
-            isHttp -> artworkAtSize(coverArtPath, sizePx)
+            isHttp -> upgradedArtworkUrl(coverArtPath, sizePx)
             !coverArtPath.isNullOrBlank() && File(coverArtPath).exists() -> File(coverArtPath)
             else -> null
         }
@@ -51,6 +51,11 @@ fun rememberArtworkRequest(
             ImageRequest.Builder(context)
                 .data(it)
                 .size(sizePx)
+                // One disk entry per asset rather than one per drawn size — see
+                // [artworkCacheKey]. Memory keys stay size-aware.
+                .apply {
+                    artworkCacheKey(coverArtPath)?.let { key -> diskCacheKey(key) }
+                }
                 .crossfade(crossfadeMs)
                 .build()
         }

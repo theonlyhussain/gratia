@@ -3,6 +3,7 @@ package com.gratia.music.provider
 import android.content.Context
 import android.util.Log
 import com.gratia.music.data.model.SongEntity
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
@@ -19,6 +20,13 @@ class ProviderManager(
          * not last week's list.
          */
         private const val HOME_CACHE_TTL_MS = 15 * 60 * 1000L
+
+        /**
+         * How long a category's cover is trusted. Long, because it is a mood
+         * tile, not a release: the point of the TTL is that a re-worn category
+         * eventually picks up fresh artwork, not that Explore chases it.
+         */
+        private const val ARTWORK_TTL_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     val youtubeMusicProvider = YouTubeMusicProvider()
@@ -134,14 +142,19 @@ class ProviderManager(
      */
     suspend fun getHomeCached(limit: Int = 8, forceRefresh: Boolean = false): List<RemoteHomeSection> {
         val cached = homeCache
-        if (!forceRefresh && cached != null && isFresh(cached.at)) return cached.sections
+        if (!forceRefresh && cached != null && isFresh(cached.at)) {
+            Log.d(TAG, "HOME_CACHE_HIT shelves=${cached.sections.size}")
+            return cached.sections
+        }
 
         return homeLock.withLock {
             val current = homeCache
             if (!forceRefresh && current != null && isFresh(current.at)) {
+                Log.d(TAG, "HOME_CACHE_HIT shelves=${current.sections.size}")
                 return@withLock current.sections
             }
 
+            Log.d(TAG, if (forceRefresh) "HOME_REFRESH" else "HOME_CACHE_MISS")
             val fresh = try {
                 youtubeMusicProvider.getHome(limit)
             } catch (e: Exception) {
@@ -182,14 +195,19 @@ class ProviderManager(
      */
     suspend fun getBrowseCategoriesCached(forceRefresh: Boolean = false): List<BrowseCategory> {
         val cached = categoriesCache
-        if (!forceRefresh && cached != null && isFresh(cached.at)) return cached.items
+        if (!forceRefresh && cached != null && isFresh(cached.at)) {
+            Log.d(TAG, "EXPLORE_CACHE_HIT categories=${cached.items.size}")
+            return cached.items
+        }
 
         return categoriesLock.withLock {
             val current = categoriesCache
             if (!forceRefresh && current != null && isFresh(current.at)) {
+                Log.d(TAG, "EXPLORE_CACHE_HIT categories=${current.items.size}")
                 return@withLock current.items
             }
 
+            Log.d(TAG, if (forceRefresh) "EXPLORE_REFRESH" else "EXPLORE_CACHE_MISS")
             val fresh = try {
                 youtubeMusicProvider.getBrowseCategories()
             } catch (e: Exception) {
@@ -199,10 +217,163 @@ class ProviderManager(
 
             if (fresh.isNotEmpty()) {
                 categoriesCache = CachedCategories(fresh, System.currentTimeMillis())
+                // The taxonomy just changed: anything resolved for a category
+                // that is no longer offered is dropped rather than kept warm
+                // for a screen that can never ask for it.
+                pruneCategoryArtwork(fresh.map { it.id }.toSet())
                 fresh
             } else {
                 current?.items ?: emptyList()
             }
+        }
+    }
+
+    // ---- Explore category artwork -------------------------------------------
+
+    /**
+     * Representative artwork per category, resolved once and held for the
+     * session. YouTube's mood/genre buttons carry no image of their own, so the
+     * only honest source is the category's own page: the first playlist or album
+     * it holds stands in for the category, and the tile is drawn from that rather
+     * than from an invented gradient.
+     *
+     * Resolution is serialised on [artworkLock] on purpose. Explore can ask for a
+     * dozen categories at once, and firing a dozen browse requests concurrently
+     * is exactly the load the endpoint is unhappy about — one at a time, cached,
+     * is both gentler and enough, since the tiles fade their covers in as they
+     * arrive.
+     */
+    private val categoryArtwork = ConcurrentHashMap<String, String>()
+    private val categoryArtworkFetchedAt = ConcurrentHashMap<String, Long>()
+    private val artworkLock = Mutex()
+    private val artworkDiskLoaded = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * The artwork already known for each category, synchronously — the frame
+     * Explore paints on its first composition can therefore draw real covers
+     * without awaiting a single request.
+     */
+    fun cachedCategoryArtwork(): Map<String, String> = categoryArtwork.toMap()
+
+    /**
+     * Loads the on-disk category artwork index into memory. Once per process;
+     * cheap to call from a screen's effect every time it is composed.
+     */
+    suspend fun primeCategoryArtwork() {
+        if (!artworkDiskLoaded.compareAndSet(false, true)) return
+        try {
+            com.gratia.music.data.SettingsDataStore(context).categoryArtworkFlow.first()
+                .forEach { (id, cached) ->
+                    categoryArtwork.putIfAbsent(id, cached.url)
+                    categoryArtworkFetchedAt.putIfAbsent(id, cached.fetchedAtMs)
+                }
+            Log.d(TAG, "CATEGORY_ARTWORK_CACHE_WARM entries=${categoryArtwork.size}")
+        } catch (e: Exception) {
+            Log.w(TAG, "primeCategoryArtwork failed: ${e.message}")
+        }
+    }
+
+    private suspend fun pruneCategoryArtwork(liveIds: Set<String>) {
+        val stale = categoryArtwork.keys.filterNot { it in liveIds }
+        if (stale.isEmpty()) return
+        stale.forEach {
+            categoryArtwork.remove(it)
+            categoryArtworkFetchedAt.remove(it)
+        }
+        runCatching {
+            val settings = com.gratia.music.data.SettingsDataStore(context)
+            settings.putCategoryArtwork(emptyMap(), liveCategoryIds = liveIds)
+        }
+    }
+
+    /**
+     * A representative cover for one category.
+     *
+     * Resolution order is the whole point: the category's own thumbnail, then
+     * whatever was already resolved in this process or a previous one, then a
+     * lookup — and only the lookup costs anything. The lookup is serialised on
+     * [artworkLock] on purpose, because Explore asks for a dozen categories at
+     * once and a dozen concurrent browse requests is exactly the load this
+     * endpoint is unhappy about.
+     */
+    suspend fun getCategoryArtwork(category: BrowseCategory, forceRefresh: Boolean = false): String? {
+        category.thumbnailUrl?.takeIf { it.isNotBlank() }?.let {
+            Log.d(TAG, "CATEGORY_ARTWORK_CACHE_HIT source=category id=${category.id}")
+            return it
+        }
+
+        awaitArtworkWarm()
+
+        val known = categoryArtwork[category.id]
+        val knownAt = categoryArtworkFetchedAt[category.id] ?: 0L
+        if (!forceRefresh && !known.isNullOrBlank() &&
+            System.currentTimeMillis() - knownAt < ARTWORK_TTL_MS
+        ) {
+            Log.d(TAG, "CATEGORY_ARTWORK_CACHE_HIT source=store id=${category.id}")
+            return known
+        }
+
+        return artworkLock.withLock {
+            val recheck = categoryArtwork[category.id]
+            val recheckAt = categoryArtworkFetchedAt[category.id] ?: 0L
+            if (!forceRefresh && !recheck.isNullOrBlank() &&
+                System.currentTimeMillis() - recheckAt < ARTWORK_TTL_MS
+            ) {
+                Log.d(TAG, "CATEGORY_ARTWORK_CACHE_HIT source=store id=${category.id}")
+                return@withLock recheck
+            }
+
+            Log.d(TAG, "CATEGORY_ARTWORK_LOAD id=${category.id}")
+            val art = try {
+                youtubeMusicProvider.getBrowsePage(category).sections
+                    .asSequence()
+                    .flatMap { it.entries.asSequence() }
+                    .mapNotNull { entry ->
+                        when (entry) {
+                            is BrowseEntry.Album -> entry.album.artworkUrl
+                            is BrowseEntry.Playlist -> entry.playlist.artworkUrl
+                            is BrowseEntry.Artist -> entry.artist.artworkUrl
+                            is BrowseEntry.Track -> entry.track.artworkUrl
+                        }
+                    }
+                    .firstOrNull { !it.isNullOrBlank() }
+            } catch (e: Exception) {
+                Log.w(TAG, "CATEGORY_ARTWORK_FAIL id=${category.id} ${e.message}")
+                null
+            }
+
+            if (art != null) {
+                val now = System.currentTimeMillis()
+                categoryArtwork[category.id] = art
+                categoryArtworkFetchedAt[category.id] = now
+                runCatching {
+                    com.gratia.music.data.SettingsDataStore(context).putCategoryArtwork(
+                        mapOf(
+                            category.id to com.gratia.music.data.SettingsDataStore.CachedCategoryArtwork(
+                                url = art,
+                                fetchedAtMs = now,
+                            )
+                        )
+                    )
+                }
+            } else {
+                // Remember the miss for the session only. A category with no
+                // resolvable cover should not be re-asked on every scroll, but
+                // a temporary failure should not be remembered for a week.
+                categoryArtworkFetchedAt[category.id] = 0L
+            }
+            art
+        }
+    }
+
+    /** Waits for the on-disk index if a caller raced ahead of the priming call. */
+    private suspend fun awaitArtworkWarm() {
+        if (artworkDiskLoaded.get() && categoryArtwork.isEmpty()) {
+            // Primed and genuinely empty: nothing to wait for.
+            return
+        }
+        if (!artworkDiskLoaded.get()) {
+            primeCategoryArtwork()
         }
     }
 
@@ -217,7 +388,19 @@ class ProviderManager(
         return if (providerType == MusicProviderType.YOUTUBE_MUSIC) {
             try {
                 val stream = com.gratia.music.provider.ytmusic.innertube.StreamResolver.resolveForDownload(videoId, maxKbps)
-                PlaybackSource(videoId, stream.url)
+                // Carry the *resolved* format through: the download's codec,
+                // container and bitrate are facts about the bytes that were
+                // kept, and they are what lets the player say "Downloaded ·
+                // AAC · 256 kbps" truthfully instead of only naming the
+                // source. Dropping them here was why every download reported
+                // no format at all.
+                PlaybackSource(
+                    videoId = videoId,
+                    streamUrl = stream.url,
+                    mimeType = stream.downloadMimeType,
+                    format = stream.downloadExtension,
+                    bitrate = stream.kbps,
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "resolveForDownload failed", e)
                 null

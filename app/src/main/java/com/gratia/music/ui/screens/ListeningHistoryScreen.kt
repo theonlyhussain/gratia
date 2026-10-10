@@ -1,87 +1,77 @@
 package com.gratia.music.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.gratia.music.GratiaApp
-import com.gratia.music.data.model.ArtistListenSummary
-import com.gratia.music.data.model.DailyListeningSummary
-import com.gratia.music.data.model.TrackListenSummary
-import com.gratia.music.data.repository.ListeningEventRepository
+import com.gratia.music.data.model.PlaybackHistoryEntity
+import com.gratia.music.data.repository.PlaybackHistoryRepository
+import com.gratia.music.player.PlayerViewModel
 import com.gratia.music.ui.components.AppleLargeTitleHeader
+import com.gratia.music.ui.components.CoverArtImage
+import com.gratia.music.ui.components.formatListeningDuration
+import com.gratia.music.ui.components.GratiaEmptyState
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
-import kotlin.math.max
 
-enum class TimePeriod(val displayName: String) {
-    TODAY("Today"),
-    WEEK("Week"),
-    MONTH("Month"),
-    ALL_TIME("All Time")
-}
-
+/**
+ * The full listening timeline behind Home's Recently Played shelf (spec 22–24).
+ *
+ * One chronological list of every recorded playback — online, local and
+ * downloaded in one source-aware history, grouped by the days they happened.
+ * A row plays its recorded track; a row can be removed; the whole timeline can
+ * be cleared with a confirmation that says exactly what clearing does.
+ *
+ * Clearing this timeline deliberately does NOT touch the listening aggregates
+ * in `listening_events` (spec 123): the stats card, Replay and the daily
+ * aggregates are measurements of time spent listening, and "remove this play
+ * from my timeline" is not a request to rewrite them. The dialog states the
+ * policy instead of leaving the listener to guess.
+ */
 @Composable
 fun ListeningHistoryScreen(
+    playerViewModel: PlayerViewModel,
     onNavigateBack: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    val listeningRepo = remember { ListeningEventRepository(GratiaApp.instance.database.listeningEventDao()) }
-
-    var selectedPeriod by remember { mutableStateOf(TimePeriod.TODAY) }
-    var totalSeconds by remember { mutableStateOf(0L) }
-    var topArtists by remember { mutableStateOf<List<ArtistListenSummary>>(emptyList()) }
-    var topTracks by remember { mutableStateOf<List<TrackListenSummary>>(emptyList()) }
-    var dailySummaries by remember { mutableStateOf<List<DailyListeningSummary>>(emptyList()) }
-    var showClearDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(selectedPeriod) {
-        withContext(Dispatchers.IO) {
-            val now = System.currentTimeMillis()
-            val startTimestamp = when (selectedPeriod) {
-                TimePeriod.TODAY -> LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                TimePeriod.WEEK -> LocalDate.now().minusDays(6).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                TimePeriod.MONTH -> LocalDate.now().minusDays(29).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                TimePeriod.ALL_TIME -> 0L
-            }
-
-            totalSeconds = listeningRepo.getTotalListeningSeconds(startTimestamp, now)
-            topArtists = listeningRepo.getTopArtists(startTimestamp, now, limit = 5)
-            topTracks = listeningRepo.getTopTracks(startTimestamp, now, limit = 5)
-            
-            val days = when (selectedPeriod) {
-                TimePeriod.TODAY -> 1
-                TimePeriod.WEEK -> 7
-                TimePeriod.MONTH -> 30
-                TimePeriod.ALL_TIME -> 30 // Fallback for charts if needed
-            }
-            dailySummaries = listeningRepo.getDailySummaries(days)
-        }
+    val historyRepository = remember {
+        PlaybackHistoryRepository(GratiaApp.instance.database.playbackHistoryDao())
     }
+    val entries by historyRepository.all(limit = 2000).collectAsState(initial = emptyList())
+    var showClearDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val bottomInset = com.gratia.music.ui.LocalBottomPadding.current
+
+    // Grouped by real date boundaries, computed once per list change — the
+    // grouping is presentation, so it lives here and not in the repository.
+    val groups = remember(entries) { groupByDay(entries) }
 
     LazyColumn(
         modifier = Modifier
@@ -95,297 +85,75 @@ fun ListeningHistoryScreen(
                 title = "Listening History",
                 onBack = onNavigateBack
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
         }
 
-        item {
-            // Time Period Selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TimePeriod.values().forEach { period ->
-                    val isSelected = selectedPeriod == period
-                    Box(
+        if (entries.isEmpty()) {
+            item {
+                Spacer(Modifier.height(48.dp))
+                GratiaEmptyState(
+                    icon = androidx.compose.material.icons.Icons.Default.History,
+                    headline = "Nothing played yet",
+                    description = "Songs you listen to will show up here, whichever source they come from.",
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            groups.forEach { group ->
+                item(key = "hdr_${group.label}") {
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isSelected) GratiaTheme.colors.accent else GratiaTheme.colors.surface)
-                            .clickable { selectedPeriod = period }
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = period.displayName,
-                            color = if (isSelected) GratiaTheme.colors.background else GratiaTheme.colors.textPrimary,
+                            text = group.label,
                             fontFamily = Inter,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 14.sp
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = GratiaTheme.colors.textSecondary
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = formatListeningDuration(group.entries.sumOf { it.listenedSeconds }),
+                            fontFamily = Inter,
+                            fontSize = 12.sp,
+                            color = GratiaTheme.colors.textSecondary
                         )
                     }
                 }
-            }
-            Spacer(Modifier.height(32.dp))
-        }
-
-        if (totalSeconds == 0L) {
-            item {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Not enough history to show", fontFamily = SpaceGrotesk, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GratiaTheme.colors.textPrimary)
-                        Spacer(Modifier.height(8.dp))
-                        Text("Start listening to build your listening statistics.", fontFamily = Inter, fontSize = 14.sp, color = GratiaTheme.colors.textSecondary, textAlign = TextAlign.Center)
-                    }
+                itemsIndexed(
+                    group.entries,
+                    key = { _, entry -> entry.id }
+                ) { _, entry ->
+                    HistoryRow(
+                        entry = entry,
+                        onPlay = { playerViewModel.playFromHistory(entry) },
+                        onRemove = {
+                            scope.launch { historyRepository.delete(entry.id) }
+                        }
+                    )
                 }
             }
-        } else {
+
             item {
-                // Overview Visualization
-                Box(
+                Spacer(Modifier.height(24.dp))
+                TextButton(
+                    onClick = { showClearDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(16.dp))
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(GratiaTheme.colors.surface)
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val hours = totalSeconds / 3600
-                        val mins = (totalSeconds % 3600) / 60
-                        
-                        Text(
-                            text = if (hours > 0) "${hours}h ${mins}m" else "${mins}m",
-                            fontFamily = SpaceGrotesk,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 32.sp,
-                            color = GratiaTheme.colors.accent
-                        )
-                        Text(
-                            text = "listened ${selectedPeriod.displayName.lowercase()}",
-                            fontFamily = Inter,
-                            fontSize = 14.sp,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                        
-                        if (selectedPeriod == TimePeriod.WEEK && dailySummaries.isNotEmpty()) {
-                            Spacer(Modifier.height(24.dp))
-                            WeekBarChart(dailySummaries = dailySummaries)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-            }
-
-            item {
-                // Summary Stats
-                val daysCount = when(selectedPeriod) {
-                    TimePeriod.TODAY -> 1
-                    TimePeriod.WEEK -> 7
-                    TimePeriod.MONTH -> 30
-                    TimePeriod.ALL_TIME -> max(1, dailySummaries.size)
-                }
-                val avgMins = (totalSeconds / 60) / daysCount
-                
-                var mostActiveDayStr = "-"
-                if (dailySummaries.isNotEmpty()) {
-                    val maxDay = dailySummaries.maxByOrNull { it.listeningSeconds }
-                    if (maxDay != null && maxDay.listeningSeconds > 0) {
-                        mostActiveDayStr = maxDay.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    SummaryCard(title = "Daily Avg", value = "${avgMins}m", modifier = Modifier.weight(1f))
-                    SummaryCard(title = "Most Active", value = mostActiveDayStr, modifier = Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(24.dp))
-            }
-
-            if (topArtists.isNotEmpty()) {
-                item {
-                    Text(
-                        "TOP ARTISTS",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(16.dp))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(GratiaTheme.colors.surface)
-                            .padding(vertical = 8.dp)
-                    ) {
-                        topArtists.forEachIndexed { index, artistSummary ->
-                            val percent = if (totalSeconds > 0) ((artistSummary.totalSeconds.toFloat() / totalSeconds) * 100).toInt() else 0
-                            val h = artistSummary.totalSeconds / 3600
-                            val m = (artistSummary.totalSeconds % 3600) / 60
-                            val timeStr = if (h > 0) "${h}h ${m}m" else "${m}m"
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${index + 1}",
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier.width(24.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = artistSummary.artist,
-                                        fontFamily = Inter,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp,
-                                        color = GratiaTheme.colors.textPrimary
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    LinearProgressIndicator(
-                                        progress = { percent / 100f },
-                                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                                        color = GratiaTheme.colors.accent,
-                                        trackColor = GratiaTheme.colors.background
-                                    )
-                                }
-                                Spacer(Modifier.width(16.dp))
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = timeStr,
-                                        fontFamily = SpaceGrotesk,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = GratiaTheme.colors.textPrimary
-                                    )
-                                    Text(
-                                        text = "$percent%",
-                                        fontFamily = Inter,
-                                        fontSize = 12.sp,
-                                        color = GratiaTheme.colors.textSecondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                }
-            }
-
-            if (topTracks.isNotEmpty()) {
-                item {
-                    Text(
-                        "TOP TRACKS",
-                        fontFamily = Inter,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp,
-                        color = GratiaTheme.colors.textSecondary,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(16.dp))
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(GratiaTheme.colors.surface)
-                            .padding(vertical = 8.dp)
-                    ) {
-                        topTracks.forEachIndexed { index, trackSummary ->
-                            val h = trackSummary.totalSeconds / 3600
-                            val m = (trackSummary.totalSeconds % 3600) / 60
-                            val timeStr = if (h > 0) "${h}h ${m}m" else "${m}m"
-
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "${index + 1}",
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = GratiaTheme.colors.textSecondary,
-                                    modifier = Modifier.width(24.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = trackSummary.title,
-                                        fontFamily = Inter,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 14.sp,
-                                        color = GratiaTheme.colors.textPrimary,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = trackSummary.artist,
-                                        fontFamily = Inter,
-                                        fontSize = 12.sp,
-                                        color = GratiaTheme.colors.textSecondary,
-                                        maxLines = 1,
-                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                                    )
-                                }
-                                Spacer(Modifier.width(16.dp))
-                                Text(
-                                    text = timeStr,
-                                    fontFamily = SpaceGrotesk,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = GratiaTheme.colors.textPrimary
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(32.dp))
-                }
-            }
-        }
-
-        item {
-            // Clear History Button
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                TextButton(
-                    onClick = { showClearDialog = true },
-                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        "Clear Listening History",
+                        "Clear all history",
                         color = GratiaTheme.colors.error,
                         fontFamily = Inter,
                         fontWeight = FontWeight.Medium
                     )
                 }
+                Spacer(Modifier.height(32.dp))
             }
-            Spacer(Modifier.height(64.dp))
         }
     }
 
@@ -394,7 +162,7 @@ fun ListeningHistoryScreen(
             onDismissRequest = { showClearDialog = false },
             title = {
                 Text(
-                    "Clear Listening History?",
+                    "Clear listening history?",
                     color = GratiaTheme.colors.textPrimary,
                     fontFamily = SpaceGrotesk,
                     fontWeight = FontWeight.Bold
@@ -402,28 +170,18 @@ fun ListeningHistoryScreen(
             },
             text = {
                 Text(
-                    "This will remove your listening statistics and listening-based recommendation data. Your music, playlists, profile, and app settings will not be affected.",
+                    "This removes every entry from your playback timeline — the Recently Played shelf and this list. Your listening statistics are measurements of real time and stay as they are.",
                     color = GratiaTheme.colors.textSecondary,
                     fontFamily = Inter
                 )
             },
             containerColor = GratiaTheme.colors.surface,
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch(Dispatchers.IO) {
-                            listeningRepo.clearHistory()
-                            
-                            // Re-fetch to clear UI
-                            totalSeconds = 0L
-                            topArtists = emptyList()
-                            topTracks = emptyList()
-                            dailySummaries = emptyList()
-                        }
-                        showClearDialog = false
-                    }
-                ) {
-                    Text("Clear History", color = GratiaTheme.colors.error, fontFamily = Inter, fontWeight = FontWeight.Bold)
+                TextButton(onClick = {
+                    scope.launch { historyRepository.clear() }
+                    showClearDialog = false
+                }) {
+                    Text("Clear history", color = GratiaTheme.colors.error, fontFamily = Inter, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -435,67 +193,106 @@ fun ListeningHistoryScreen(
     }
 }
 
+/** One playback, one row: snapshot artwork, truthful source, real time. */
 @Composable
-fun SummaryCard(title: String, value: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .border(1.dp, GratiaTheme.colors.glassBorder, RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
-            .background(GratiaTheme.colors.surface)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun HistoryRow(
+    entry: PlaybackHistoryEntity,
+    onPlay: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val sourceLabel = when (entry.source) {
+        com.gratia.music.data.model.MusicSource.YOUTUBE_MUSIC.name -> "YouTube Music"
+        com.gratia.music.data.model.MusicSource.DOWNLOADED_REMOTE.name -> "Downloaded"
+        com.gratia.music.data.model.MusicSource.LOCAL.name -> "Local"
+        else -> null
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onPlay)
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = value,
-            fontFamily = SpaceGrotesk,
-            fontWeight = FontWeight.Bold,
-            fontSize = 20.sp,
-            color = GratiaTheme.colors.textPrimary
+        CoverArtImage(
+            coverArtPath = entry.artworkUrl,
+            title = entry.title,
+            artist = entry.artist,
+            size = 48.dp,
+            cornerRadius = 8.dp,
+            fontSize = 14.sp
         )
-        Text(
-            text = title,
-            fontFamily = Inter,
-            fontSize = 12.sp,
-            color = GratiaTheme.colors.textSecondary
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = entry.title,
+                fontFamily = SpaceGrotesk,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.sp,
+                color = GratiaTheme.colors.textPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = entry.artist,
+                    fontFamily = Inter,
+                    fontSize = 12.sp,
+                    color = GratiaTheme.colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (sourceLabel != null) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "· $sourceLabel",
+                        fontFamily = Inter,
+                        fontSize = 11.sp,
+                        color = GratiaTheme.colors.textSecondary.copy(alpha = 0.8f)
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            imageVector = Icons.Default.Close,
+            contentDescription = "Remove from history",
+            tint = GratiaTheme.colors.textSecondary.copy(alpha = 0.5f),
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .clickable(onClick = onRemove)
+                .padding(8.dp)
         )
     }
 }
 
-@Composable
-fun WeekBarChart(dailySummaries: List<DailyListeningSummary>) {
-    // A simple representation of a bar chart
-    val maxSeconds = dailySummaries.maxOfOrNull { it.listeningSeconds } ?: 1L
-    
-    // Sort so it's chronologically ordered for the week
-    val sorted = dailySummaries.sortedBy { it.dateString }
-    
-    Row(
-        modifier = Modifier.fillMaxWidth().height(100.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        sorted.forEach { summary ->
-            val heightFraction = if (maxSeconds > 0) summary.listeningSeconds.toFloat() / maxSeconds else 0f
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Bottom,
-                modifier = Modifier.fillMaxHeight()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(24.dp)
-                        .fillMaxHeight(heightFraction.coerceAtLeast(0.05f))
-                        .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                        .background(GratiaTheme.colors.accent)
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = summary.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault()).take(3),
-                    fontFamily = Inter,
-                    fontSize = 10.sp,
-                    color = GratiaTheme.colors.textSecondary
-                )
-            }
+/**
+ * Groups plays into real calendar buckets — Today, Yesterday, this week,
+ * then plain dates (spec 22). Pure and deterministic.
+ */
+/** A day's slice of the timeline. */
+internal data class HistoryDayGroup(val label: String, val entries: List<PlaybackHistoryEntity>)
+
+internal fun groupByDay(entries: List<PlaybackHistoryEntity>): List<HistoryDayGroup> {
+    val zone = ZoneId.systemDefault()
+    val today = LocalDate.now(zone)
+    val yesterday = today.minusDays(1)
+
+    val buckets = LinkedHashMap<String, MutableList<Pair<PlaybackHistoryEntity, LocalDate>>>()
+    for (entry in entries) {
+        val date = Instant.ofEpochMilli(entry.playedAt).atZone(zone).toLocalDate()
+        val label = when {
+            date == today -> "Today"
+            date == yesterday -> "Yesterday"
+            date.isAfter(today.minusDays(7)) ->
+                date.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            else -> date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.getDefault()))
         }
+        buckets.getOrPut(label) { mutableListOf() }.add(entry to date)
+    }
+
+    return buckets.map { (label, list) ->
+        HistoryDayGroup(label, list.map { it.first })
     }
 }

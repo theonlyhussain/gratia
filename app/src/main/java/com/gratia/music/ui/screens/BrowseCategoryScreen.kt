@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.provider.BrowseCategory
 import com.gratia.music.provider.BrowseEntry
 import com.gratia.music.provider.BrowsePage
@@ -184,7 +185,7 @@ fun BrowseCategoryScreen(
                                         entry = entry,
                                         currentSongId = currentSong?.id,
                                         isPlaying = isPlaying,
-                                        onPlayTrack = { song -> playerViewModel.playSong(song, trackQueue) },
+                                        onPlayTrack = { song -> playerViewModel.playSong(song, trackQueue, PlaybackOrigin.EXPLORE) },
                                         onNavigateToAlbum = onNavigateToAlbum,
                                         onNavigateToArtist = onNavigateToArtist,
                                         onNavigateToPlaylist = onNavigateToPlaylist

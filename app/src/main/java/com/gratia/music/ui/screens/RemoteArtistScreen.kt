@@ -15,6 +15,8 @@ package com.gratia.music.ui.screens
 
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
+import android.util.Log
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -43,6 +45,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -51,6 +54,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -58,6 +62,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -76,9 +82,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -101,12 +107,17 @@ import coil.request.ImageRequest
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.network.NetworkMonitor
+import com.gratia.music.data.repository.SavedArtistRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.provider.RemoteAlbumSummary
 import com.gratia.music.provider.RemoteArtist
 import com.gratia.music.provider.RemoteTrack
+import com.gratia.music.provider.RemoteDetailMerge
 import com.gratia.music.provider.RemoteTrackMapper
 import com.gratia.music.ui.LocalBottomPadding
+import com.gratia.music.ui.components.DetailHeroArtwork
+import com.gratia.music.ui.components.DetailPageBackground
 import com.gratia.music.ui.components.artworkAtSize
 import com.gratia.music.ui.components.LARGE_ARTWORK_PX
 import com.gratia.music.ui.components.ROW_ARTWORK_PX
@@ -121,9 +132,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
-import com.gratia.music.ui.components.optimizedHazeEffect
+import com.gratia.music.ui.components.shimmer
 
 /** The artist photo, very slightly taller than it is wide — the original ARTIST_PHOTO_RATIO. */
 private const val ARTIST_PHOTO_RATIO = 0.95f
@@ -142,15 +151,22 @@ private val ABOUT_GUTTER = 24.dp + 12.dp
 
 /**
  * How far past the foot of the artwork the title block hangs — the original
- * HEADER_DROP: the title sits on the blurred colour, not on a busy picture.
+ * HEADER_DROP: the title sits on the page's own colour rather than on the
+ * picture, which is why it hangs below the foot of the artwork.
  */
 private val HEADER_DROP = 44.dp
 
-/** How tall the merge glass is — the original MERGE_BAND. */
-private val MERGE_BAND = 320.dp
-
 /** How many of a shelf's cards a detail row shows before it offers Show all. */
 private const val SHELF_ROW_MAX_ITEMS = 5
+
+/**
+ * The vertical rhythm between the artist page's sections (spec B). One token
+ * rather than a different number at each call site: the page used to run its
+ * shelves together at 22dp while Top Songs sat flush against the action row,
+ * which is what made it read as cramped. Every section gap and section top
+ * comes from here, so the rhythm stays even as sections are added or removed.
+ */
+private val SECTION_GAP = 28.dp
 
 /**
  * The remote artist destination, ported from the original artist detail page.
@@ -160,18 +176,20 @@ private const val SHELF_ROW_MAX_ITEMS = 5
  * the picture for the credit line and the Play/Shuffle pair. See
  * [rememberArtworkPalette] for how those are derived and kept legible.
  *
- * It is built in three layers rather than the obvious one, and the order is the
- * whole trick:
+ * It is built in two layers and the order is the trick:
  *
  *  1. [ArtistPageBackground] — the wash and the artwork, and nothing you can read.
- *  2. [MergeBand] — one pane of softening laid across the join.
- *  3. The list — titles, buttons and rows, drawn over the band and so sharp.
+ *  2. The list — titles, buttons and rows, drawn over it and so sharp.
  *
- * Blurring only the artwork leaves the artwork and the page as two surfaces
- * that have been made to *resemble* each other, and the eye finds that edge
- * every time. Colour from the picture is carried down past where the picture
- * ends and the page's colour is carried up into it, and the line that used to
- * be there has nothing left to be a line between.
+ * The photograph is neither blurred nor masked. It is simply allowed to run out:
+ * sharp and opaque through its upper half, then dissolving along an eased alpha
+ * curve until its last row of pixels *is* the colour the page is made of. There
+ * is no join to soften, because at the join the two sides are the same colour.
+ *
+ * An earlier version blurred the artwork instead. That is a different effect and
+ * a worse one: a blurred photograph reads as a load that has not finished, and
+ * it takes the artist's face with it. Softening the picture is not the same as
+ * letting it fade.
  */
 @Composable
 fun RemoteArtistScreen(
@@ -179,7 +197,13 @@ fun RemoteArtistScreen(
     playerViewModel: PlayerViewModel,
     onBack: () -> Unit,
     onNavigateToAlbum: (String) -> Unit = {},
-    onNavigateToArtist: (String) -> Unit = {}
+    onNavigateToArtist: (String) -> Unit = {},
+    /** Opens the full Top Songs list as its own destination (spec G/H). */
+    onShowAllSongs: (playlistId: String?, artistName: String?) -> Unit = { _, _ -> },
+    /** Opens the full Albums list as its own destination. */
+    onShowAllAlbums: (artistName: String?) -> Unit = {},
+    /** Opens the full Singles & EPs list as its own destination. */
+    onShowAllSingles: (artistName: String?) -> Unit = {}
 ) {
     val context = LocalContext.current
     var artist by remember { mutableStateOf<RemoteArtist?>(null) }
@@ -188,32 +212,97 @@ fun RemoteArtistScreen(
     var isOffline by remember { mutableStateOf(false) }
     var refreshNonce by remember { mutableStateOf(0) }
     var selectedSongForMenu by remember { mutableStateOf<SongEntity?>(null) }
+    var showAddToPlaylistFor by remember { mutableStateOf<SongEntity?>(null) }
 
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val favoriteSongIds by playerViewModel.favoriteSongIds.collectAsState()
     val scope = rememberCoroutineScope()
 
+    // Gratia's local saved-artist state. The button is instant: it writes the
+    // local row and flips the icon in the same tap, with no network in the way.
+    val savedArtistRepo = remember { SavedArtistRepository(GratiaApp.instance.database.savedArtistDao()) }
+    val isArtistSaved by remember(channelId) { savedArtistRepo.isSavedFlow(channelId) }
+        .collectAsState(initial = false)
+
+    // Cache-for-offline: a previously saved artist keeps name/artwork here even
+    // when the page itself cannot be fetched (spec 39). The cached data is
+    // used only when the live fetch fails.
+    var cachedSavedArtist by remember(channelId) {
+        mutableStateOf<com.gratia.music.data.model.SavedArtistEntity?>(null)
+    }
+    LaunchedEffect(channelId) {
+        cachedSavedArtist = savedArtistRepo.get(channelId)
+    }
+
+    fun toggleSavedArtist() {
+        val artist = artist
+        scope.launch {
+            if (isArtistSaved) {
+                savedArtistRepo.unsave(channelId)
+            } else {
+                // The saved entry keeps the remote identity plus whatever is on
+                // screen at save time; a later refresh or Library visit fills
+                // the rest. Saving must not depend on the page having finished
+                // loading.
+                savedArtistRepo.save(
+                    remoteId = channelId,
+                    name = artist?.name ?: cachedSavedArtist?.name ?: "Artist",
+                    artworkUrl = artist?.artworkUrl ?: cachedSavedArtist?.artworkUrl,
+                )
+            }
+        }
+    }
+
     val listState = rememberLazyListState()
     val isDark = GratiaTheme.colors.isDark
     val palette = rememberArtworkPalette(artist?.artworkUrl, dark = isDark)
-
-    // the original shelf-grid: tapping a shelf's "Show all" turns the page into
-    // a proper grid of that shelf's contents.
-    var activeShelf by remember(channelId) { mutableStateOf<DiscographyShelf?>(null) }
 
     // Full artist song list, paged from the playlist the page links.
     var allSongs by remember(channelId) { mutableStateOf<List<RemoteTrack>>(emptyList()) }
     var songsContinuation by remember(channelId) { mutableStateOf<String?>(null) }
     var songsLoadingMore by remember { mutableStateOf(false) }
 
+    val artistCache = remember { com.gratia.music.data.cache.ArtistCache() }
+
+    // Cache first, network second. A page visited before renders instantly from
+    // the last answer — the shell of the screen with real data, not a spinner —
+    // and the refresh below replaces it when the network answers (spec 51/52).
+    LaunchedEffect(channelId) {
+        val cached = withContext(Dispatchers.IO) { artistCache.get(channelId) }
+        if (cached != null && artist == null) {
+            Log.d("RemoteArtistScreen", "ARTIST_OPEN id=$channelId source=cache")
+            artist = cached
+            isLoading = false
+            cached.songsPlaylistId?.let { playlistId ->
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        GratiaApp.instance.providerManager.youtubeMusicProvider.getArtistSongs(playlistId)
+                    }
+                }.onSuccess { page ->
+                    if (page.items.isNotEmpty()) {
+                        allSongs = page.items
+                        songsContinuation = page.continuation
+                    }
+                }
+            }
+        } else {
+            Log.d("RemoteArtistScreen", "ARTIST_OPEN id=$channelId source=network")
+        }
+    }
+
     LaunchedEffect(channelId, refreshNonce) {
-        isLoading = true
+        Log.d("RemoteArtistScreen", "ARTIST_FETCH id=$channelId nonce=$refreshNonce")
+        // Only the very first open waits behind a spinner; a cache hit has
+        // already given the listener the page, and the refresh simply improves it.
+        if (artist == null) isLoading = true
         error = null
         isOffline = false
         try {
             if (!NetworkMonitor.isCurrentlyOnline()) {
-                isOffline = true
+                // Offline with a cached page is a usable page, not an error
+                // state — the cache branch above already filled it in.
+                if (artist == null) isOffline = true
                 isLoading = false
                 return@LaunchedEffect
             }
@@ -221,7 +310,23 @@ fun RemoteArtistScreen(
                 GratiaApp.instance.providerManager.youtubeMusicProvider.getArtist(channelId)
             }
             if (res != null) {
-                artist = res
+                Log.d("RemoteArtistScreen", "ARTIST_FETCH_OK id=$channelId songs=${res.topSongs.size} albums=${res.albums.size}")
+                // Merge, never overwrite: a partial refresh must not replace a
+                // known name with "Unknown Artist" or a good cover with null
+                // (spec C/N/O/P). The merged result is what gets cached, so the
+                // cache cannot be poisoned by a partial response either.
+                val merged = RemoteDetailMerge.mergeArtist(artist, res)
+                artist = merged
+                artistCache.put(merged)
+                // Keep the cached saved entry's identity fresh so offline
+                // reopen has a real name and artwork to show (spec 39).
+                if (isArtistSaved) {
+                    savedArtistRepo.save(
+                        remoteId = channelId,
+                        name = res.name,
+                        artworkUrl = res.artworkUrl,
+                    )
+                }
                 // Kick off the full song list in the background — the landing
                 // page only carries the first handful.
                 res.songsPlaylistId?.let { playlistId ->
@@ -237,10 +342,12 @@ fun RemoteArtistScreen(
                     }
                 }
             } else {
-                error = "Couldn't load artist details."
+                // A cached page stands even when the refresh fails — stale
+                // beats blank, and the next open retries.
+                if (artist == null) error = "Couldn't load artist details."
             }
         } catch (e: Exception) {
-            error = "Failed to load artist: ${e.message}"
+            if (artist == null) error = "Failed to load artist: ${e.message}"
         } finally {
             isLoading = false
         }
@@ -272,7 +379,25 @@ fun RemoteArtistScreen(
             onDismiss = { selectedSongForMenu = null },
             onPlayNext = { playerViewModel.playNext(song) },
             onAddToQueue = { playerViewModel.addToQueue(song) },
-            onToggleLike = { playerViewModel.toggleFavorite(song) }
+            onToggleLike = { playerViewModel.toggleFavorite(song) },
+            onAddToPlaylist = {
+                selectedSongForMenu = null
+                showAddToPlaylistFor = song
+            },
+            downloadState = playerViewModel.downloadStateFor(song),
+            onDownload = { playerViewModel.downloadSong(song) },
+            onRemoveDownload = { playerViewModel.removeDownload(song) },
+            // Useful from an artist page; "Go to artist" would be circular.
+            onGoToAlbum = song.providerAlbumId?.takeIf { it.isNotBlank() }?.let { id ->
+                { selectedSongForMenu = null; onNavigateToAlbum(id) }
+            }
+        )
+    }
+
+    showAddToPlaylistFor?.let { song ->
+        com.gratia.music.ui.components.AddToPlaylistSheet(
+            song = song,
+            onDismiss = { showAddToPlaylistFor = null }
         )
     }
 
@@ -280,11 +405,8 @@ fun RemoteArtistScreen(
 
     Box(modifier = Modifier.fillMaxSize().background(palette.background)) {
         when {
-            isLoading && artist == null -> Box(
-                Modifier.fillMaxSize().background(GratiaTheme.colors.background),
-                contentAlignment = Alignment.Center,
-            ) {
-                GratiaLoadingState(message = "Loading artist…")
+            isLoading && artist == null -> {
+                ArtistSkeletonScreen()
             }
             error != null && artist == null -> Box(
                 Modifier.fillMaxSize().background(GratiaTheme.colors.background),
@@ -318,22 +440,17 @@ fun RemoteArtistScreen(
                 }
             }
             else -> {
-                val currentArtist = artist!!
+                // Safe: this branch is only reached when `artist != null` (the
+                // loading and error branches above both require it to be null),
+                // but `!!` converts any future reordering of those branches
+                // into a crash — the crash class this screen is here to end.
+                val currentArtist = artist ?: return@Box
                 val pageSongs = remember(currentArtist, allSongs) {
                     (allSongs.ifEmpty { currentArtist.topSongs })
                         .distinctBy { it.videoId }
                 }
 
-                AnimatedContent(
-                    targetState = activeShelf,
-                    transitionSpec = {
-                        fadeIn(tween(220)) togetherWith fadeOut(tween(180))
-                    },
-                    label = "artist_shelf_transition",
-                    modifier = Modifier.fillMaxSize(),
-                ) { targetShelf ->
-                    if (targetShelf == null) {
-                        ArtistDetailContent(
+                ArtistDetailContent(
                             artist = currentArtist,
                             songs = pageSongs,
                             songsExhausted = songsContinuation == null,
@@ -343,46 +460,65 @@ fun RemoteArtistScreen(
                             currentSong = currentSong,
                             isPlaying = isPlaying,
                             bottomInset = bottomInset,
+                            isSaved = isArtistSaved,
+                            onToggleSaved = { toggleSavedArtist() },
                             onSongClick = { queue, index ->
+                                // An out-of-range tap (stale index after the
+                                // list refreshed under a gesture) must be a
+                                // no-op, not an IndexOutOfBounds crash — the
+                                // one crash class this screen was reworked to
+                                // end (spec 24–31).
                                 val entities = queue.map { RemoteTrackMapper.toSongEntity(it) }
-                                playerViewModel.playSong(entities[index], entities)
+                                val target = entities.getOrNull(index)
+                                    ?: entities.firstOrNull()
+                                    ?: return@ArtistDetailContent
+                                playerViewModel.playSong(target, entities, PlaybackOrigin.ARTIST)
                             },
                             onSongLongPress = { track ->
                                 selectedSongForMenu = RemoteTrackMapper.toSongEntity(track)
                             },
                             onShuffle = { queue ->
                                 val entities = queue.map { RemoteTrackMapper.toSongEntity(it) }
-                                entities.firstOrNull()?.let {
-                                    playerViewModel.playSong(
-                                        it,
-                                        entities.shuffled(),
-                                    )
+                                    .ifEmpty { return@ArtistDetailContent }
+                                playerViewModel.playSong(
+                                    entities.random(),
+                                    entities.shuffled(),
+                                    PlaybackOrigin.ARTIST,
+                                )
+                            },
+                            // "Show all" is real navigation: the list opens as
+                            // its own destination, so Back returns to it rather
+                            // than to this artist page (spec G/H/K).
+                            onShowAllSongs = {
+                                onShowAllSongs(currentArtist.songsPlaylistId, currentArtist.name)
+                            },
+                            onShelfShowAll = { shelf ->
+                                if (shelf.title.contains("single", ignoreCase = true)) {
+                                    onShowAllSingles(currentArtist.name)
+                                } else {
+                                    onShowAllAlbums(currentArtist.name)
                                 }
                             },
-                            onShowAllSongs = { songsLoadingMore = true },
-                            onShelfShowAll = { activeShelf = it },
                             onNavigateToAlbum = onNavigateToAlbum,
                             onNavigateToArtist = onNavigateToArtist,
                         )
-                    } else {
-                        ShelfGridPage(
-                            shelf = targetShelf,
-                            palette = palette,
-                            bottomInset = bottomInset,
-                            onBack = { activeShelf = null },
-                            onAlbumClick = onNavigateToAlbum,
-                        )
-                    }
-                }
             }
         }
 
         // Back arrow over everything, theme-aware tint like the rest of the page.
+        //
+        // The photo is deliberately full-bleed and runs under the status bar —
+        // that is the look. This control is not: it used to sit 4dp from the top
+        // of the *window*, which under edge-to-edge put the circle on top of the
+        // system clock and battery readout. It now clears the status bar and then
+        // takes its own margin, so it is the first thing below the clock rather
+        // than sitting in it.
         IconButton(
-            onClick = { if (activeShelf != null) activeShelf = null else onBack() },
+            onClick = onBack,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 4.dp, top = 4.dp)
+                .statusBarsPadding()
+                .padding(start = 8.dp, top = 6.dp)
                 .background(palette.background.copy(alpha = 0.35f), CircleShape),
         ) {
             Icon(
@@ -411,6 +547,8 @@ private fun ArtistDetailContent(
     currentSong: SongEntity?,
     isPlaying: Boolean,
     bottomInset: androidx.compose.ui.unit.Dp,
+    isSaved: Boolean,
+    onToggleSaved: () -> Unit,
     onSongClick: (List<RemoteTrack>, Int) -> Unit,
     onSongLongPress: (RemoteTrack) -> Unit,
     onShuffle: (List<RemoteTrack>) -> Unit,
@@ -423,22 +561,12 @@ private fun ArtistDetailContent(
         val artHeight = (maxWidth / ARTIST_PHOTO_RATIO)
             .coerceAtMost(maxHeight * 0.6f)
             
-        val hazeState = remember { HazeState() }
-
         ArtistPageBackground(
             artist = artist,
             palette = palette,
             artHeight = artHeight,
             listState = listState,
-            hazeState = hazeState,
             modifier = Modifier.matchParentSize(),
-        )
-
-        MergeBand(
-            palette = palette,
-            artHeight = artHeight,
-            listState = listState,
-            hazeState = hazeState,
         )
 
         LazyColumn(
@@ -450,12 +578,15 @@ private fun ArtistDetailContent(
                 ArtistHeader(artist = artist, palette = palette, artHeight = artHeight)
             }
 
-            // Stat pills only where YouTube provides real values.
+            // Subscriber count only, where YouTube provides a real value.
+            // Monthly listeners was removed by product decision: the number is
+            // platform-wide bookkeeping rather than something the listener can
+            // act on, and it cluttered the header for it. Absent data hides the
+            // pill; it is never invented.
             if (!artist.subscribers.isNullOrBlank()) {
                 item(key = "artist-stats") {
                     ArtistStatsRow(
                         subscribers = artist.subscribers,
-                        monthlyListeners = null,
                         palette = palette,
                     )
                 }
@@ -465,6 +596,8 @@ private fun ArtistDetailContent(
                 item(key = "actions") {
                     ActionRow(
                         palette = palette,
+                        isSaved = isSaved,
+                        onToggleSaved = onToggleSaved,
                         onPlay = { onSongClick(songs, 0) },
                         onShuffle = { onShuffle(songs) },
                         // Halved when an About section follows directly — the
@@ -488,6 +621,7 @@ private fun ArtistDetailContent(
             if (songs.isNotEmpty()) {
                 item(key = "top-songs") {
                     val top = remember(songs) { songs.take(MAX_ARTIST_SONGS) }
+                    Column(Modifier.padding(top = SECTION_GAP)) {
                     SectionHeading(
                         title = "Top songs",
                         palette = palette,
@@ -518,6 +652,7 @@ private fun ArtistDetailContent(
                             }
                         }
                     }
+                    }
                 }
             }
 
@@ -525,7 +660,7 @@ private fun ArtistDetailContent(
             val shelves = artist.discographyShelves()
             items(shelves.size, key = { "shelf_$it" }) { index ->
                 val shelf = shelves[index]
-                Column(Modifier.padding(top = 22.dp)) {
+                Column(Modifier.padding(top = SECTION_GAP)) {
                     SectionHeading(
                         title = shelf.title,
                         palette = palette,
@@ -555,7 +690,7 @@ private fun ArtistDetailContent(
             // Related artists — only real ones from the catalogue.
             if (artist.relatedArtists.isNotEmpty()) {
                 item(key = "related") {
-                    Column(Modifier.padding(top = 22.dp)) {
+                    Column(Modifier.padding(top = SECTION_GAP)) {
                         SectionHeading(title = "Fans also like", palette = palette)
                         LazyRow(
                             contentPadding = PaddingValues(horizontal = PAGE_GUTTER),
@@ -607,12 +742,11 @@ private fun ArtistDetailContent(
  * Everything on the artist page that is colour rather than words: the page wash,
  * and the artwork sitting on top of it.
  *
- * This is the whole of what [MergeBand] softens, and the reason it is a layer of
- * its own: split out, the merge has the join to itself. It carries the
- * artwork's scroll instead of being scrolled: the list owns the gesture and
- * reserves the room, and the picture is offset to follow whatever the list did
- * with item zero. Read in a layer block, so a scroll moves it without
- * recomposing anything.
+ * It is a layer of its own so that the dissolve has the join to itself: the
+ * picture's scroll is carried here rather than scrolled with the list, because
+ * the list owns the gesture and reserves the room. This box is offset to follow
+ * whatever the list did with item zero, so a scroll moves the photograph
+ * without recomposing anything.
  */
 @Composable
 private fun ArtistPageBackground(
@@ -620,139 +754,26 @@ private fun ArtistPageBackground(
     palette: ArtworkPalette,
     artHeight: androidx.compose.ui.unit.Dp,
     listState: LazyListState,
-    hazeState: HazeState,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    Box(modifier.clipToBounds()) {
+        // The wash: one shared implementation for artist, album and playlist,
+        // so the three pages cannot drift apart (spec 70).
+        DetailPageBackground(palette = palette, modifier = Modifier.matchParentSize())
 
-    Box(modifier.clipToBounds().hazeSource(hazeState)) {
-        // The wash: the eased colour the page is made of below the artwork.
-        Canvas(modifier = Modifier.matchParentSize()) {
-            val washFraction = 0.62f
-            drawRect(
-                Brush.verticalGradient(
-                    0f to palette.wash,
-                    washFraction to palette.wash,
-                    lerp(washFraction, 1f, 0.35f) to colorLerp(palette.wash, palette.background, 0.12f),
-                    lerp(washFraction, 1f, 0.70f) to colorLerp(palette.wash, palette.background, 0.55f),
-                    1f to palette.background,
-                ),
-            )
-            blob(palette.accent.copy(alpha = 0.13f), Offset(0.12f, washFraction + 0.08f), 0.80f)
-            blob(palette.elevated.copy(alpha = 0.30f), Offset(0.96f, washFraction + 0.30f), 0.95f)
-        }
-
-        // The artwork, drawn behind the list rather than in it.
-        Box(
-            Modifier
+        // The artwork + dissolve, drawn behind the list rather than in it, and
+        // offset to follow whatever the list did with item zero. This is the
+        // same hero the album and playlist pages use (spec 68/69).
+        DetailHeroArtwork(
+            artworkUrl = artist.artworkUrl,
+            contentDescription = artist.name,
+            palette = palette,
+            modifier = Modifier
                 .fillMaxWidth()
                 .height(artHeight)
                 .offset { IntOffset(0, listState.headerTop(artHeight.toPx()).roundToInt()) },
-        ) {
-            if (!artist.artworkUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(artworkAtSize(artist.artworkUrl, LARGE_ARTWORK_PX))
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = artist.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .matchParentSize()
-                        .then(
-                            if (canBlur) {
-                                // Softened where it meets the page: the merge
-                                // band below carries the colour across the join.
-                                Modifier.blur(24.dp)
-                            } else Modifier
-                        ),
-                )
-            } else {
-                Box(Modifier.matchParentSize().background(palette.elevated))
-            }
-
-            // Shade under the back arrow, drawn in the page's own tint rather
-            // than black, so the themed arrow keeps contrast in light mode.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.28f)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(palette.background.copy(alpha = 0.55f), Color.Transparent),
-                        ),
-                    ),
-            )
-
-            // Settles the foot of the picture onto the colour the page is made
-            // of, so the two sides of the join are already close before the
-            // merge band goes over them — a blur averages what it is given and
-            // cannot invent agreement that isn't there.
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.55f to Color.Transparent,
-                            1.00f to palette.wash.copy(alpha = 0.88f),
-                        ),
-                    ),
-            )
-        }
+        )
     }
-}
-
-/** One mesh lobe: a colour at its centre, gone by [radiusFraction] of the width. */
-private fun DrawScope.blob(color: Color, at: Offset, radiusFraction: Float) {
-    val center = Offset(at.x * size.width, at.y * size.height)
-    val radius = size.width * radiusFraction
-    drawCircle(
-        brush = Brush.radialGradient(
-            colors = listOf(color, color.copy(alpha = 0f)),
-            center = center,
-            radius = radius,
-        ),
-        radius = radius,
-        center = center,
-    )
-}
-
-/**
- * The band laid across the artwork-to-content join.
- *
- * Gratia implements this with Haze blurring the PageBackground layer; Gratia
- * has no Haze dependency, so this is the original own reduceDynamicBlur fallback
- * carried out explicitly: the artwork's foot is already settled onto
- * [ArtworkPalette.wash] inside [ArtistPageBackground], and the band adds the
- * eased colour carry-down from the seam. The list draws over it and stays
- * sharp, exactly as in the original layering.
- */
-@Composable
-private fun MergeBand(
-    palette: ArtworkPalette,
-    artHeight: androidx.compose.ui.unit.Dp,
-    listState: LazyListState,
-    hazeState: HazeState,
-) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(MERGE_BAND)
-            .offset {
-                IntOffset(
-                    x = 0,
-                    y = (
-                        listState.headerTop(artHeight.toPx()) +
-                            artHeight.toPx() - MERGE_BAND.toPx() / 2f
-                        ).roundToInt(),
-                )
-            }
-            .optimizedHazeEffect(hazeState) {
-                // Without this the band draws nothing at all.
-                fallbackTint = dev.chrisbanes.haze.HazeTint(palette.wash.copy(alpha = 0.45f))
-            },
-    )
 }
 
 /** Where the top of the artwork currently is — the original LazyListState.headerTop. */
@@ -791,30 +812,37 @@ private fun ArtistHeader(artist: RemoteArtist, palette: ArtworkPalette, artHeigh
     }
 }
 
-/** "1.2M subscribers" / "3.4M monthly listeners" — real values only. */
+/**
+ * "1.2M subscribers · YouTube" — the catalogue's own count, rendered through
+ * the typed metric so it can only ever be described as what it is (artist
+ * spec 2/3). Monthly listeners is a different metric from a different
+ * surface and is never shown in its place. An unparsable count omits the
+ * chip rather than displaying a guess (artist spec 37).
+ */
 @Composable
 private fun ArtistStatsRow(
     subscribers: String?,
-    monthlyListeners: String?,
     palette: ArtworkPalette,
 ) {
+    val metric = subscribers?.let { raw ->
+        com.gratia.music.data.model.ArtistMetric.parseCompact(raw.substringBefore(' '))?.let { value ->
+            com.gratia.music.data.model.ArtistMetric(
+                value = value,
+                type = com.gratia.music.data.model.ArtistMetricType.SUBSCRIBERS,
+                source = "YouTube",
+            )
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = PAGE_GUTTER, end = PAGE_GUTTER, bottom = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
-        subscribers?.let {
+        metric?.let {
             StatChip(
                 icon = Icons.Filled.Person,
-                text = it.substringBefore(' ') + " subscribers",
-                palette = palette,
-            )
-        }
-        monthlyListeners?.let {
-            StatChip(
-                icon = Icons.Filled.GraphicEq,
-                text = it.substringBefore(' ') + " monthly listeners",
+                text = it.label,
                 palette = palette,
             )
         }
@@ -846,14 +874,32 @@ private fun StatChip(icon: ImageVector, text: String, palette: ArtworkPalette) {
     }
 }
 
-/** Shuffle • Play — the Apple Music action row, in the original glass treatment. */
+/**
+ * Save • Shuffle • Play — the action row with Gratia's local save state on the
+ * left. The + and ✓ swap in place, with a scale bump so the state change is
+ * felt and not merely assumed; the row's meaning stays the listener's own
+ * local follow, never a claim about the remote account.
+ */
 @Composable
 private fun ActionRow(
     palette: ArtworkPalette,
+    isSaved: Boolean,
+    onToggleSaved: () -> Unit,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     bottomSpace: androidx.compose.ui.unit.Dp = 22.dp,
 ) {
+    val context = LocalContext.current
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.5f,
+            stiffness = 400f,
+        ),
+        label = "saveScale",
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -861,6 +907,28 @@ private fun ActionRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(palette.elevated.copy(alpha = 0.75f))
+                .border(0.5.dp, palette.divider, CircleShape)
+                .clickable {
+                    haptics.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                    )
+                    onToggleSaved()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (isSaved) Icons.Filled.Check else Icons.Filled.Add,
+                contentDescription = if (isSaved) "Saved" else "Save artist",
+                tint = palette.onBackground,
+                modifier = Modifier.size(50.dp * 0.44f),
+            )
+        }
         CircleIconButton(
             icon = Icons.Filled.Shuffle,
             contentDescription = "Shuffle",
@@ -1147,10 +1215,25 @@ private fun ShelfGridPage(
     shelf: DiscographyShelf,
     palette: ArtworkPalette,
     bottomInset: androidx.compose.ui.unit.Dp,
+    hasMore: Boolean,
+    isLoadingMore: Boolean,
+    onLoadMore: () -> Unit,
     onBack: () -> Unit,
     onAlbumClick: (String) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
+    // Follows the listener to the foot of the grid: when they near the last
+    // row and the catalogue still has pages left, the next one is requested.
+    val nearEnd by remember {
+        derivedStateOf {
+            val info = gridState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            last >= info.totalItemsCount - 4
+        }
+    }
+    LaunchedEffect(nearEnd, hasMore, isLoadingMore) {
+        if (nearEnd && hasMore && !isLoadingMore) onLoadMore()
+    }
     Column(Modifier.fillMaxSize().background(palette.background)) {
         Row(
             modifier = Modifier
@@ -1195,6 +1278,19 @@ private fun ShelfGridPage(
                     onClickNavigate = { onAlbumClick(album.id) },
                 )
             }
+            if (isLoadingMore || hasMore) {
+                item(key = "shelf_grid_loading") {
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        if (isLoadingMore) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                                color = palette.onBackgroundVariant,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1216,3 +1312,71 @@ private val PAGE_GUTTER = 24.dp
 private const val MAX_ARTIST_SONGS = 20
 private const val SONGS_PER_COLUMN = 4
 
+@Composable
+fun ArtistSkeletonScreen() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(GratiaTheme.colors.background)
+    ) {
+        // Fake Header (Image + Title)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .shimmer()
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Fake "Songs" section title
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .width(120.dp)
+                .height(24.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                .shimmer()
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Fake Song Rows
+        repeat(5) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Fake artwork
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        .shimmer()
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    // Fake title
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(16.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                            .shimmer()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Fake artist
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.4f)
+                            .height(14.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                            .shimmer()
+                    )
+                }
+            }
+        }
+    }
+}

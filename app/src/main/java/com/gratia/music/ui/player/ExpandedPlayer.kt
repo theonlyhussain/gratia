@@ -24,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,7 +37,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -55,6 +53,9 @@ import com.gratia.music.lyrics.LyricsParser
 import com.gratia.music.lyrics.LyricsDocument
 
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.CollapseGesture
+import com.gratia.music.data.model.musicSource
+import com.gratia.music.data.model.hasRemoteIdentity
 import com.gratia.music.ui.components.AnimatedText
 import com.gratia.music.ui.components.GratiaText
 import com.gratia.music.ui.lyrics.LyricsSkeleton
@@ -107,6 +108,24 @@ private const val COLLAPSE_MS = 420
 private const val PANEL_FADE_MS = 200
 
 /**
+ * How far the player must be dragged down before releasing collapses it.
+ *
+ * A physical distance, not the fixed pixel count this used to compare against —
+ * 150 raw pixels is barely a thumb's width on a dense phone, which is why the
+ * old threshold let a nudge dismiss the player. Short of this, the drag springs
+ * back.
+ */
+private val DISMISS_DISTANCE = 120.dp
+
+/**
+ * Flick speed that can stand in for distance — but only for a drag that already
+ * covered most of the way there, so a quick tap-and-flick with almost no
+ * movement cannot throw the player away. The decision itself lives in
+ * [CollapseGesture.decide] so the acceptance bar can be unit-tested.
+ */
+private const val DISMISS_VELOCITY = CollapseGesture.FLING_VELOCITY_PX_S
+
+/**
  * Full-screen expanded player with a unified transformation system.
  *
  * Supports three content modes (Normal, Lyrics, Queue) that share a single
@@ -147,8 +166,14 @@ fun ExpandedPlayer(
     onOpenSleepTimer: () -> Unit = {},
     onNavigateToAlbum: (String) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {},
+    // Remote catalogue routes. A remote track's artist/album must open the
+    // remote page keyed by the provider's own id, never Gratia's local
+    // artist/album collection routes — a remote artist name is not a local
+    // collection, and the two must not collide (see the local/remote rule).
+    onNavigateToRemoteAlbum: (String) -> Unit = {},
+    onNavigateToRemoteArtist: (String) -> Unit = {},
     onNavigateToEqualizer: () -> Unit = {},
-    onDismiss: () -> Unit = { playerViewModel.setExpandedPlayerOpen(false) }
+    onDismiss: () -> Unit = { playerViewModel.collapsePlayer() }
 ) {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val currentLyrics by playerViewModel.currentLyrics.collectAsState()
@@ -168,6 +193,27 @@ fun ExpandedPlayer(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val song = currentSong ?: return
+
+    // The honesty pair for the format badge: whether the rendition actually
+    // playing was swapped in by a proven quality upgrade, and the source the
+    // track identifies as. Neither is displayed unless known. Computed after
+    // [song] exists — it derives from it — and keyed on the track so a queued
+    // transition can never show the previous song's source.
+    val isUpgradedStream by playerViewModel.playerManager.isUpgradedStream.collectAsState()
+    // The in-progress half of the quality story (spec 51): shown only while the
+    // better-rendition search is actually running, cleared the moment it
+    // concludes either way.
+    val isUpgradeOptimizing by playerViewModel.playerManager.isUpgradeOptimizing.collectAsState()
+    // The authoritative load state: the hero control and the seek bar read
+    // this rather than guessing from booleans (spec 38/39/52).
+    val loadState by playerViewModel.playerManager.loadState.collectAsState()
+    val isTrackLoading = loadState == com.gratia.music.player.PlayerManager.PlaybackLoadState.RESOLVING ||
+        loadState == com.gratia.music.player.PlayerManager.PlaybackLoadState.BUFFERING
+    val sourceLabel = when (song.musicSource) {
+        com.gratia.music.data.model.MusicSource.LOCAL -> "Local file"
+        com.gratia.music.data.model.MusicSource.DOWNLOADED_REMOTE -> "Downloaded"
+        com.gratia.music.data.model.MusicSource.YOUTUBE_MUSIC -> "YouTube Music"
+    }
 
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
     val animateWordFill by settingsDataStore.animatedWordLyricsFlow.collectAsState(initial = true)
@@ -192,6 +238,7 @@ fun ExpandedPlayer(
     var showAddToPlaylist by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showSleepTimerSheet by remember { mutableStateOf(false) }
+    var showLyricsTiming by remember { mutableStateOf(false) }
 
     val sleepTimerActive by playerViewModel.sleepTimerActive.collectAsState()
     val sleepTimerRemainingMs by playerViewModel.sleepTimerRemainingMs.collectAsState()
@@ -206,8 +253,11 @@ fun ExpandedPlayer(
         }
     }
 
-    // --- Estimated Timings state ---
-    var enableEstimatedTimings by remember { mutableStateOf(false) }
+    // --- Estimated Timings ---
+    // No longer a player affordance. Kept as a constant so the parser call site
+    // stays explicit: real provider timings are trusted, estimated fill-ins are
+    // not, and the stopwatch control that used to toggle this is gone.
+    val enableEstimatedTimings = false
 
     // --- Credits and Bio state ---
     var showBiographySheet by remember { mutableStateOf(false) }
@@ -301,7 +351,7 @@ fun ExpandedPlayer(
 
     val isAnyOverlayOpen = showBiographySheet || showCreditsSheet || showSongMenu ||
             showLyricsEditor || showAddToPlaylist ||
-            showDeleteConfirm || showSongInfo || showMultipleArtistSelector
+            showDeleteConfirm || showSongInfo || showMultipleArtistSelector || showLyricsTiming
 
     // Intercept back button for ALL overlays + content modes + normal closing
     androidx.activity.compose.BackHandler(enabled = true) {
@@ -314,6 +364,7 @@ fun ExpandedPlayer(
             showDeleteConfirm -> showDeleteConfirm = false
             showSongInfo -> showSongInfo = false
             showMultipleArtistSelector -> showMultipleArtistSelector = false
+            showLyricsTiming -> showLyricsTiming = false
             contentMode != PlayerContentMode.Normal -> {
                 contentMode = PlayerContentMode.Normal
             }
@@ -334,6 +385,76 @@ fun ExpandedPlayer(
         animationSpec = tween(motion.instant),
         label = "dismissAlpha"
     )
+
+    val dismissThresholdPx = with(density) { DISMISS_DISTANCE.toPx() }
+
+    // Source-aware artist/album navigation.
+    //
+    // A remote track opens the remote catalogue page, addressed by the provider's
+    // own id ([SongEntity.providerArtistId] / [SongEntity.providerAlbumId]) — not
+    // by display name, which is not an identity and can collide with a local
+    // collection of the same name. A local file has no remote identity, so its
+    // artist/album text stays inert metadata. A downloaded remote track keeps
+    // its ids, so it still opens the remote page.
+    fun openArtistOf(target: com.gratia.music.data.model.SongEntity) {
+        if (!target.hasRemoteIdentity()) return
+        val remoteId = target.providerArtistId
+        if (!remoteId.isNullOrBlank()) {
+            onDismiss()
+            onNavigateToRemoteArtist(remoteId)
+            return
+        }
+        // No catalogue id on the model: offer the name picker rather than
+        // routing a remote artist onto a local collection page.
+        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(target.artist)
+        if (parsed.size > 1) {
+            multipleArtistsList = parsed
+            showMultipleArtistSelector = true
+        }
+    }
+
+    fun openAlbumOf(target: com.gratia.music.data.model.SongEntity) {
+        if (!target.hasRemoteIdentity()) return
+        val albumId = target.providerAlbumId
+        if (!albumId.isNullOrBlank()) {
+            onDismiss()
+            onNavigateToRemoteAlbum(albumId)
+        }
+    }
+
+    // The collapse gesture belongs to the handle — see [PlayerCollapseHandle].
+    // What the parent owns is the travel: the handle reports deltas, the player
+    // follows the finger, and when the finger lifts the decision is made from
+    // the total travel and the smoothed release velocity.
+    fun followCollapseDrag(deltaPx: Float) {
+        if (deltaPx <= 0f && dismissOffsetY.value <= 0f) return
+        val raw = (dismissOffsetY.value + deltaPx).coerceAtLeast(0f)
+        // Rubber-band past the threshold: the player keeps answering the finger
+        // but each extra pixel buys less and less, so the travel past the point
+        // of no return reads as resistance rather than runaway.
+        val resolved = if (raw > dismissThresholdPx) {
+            dismissThresholdPx + (raw - dismissThresholdPx) * 0.35f
+        } else raw
+        scope.launch { dismissOffsetY.snapTo(resolved) }
+    }
+
+    fun endCollapseGesture(velocityPxS: Float) {
+        scope.launch {
+            val dragged = dismissOffsetY.value
+            val shouldCollapse = CollapseGesture.decide(
+                draggedPx = dragged,
+                thresholdPx = dismissThresholdPx,
+                velocityPxS = velocityPxS,
+            )
+            if (shouldCollapse) {
+                onDismiss()
+                dismissOffsetY.snapTo(0f)
+            } else {
+                // Not enough. Hand it back, the way it came.
+                dismissOffsetY.animateTo(0f, motion.springStiff())
+            }
+        }
+    }
 
     // ======================================================================
     // HORIZONTAL PEEK GESTURE — for song switching
@@ -379,16 +500,32 @@ fun ExpandedPlayer(
     // --- Parse lyrics for the SyncedLyricsView ---
     // Critical: do NOT gate on isSynced — the parser detects the actual format
     // from content. A TTML payload with isSynced=false will still parse correctly.
+    //
+    // Parsing happens OFF the main thread. This remember block used to run
+    // during composition — a TTML document is thousands of timed spans, and
+    // parsing one on the UI thread was the 2–3 second freeze between tapping
+    // Lyrics and the panel appearing: composition blocked, gesture queue
+    // backed up, player unresponsive until the parse finished. A blank document
+    // renders first (the skeleton shows while loading), and the parsed lines
+    // land when the background parse completes.
     val lyricsRaw = currentLyrics?.text ?: ""
-    val parsedDocument = remember(lyricsRaw, enableEstimatedTimings) {
-        if (lyricsRaw.isNotBlank()) {
-            LyricsParser.parse(lyricsRaw, enableEstimatedTimings)
-        } else LyricsDocument.Plain("")
+    val parsedDocument by produceState<LyricsDocument>(
+        initialValue = LyricsDocument.Plain(""),
+        lyricsRaw,
+        enableEstimatedTimings
+    ) {
+        value = if (lyricsRaw.isBlank()) {
+            LyricsDocument.Plain("")
+        } else {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                LyricsParser.parse(lyricsRaw, enableEstimatedTimings)
+            }
+        }
     }
     val parsedLines = remember(parsedDocument) {
-        when (parsedDocument) {
-            is LyricsDocument.WordSynced -> parsedDocument.lines
-            is LyricsDocument.LineSynced -> parsedDocument.lines
+        when (val doc = parsedDocument) {
+            is LyricsDocument.WordSynced -> doc.lines
+            is LyricsDocument.LineSynced -> doc.lines
             is LyricsDocument.Plain -> emptyList()
         }
     }
@@ -410,8 +547,25 @@ fun ExpandedPlayer(
         label = "headerAlpha"
     )
 
-    // Nested scroll connection for smooth swipe-to-dismiss
-    val nestedScrollConnection = remember(isAnyOverlayOpen, contentMode) {
+    // Nested scroll connection for swipe-to-dismiss
+    //
+    // Deliberately narrow. It does two things and nothing else:
+    //
+    //  1. **Pre-scroll**: while a handle drag is holding the panel down and the
+    //     finger moves up, the drag follows rather than the content — the
+    //     player returns to expanded with the finger instead of the lyrics
+    //     scrolling underneath a held-open sheet.
+    //
+    //  2. **Pre-fling**: a drag in progress is judged by [CollapseGesture.decide]
+    //     — past the threshold it collapses, short of it it springs back.
+    //
+    // What it deliberately does NOT do is watch the content's leftover scroll
+    // (onPostScroll). That was the route by which a downward scroll at the top
+    // of the lyrics — or any upward fling of content that had nowhere left to
+    // go — translated into a dismissal gesture, which is exactly the coupling
+    // the handle exists to break: the lyrics own their vertical scrolling, and
+    // the one gesture that leaves this screen starts at the handle.
+    val nestedScrollConnection = remember(isAnyOverlayOpen) {
         object : NestedScrollConnection {
             override fun onPreScroll(
                 available: androidx.compose.ui.geometry.Offset,
@@ -428,27 +582,23 @@ fun ExpandedPlayer(
                 return androidx.compose.ui.geometry.Offset.Zero
             }
 
-            override fun onPostScroll(
-                consumed: androidx.compose.ui.geometry.Offset,
-                available: androidx.compose.ui.geometry.Offset,
-                source: NestedScrollSource
-            ): androidx.compose.ui.geometry.Offset {
-                if (isAnyOverlayOpen) return androidx.compose.ui.geometry.Offset.Zero
-
-                if (available.y > 0) {
-                    val newOffset = (dismissOffsetY.value + available.y).coerceAtLeast(0f)
-                    scope.launch { dismissOffsetY.snapTo(newOffset) }
-                    return androidx.compose.ui.geometry.Offset(0f, available.y)
-                }
-                return androidx.compose.ui.geometry.Offset.Zero
-            }
-
             override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
-                if (dismissOffsetY.value > 150f || available.y > 1000f) {
+                val dragged = dismissOffsetY.value
+                // Deliberate collapse, or not. Velocity can stand in for distance
+                // only when the drag also travelled most of the way there —
+                // speed by itself was letting an almost-still touch collapse the
+                // player.
+                val shouldDismiss = CollapseGesture.decide(
+                    draggedPx = dragged,
+                    thresholdPx = dismissThresholdPx,
+                    velocityPxS = available.y,
+                )
+                if (shouldDismiss) {
                     onDismiss()
                     dismissOffsetY.snapTo(0f)
                     return available
-                } else if (dismissOffsetY.value > 0f) {
+                } else if (dragged > 0f) {
+                    // Not enough. Hand it back, the way it came.
                     dismissOffsetY.animateTo(
                         targetValue = 0f,
                         animationSpec = motion.springStiff()
@@ -513,6 +663,7 @@ fun ExpandedPlayer(
                     isPlaying = isPlaying,
                     isDragging = isDragging,
                     isFavorite = isFavorite,
+                    isTrackLoading = isTrackLoading,
                     progress = progress,
                     currentTimeMs = currentTimeMs,
                     durationMs = durationMs,
@@ -522,6 +673,9 @@ fun ExpandedPlayer(
                     artistInfos = artistInfos,
                     trackCredits = trackCredits,
                     audioFormat = playerViewModel.audioFormat.collectAsState().value,
+                    isUpgradedStream = isUpgradedStream,
+                    isUpgradeOptimizing = isUpgradeOptimizing,
+                    sourceLabel = sourceLabel,
                     screenHeight = screenHeight,
                     onSeek = { newProgress ->
                         playerViewModel.seekTo((newProgress * durationMs).toLong())
@@ -538,27 +692,16 @@ fun ExpandedPlayer(
                     },
                     onMoreClick = { showSongMenu = true },
                     onClickTitle = { showSongInfo = true },
-                    onClickArtist = {
-                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
-                        if (parsed.size > 1) {
-                            multipleArtistsList = parsed
-                            showMultipleArtistSelector = true
-                        } else {
-                            onDismiss()
-                            onNavigateToArtist(parsed.firstOrNull() ?: song.artist)
-                        }
-                    },
-                    onClickAlbum = {
-                        if (!song.album.isNullOrBlank()) {
-                            onDismiss()
-                            onDismiss()
-                            onNavigateToAlbum(song.album)
-                        }
-                    },
+                    onClickArtist = { openArtistOf(song) },
+                    onClickAlbum = { openAlbumOf(song) },
                     onOpenLyrics = {
-                        if (currentLyrics != null) {
-                            contentMode = PlayerContentMode.Lyrics
-                        }
+                        // Open the lyrics page immediately. The page has
+                        // something honest to show for every state now —
+                        // cached lyrics, a skeleton while a lookup is in
+                        // flight, or a "none available" message. Waiting here
+                        // until lyrics existed is what made tapping Lyrics feel
+                        // like nothing happened on a slow lookup.
+                        contentMode = PlayerContentMode.Lyrics
                     },
                     onOpenQueue = {
                         contentMode = PlayerContentMode.Queue
@@ -598,8 +741,6 @@ fun ExpandedPlayer(
                     parsedDocument = parsedDocument,
                     queueListState = queueListState,
                     audioFormat = playerViewModel.audioFormat.collectAsState().value,
-                    enableEstimatedTimings = enableEstimatedTimings,
-                    onToggleEstimatedTimings = { enableEstimatedTimings = !enableEstimatedTimings },
                     onUserInteraction = { onUserInteraction() },
                     onSeek = { newProgress ->
                         onUserInteraction()
@@ -660,6 +801,8 @@ fun ExpandedPlayer(
                     syncOffset = currentLyrics?.offsetMs ?: 0L,
                     animateWordFill = animateWordFill,
                     reduceAnimation = reduceAnimation,
+                    onCollapseDrag = ::followCollapseDrag,
+                    onCollapseGestureEnd = ::endCollapseGesture,
                     playerViewModel = playerViewModel
                 )
             }
@@ -674,6 +817,9 @@ fun ExpandedPlayer(
                 sleepTimerActive = sleepTimerActive,
                 sleepTimerRemainingMs = sleepTimerRemainingMs,
                 showPlayNextAndFavorite = false,
+                downloadState = playerViewModel.downloadStateFor(song),
+                onDownload = { playerViewModel.downloadSong(song) },
+                onRemoveDownload = { playerViewModel.removeDownload(song) },
                 onDismiss = { showSongMenu = false },
                 onPlayNext = {
                     playerViewModel.playNext(song)
@@ -692,23 +838,17 @@ fun ExpandedPlayer(
                     val msg = if (isFavorite) "Removed from Liked Songs" else "Added to Liked Songs"
                     scope.launch { snackbarHostState.showSnackbar(msg) }
                 },
-                onGoToAlbum = {
-                    if (!song.album.isNullOrBlank()) {
-                        onDismiss()
-                        onNavigateToAlbum(song.album)
-                    }
-                },
-                onGoToArtist = {
-                    val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
-                    if (parsed.size > 1) {
+                // A local file has no catalogue album/artist to open, so the
+                // tiles are not offered rather than offered and inert.
+                onGoToAlbum = if (song.hasRemoteIdentity()) {
+                    { openAlbumOf(song) }
+                } else null,
+                onGoToArtist = if (song.hasRemoteIdentity()) {
+                    {
                         showSongMenu = false
-                        multipleArtistsList = parsed
-                        showMultipleArtistSelector = true
-                    } else {
-                        onDismiss()
-                        onNavigateToArtist(parsed.firstOrNull() ?: song.artist)
+                        openArtistOf(song)
                     }
-                },
+                } else null,
                 hasLyrics = currentLyrics != null,
                 onEditLyrics = {
                     showLyricsEditor = true
@@ -722,10 +862,19 @@ fun ExpandedPlayer(
                     onDismiss()
                     onNavigateToEqualizer()
                 },
+                onOpenLyricsTiming = { showLyricsTiming = true },
                 onDelete = {
                     showSongMenu = false
                     showDeleteConfirm = true
                 }
+            )
+        }
+
+        // --- Lyrics Timing (offset adjustment, per recording) ---
+        if (showLyricsTiming) {
+            com.gratia.music.ui.components.LyricsTimingSheet(
+                playerViewModel = playerViewModel,
+                onDismiss = { showLyricsTiming = false }
             )
         }
 
@@ -874,6 +1023,7 @@ private fun NormalModeContent(
     isPlaying: Boolean,
     isDragging: Boolean,
     isFavorite: Boolean,
+    isTrackLoading: Boolean,
     progress: Float,
     currentTimeMs: Long,
     durationMs: Long,
@@ -883,6 +1033,9 @@ private fun NormalModeContent(
     artistInfos: Map<String, com.gratia.music.data.repository.ArtistInfo?>,
     trackCredits: List<com.gratia.music.data.repository.ContributorInfo>,
     audioFormat: com.gratia.music.player.AudioFormatInfo?,
+    isUpgradedStream: Boolean,
+    isUpgradeOptimizing: Boolean,
+    sourceLabel: String?,
     screenHeight: androidx.compose.ui.unit.Dp,
     onSeek: (Float) -> Unit,
     onDragStart: () -> Unit,
@@ -903,6 +1056,9 @@ private fun NormalModeContent(
     playerViewModel: PlayerViewModel
 ) {
     val scrollState = rememberScrollState()
+    // The session's real origin — not the current song's album, which is what
+    // used to be printed here and which is unrelated to where playback began.
+    val playbackOrigin by playerViewModel.playbackOrigin.collectAsState()
 
     Column(
         modifier = Modifier
@@ -1040,22 +1196,28 @@ private fun NormalModeContent(
                 artist = song.artist,
                 album = song.album,
                 isFavorite = isFavorite,
-                playingFrom = (song.album ?: "GRATIA").uppercase(),
+                playingFrom = com.gratia.music.player.playbackContextLabel(playbackOrigin) ?: "GRATIA",
                 onClickTitle = onClickTitle,
                 onClickArtist = onClickArtist,
                 onClickAlbum = onClickAlbum,
                 onToggleFavorite = onToggleFavorite,
                 onMoreClick = onMoreClick,
-                audioFormatInfo = audioFormat
+                audioFormatInfo = audioFormat,
+                isUpgradedStream = isUpgradedStream,
+                isUpgradeOptimizing = isUpgradeOptimizing,
+                sourceLabel = sourceLabel
             )
 
             Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge))
 
             // --- Progress Bar ---
+            // While the chosen track is resolving there is no position to
+            // scrub — the bar shows the pre-playback state rather than moving
+            // as though audio were already running (spec 52).
             GratiaProgressBar(
-                progress = progress,
-                currentTimeMs = currentTimeMs,
-                durationMs = durationMs,
+                progress = if (isTrackLoading) 0f else progress,
+                currentTimeMs = if (isTrackLoading) 0L else currentTimeMs,
+                durationMs = if (isTrackLoading) 0L else durationMs,
                 onSeek = onSeek,
                 onDragStart = onDragStart,
                 onDragEnd = onDragEnd
@@ -1069,7 +1231,8 @@ private fun NormalModeContent(
                 onPlayPause = onPlayPause,
                 onPrevious = onPrevious,
                 onNext = onNext,
-                glowColor = coverColors.vibrant
+                glowColor = coverColors.vibrant,
+                isLoading = isTrackLoading
             )
 
             Spacer(Modifier.height(GratiaTheme.spacing.mediumLarge))
@@ -1158,8 +1321,6 @@ private fun ContentModeLayout(
     parsedDocument: LyricsDocument?,
     queueListState: androidx.compose.foundation.lazy.LazyListState,
     audioFormat: com.gratia.music.player.AudioFormatInfo?,
-    enableEstimatedTimings: Boolean,
-    onToggleEstimatedTimings: () -> Unit,
     onUserInteraction: () -> Unit,
     onSeek: (Float) -> Unit,
     onSeekLyrics: (Long) -> Unit,
@@ -1175,6 +1336,8 @@ private fun ContentModeLayout(
     syncOffset: Long,
     animateWordFill: Boolean = true,
     reduceAnimation: Boolean = false,
+    onCollapseDrag: (Float) -> Unit = {},
+    onCollapseGestureEnd: (Float) -> Unit = {},
     playerViewModel: PlayerViewModel
 ) {
     // This screen is only composed once the artwork has finished collapsing, so
@@ -1199,6 +1362,22 @@ private fun ContentModeLayout(
         modifier = Modifier.fillMaxSize()
     ) {
         Spacer(Modifier.statusBarsPadding())
+
+        // --- Drag handle ---------------------------------------------------
+        // The visible affordance for "pull down to collapse", and the *owner*
+        // of that gesture — not a decoration on top of it. Only this area
+        // translates a downward drag into a dismissal; the lyrics below own
+        // their own vertical scrolling and never speak for the player.
+        //
+        // The touch target is deliberately taller than the 4dp pill: a gesture
+        // that leaves the screen should be grabbable, not threaded. Velocity is
+        // smoothed across the drag so a release reads as a fling only when the
+        // whole gesture was moving, not on the strength of one fast frame.
+        PlayerCollapseHandle(
+            onDragDelta = onCollapseDrag,
+            onGestureEnd = onCollapseGestureEnd,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         // --- Compact header (always visible, dims in fullscreen lyrics) ---
         // In fullscreen mode: header dims to 40% alpha but stays visible
@@ -1253,8 +1432,6 @@ private fun ContentModeLayout(
                             isLyricsLoading = isLyricsLoading,
                             visualTimeProvider = visualTimeProvider,
                             syncOffset = syncOffset,
-                            enableEstimatedTimings = enableEstimatedTimings,
-                            onToggleEstimatedTimings = onToggleEstimatedTimings,
                             isFullscreenContent = isFullscreenContent,
                             onSeek = onSeekLyrics,
                             onInteraction = onUserInteraction,
@@ -1343,8 +1520,6 @@ private fun LyricsContentArea(
     isLyricsLoading: Boolean,
     visualTimeProvider: () -> Long,
     syncOffset: Long,
-    enableEstimatedTimings: Boolean,
-    onToggleEstimatedTimings: () -> Unit,
     isFullscreenContent: Boolean,
     onSeek: (Long) -> Unit,
     onInteraction: () -> Unit,
@@ -1379,41 +1554,17 @@ private fun LyricsContentArea(
                 },
                 onTapLyricsView = onInteraction,
                 syncOffset = syncOffset,
-                lyricsSource = currentLyrics?.provider,
+                // Credit the provider that actually answered, not the storage
+                // slot. Legacy rows cached before the provider name was kept
+                // have no name to show, so they show no credit rather than the
+                // literal word "automatic".
+                lyricsSource = currentLyrics?.let { lyrics ->
+                    lyrics.providerName?.takeIf { it.isNotBlank() }
+                        ?: lyrics.provider.takeIf { it != "automatic" && !it.startsWith("legacy") }
+                },
                 animateWordFill = animateWordFill,
                 modifier = Modifier.fillMaxSize()
             )
-            
-            // Estimated timing toggle button overlay
-            if (parsedDocument is LyricsDocument.LineSynced) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = !isFullscreenContent,
-                    enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)),
-                    exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300)),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 16.dp, bottom = 16.dp)
-                ) {
-                    androidx.compose.material3.FilledTonalIconToggleButton(
-                        checked = enableEstimatedTimings,
-                        onCheckedChange = { onToggleEstimatedTimings() },
-                        modifier = Modifier.size(36.dp),
-                        shape = androidx.compose.foundation.shape.CircleShape,
-                        colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconToggleButtonColors(
-                            containerColor = Color.White.copy(alpha = 0.15f),
-                            checkedContainerColor = GratiaTheme.colors.accent,
-                            contentColor = Color.White.copy(alpha = 0.6f),
-                            checkedContentColor = Color.White
-                        )
-                    ) {
-                        androidx.compose.material3.Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.Timer,
-                            contentDescription = "Toggle Word-by-Word Timings",
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
         } else if (isLyricsLoading) {
             // A lookup is still in flight — several providers are tried in turn,
             // so stand in for the page being fetched rather than showing an
@@ -1448,4 +1599,74 @@ private fun LyricsContentArea(
             }
         }
     }
+}
+
+// =============================================================================
+// COLLAPSE HANDLE — the owner of the one gesture that leaves this screen
+// =============================================================================
+
+/**
+ * The top drag handle of the lyrics/queue panel, with the collapse gesture
+ * attached to it.
+ *
+ * Why a dedicated handle rather than a broad vertical-drag detector on the
+ * whole panel: the panel's content scrolls. A detector that watched every
+ * downward movement anywhere on the screen would make the lyrics complicit in
+ * their own dismissal — a scroll that started at the top of the list would
+ * close the player. Here the gesture and the content are separated the way
+ * the two intents are: dragging the *handle* means "leave", scrolling the
+ * *lyrics* means "read on".
+ *
+ * The pill is 4dp but the touch target is 28dp, plus 8dp above and 6dp below:
+ * a dismissal gesture should be easy to catch, not to thread. Velocity is
+ * tracked across the whole drag rather than read off the final frame, so a
+ * release counts as a fling only when the gesture itself was moving.
+ */
+@Composable
+private fun PlayerCollapseHandle(
+    onDragDelta: (Float) -> Unit,
+    onGestureEnd: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var velocityTracker = remember { androidx.compose.ui.input.pointer.util.VelocityTracker() }
+
+    Box(
+        modifier = modifier
+            .height(28.dp)
+            .padding(top = 8.dp, bottom = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.35f))
+                // One pointer is all a collapse gesture is. The "+1" is what
+                // keeps the pill's own size-change pointer data (from the clip
+                // and background modifiers) out of the tracker; changes to the
+                // pill's size must not read as drags.
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragStart = { offset ->
+                            velocityTracker.resetTracking()
+                        },
+                        onVerticalDrag = { change, dragAmount ->
+                            change.consume()
+                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                            onDragDelta(dragAmount)
+                        },
+                        onDragEnd = {
+                            val velocity = velocityTracker.calculateVelocity().y
+                            onGestureEnd(velocity)
+                        },
+                        onDragCancel = { onGestureEnd(0f) }
+                    )
+                }
+        )
+    }
+    // Density is used implicitly through dp sizing above; keep the reference so
+    // imports stay stable if thresholds move here in future.
+    @Suppress("UNUSED_EXPRESSION") density
 }

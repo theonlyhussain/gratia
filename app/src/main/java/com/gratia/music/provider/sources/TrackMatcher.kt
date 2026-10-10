@@ -166,20 +166,13 @@ object TrackMatcher {
             candidate.durationText.secondsOf(),
             allowVideoDrift = creditedArtist != null,
         ) ?: return null
-        val artist = creditedArtist
-            // The credits don't merely differ in spelling, they name different
-            // people — and sometimes that is because they are describing the
-            // same recording from different ends of it (composer credit on
-            // one service, singer credit on another). What breaks the tie is
-            // length: two recordings that share an exact title and agree on
-            // their runtime to the second are the same master. An exact
-            // runtime is allowed to stand in for a shared credit, and *only*
-            // an exact one. It still scores below a genuine credit match.
-            ?: CREDITS_DISAGREE.takeIf {
-                !target.isVideo && withinSeconds(candidate, target, CREDIT_OVERRIDE_SEC)
-            }
-            ?: return null
-        val explicit = explicitScore(target.isExplicit, candidate.isExplicit.takeIf { it }) ?: return null
+        // A differing credit is a veto, not a tie to break. The exact-runtime
+        // escape this replaced let a same-length cover through under the right
+        // title — the wrong recording playing, with nothing on screen to say
+        // so. If neither catalogue names the other's artist, this is some other
+        // recording, however closely the runtime happens to line up.
+        val artist = creditedArtist ?: return null
+        val explicit = explicitScore(target.isExplicit, candidate.isExplicit) ?: return null
         return BASE + artist + duration + albumScore(target.album, candidate.album?.name) + explicit +
             contextScore(wanted, got)
     }
@@ -470,11 +463,6 @@ object TrackMatcher {
     private const val ARTIST_EXACT = 25
     private const val ARTIST_SHARED = 10
 
-    /** Carried by a match the runtime vouched for rather than the credit. A penalty, not a pass. */
-    private const val CREDITS_DISAGREE = -30
-
-    /** How exactly two runtimes must agree before that is allowed to stand in for a shared credit. */
-    private const val CREDIT_OVERRIDE_SEC = 2
     private const val DURATION_TIGHT = 40
     private const val DURATION_LOOSE = 15
     private const val ALBUM_EXACT = 35
@@ -500,8 +488,12 @@ object TrackMatcher {
         return abs(actualSec - expectedSec) > DURATION_LIMIT_SEC
     }
 
-    /** Visual intros/outros can make the video substantially longer than its audio master. */
-    private const val VIDEO_DURATION_LIMIT_SEC = 90
+    /**
+     * Visual intros/outros can make the video substantially longer than its
+     * audio master. Wide enough for a real spoken intro or a cold open — a
+     * tighter bound was rejecting genuine music videos outright.
+     */
+    private const val VIDEO_DURATION_LIMIT_SEC = 150
 
     private const val BRACKET_PASSES = 3
     private const val DASH_PASSES = 3

@@ -34,6 +34,18 @@ class SongRepository(private val songDao: SongDao) {
     fun getLastAdded(limit: Int = 20): Flow<List<SongEntity>> =
         songDao.getLastAdded(limit)
 
+    /**
+     * Genuine "recently added" events — downloads Gratia itself completed.
+     *
+     * Distinct from [getLastAdded], which orders by `createdAt` and therefore
+     * counts a scanned local file as "added" the moment discovery saw it.
+     */
+    fun getRecentlyDownloaded(limit: Int = 20): Flow<List<SongEntity>> =
+        songDao.getRecentlyDownloaded(limit)
+
+    /** Every Gratia-managed download, newest first — the downloads manager's source. */
+    fun getDownloaded(): Flow<List<SongEntity>> = songDao.getDownloadedSongs()
+
     fun getRecentArtists(limit: Int = 10): Flow<List<String>> =
         songDao.getRecentArtists(limit)
 

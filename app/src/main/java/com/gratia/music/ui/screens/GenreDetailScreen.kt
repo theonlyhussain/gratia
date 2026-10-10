@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.components.*
 import com.gratia.music.ui.theme.GratiaTheme
 
@@ -48,7 +49,10 @@ fun GenreDetailScreen(
                     index = index,
                     isActive = currentSong?.id == song.id,
                     isPlaying = currentSong?.id == song.id && isPlaying,
-                    onClick = { playerViewModel.playSong(song, songs) },
+                    onClick = { playerViewModel.playSong(song, songs, PlaybackOrigin.LIBRARY) },
+                    // Same shared actions (download, add to playlist, …) the
+                    // other song lists expose.
+                    onMoreClick = {},
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }

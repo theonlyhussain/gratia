@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.data.model.SongEntity
+import com.gratia.music.data.model.hasRemoteIdentity
 import com.gratia.music.ui.LocalNavController
 import com.gratia.music.ui.LocalPlayerViewModel
 import com.gratia.music.ui.components.SongMenuSheet
@@ -147,12 +148,23 @@ fun SongRow(
                     color = GratiaTheme.colors.textSecondary,
                     maxLines = 1,
                     modifier = Modifier.clickable {
-                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
-                        if (parsed.size > 1) {
-                            multipleArtistsList = parsed
-                            showMultipleArtistSelector = true
+                        // A remote track has a catalogue artist id to route on;
+                        // a local file's artist is metadata, so it opens the
+                        // local artist page and never the remote one.
+                        val remoteArtistId = song.providerArtistId
+                            ?.takeIf { song.hasRemoteIdentity() && it.isNotBlank() }
+                        if (remoteArtistId != null) {
+                            navController.navigate(
+                                "remote_artist/${android.net.Uri.encode(remoteArtistId)}"
+                            )
                         } else {
-                            navController.navigate("artist/${android.net.Uri.encode(parsed.firstOrNull() ?: song.artist)}")
+                            val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                            if (parsed.size > 1) {
+                                multipleArtistsList = parsed
+                                showMultipleArtistSelector = true
+                            } else {
+                                navController.navigate("artist?name=${android.net.Uri.encode(parsed.firstOrNull() ?: song.artist)}")
+                            }
                         }
                     }
                 )
@@ -187,12 +199,16 @@ fun SongRow(
             Spacer(Modifier.width(8.dp))
         }
 
-        // Duration
-        Text(
-            formatTime(song.durationMs),
-            style = GratiaTheme.typography.caption,
-            color = GratiaTheme.colors.textSecondary
-        )
+        // Duration. A remote row that never stated one is *unknown*, not zero:
+        // printing 0:00 claimed every such track was empty. Nothing is drawn
+        // until a real length is known.
+        if (song.durationMs > 0) {
+            Text(
+                formatTime(song.durationMs),
+                style = GratiaTheme.typography.caption,
+                color = GratiaTheme.colors.textSecondary
+            )
+        }
         
         if (onMoreClick != null) {
             Spacer(Modifier.width(8.dp))
@@ -211,6 +227,11 @@ fun SongRow(
     }
 
     if (showMenu) {
+        // Source-aware targets: a remote track has catalogue ids to route on, a
+        // local file does not — and an action that cannot be honoured is passed
+        // as null so its tile is not drawn.
+        val remoteAlbumId = song.providerAlbumId?.takeIf { song.hasRemoteIdentity() && it.isNotBlank() }
+        val remoteArtistId = song.providerArtistId?.takeIf { song.hasRemoteIdentity() && it.isNotBlank() }
         SongMenuSheet(
             song = song,
             isFavorite = isFavorite,
@@ -221,23 +242,46 @@ fun SongRow(
                 showMenu = false
                 showAddToPlaylist = true 
             },
+            // The download tile must actually download — a row's menu offering
+            // a "Download" button that does nothing is worse than not offering
+            // it. State comes from the app-wide ledger, so a row reflects a
+            // download started anywhere else.
+            downloadState = playerViewModel.downloadStateFor(song),
+            onDownload = { playerViewModel.downloadSong(song) },
+            onRemoveDownload = { playerViewModel.removeDownload(song) },
             onToggleLike = { playerViewModel.toggleFavorite(song) },
-            onGoToAlbum = { 
-                if (!song.album.isNullOrBlank()) navController.navigate("album/${android.net.Uri.encode(song.album)}")
-            },
-            onGoToArtist = {
-                val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
-                if (parsed.size > 1) {
-                    showMenu = false
-                    multipleArtistsList = parsed
-                    showMultipleArtistSelector = true
-                } else {
-                    navController.navigate("artist/${android.net.Uri.encode(parsed.firstOrNull() ?: song.artist)}")
+            // Source-aware routing: a remote track opens the remote page keyed
+            // by its provider id; a local file's album/artist is metadata, not
+            // a catalogue route.
+            onGoToAlbum = remoteAlbumId?.let { id ->
+                {
+                    // The row knows the album's display name; carrying it in
+                    // the route lets the destination page show the title
+                    // immediately while its details load.
+                    val title = android.net.Uri.encode(song.album ?: song.title)
+                    navController.navigate("remote_album/${android.net.Uri.encode(id)}?title=$title")
                 }
             },
-            onEditLyrics = {
-                navController.navigate("fullLyrics/${song.id}")
+            onGoToArtist = when {
+                remoteArtistId != null -> {
+                    { navController.navigate("remote_artist/${android.net.Uri.encode(remoteArtistId)}") }
+                }
+                song.hasRemoteIdentity() -> {
+                    {
+                        val parsed = com.gratia.music.utils.ArtistParser.parseArtists(song.artist)
+                        if (parsed.size > 1) {
+                            showMenu = false
+                            multipleArtistsList = parsed
+                            showMultipleArtistSelector = true
+                        }
+                    }
+                }
+                else -> null
             },
+            // There is no standalone lyrics-editor destination for a list row;
+            // the editor lives in the player. Offering a tile that navigates to
+            // an unregistered route crashes, so it is simply not offered here.
+            onEditLyrics = null,
             onSongInfo = { showInfo = true },
             onDelete = { 
                 showMenu = false
@@ -324,7 +368,7 @@ fun SongRow(
             artists = multipleArtistsList,
             onArtistClick = { artistName ->
                 showMultipleArtistSelector = false
-                navController.navigate("artist/${android.net.Uri.encode(artistName)}")
+                navController.navigate("artist?name=${android.net.Uri.encode(artistName)}")
             },
             onDismissRequest = { showMultipleArtistSelector = false }
         )

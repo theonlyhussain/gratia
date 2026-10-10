@@ -39,6 +39,7 @@ import com.gratia.music.data.model.SongEntity
 import com.gratia.music.data.repository.ArtistRepository
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.components.AddToPlaylistSheet
 import com.gratia.music.ui.components.PlayingIndicator
 import com.gratia.music.ui.components.SongInfoDialog
@@ -156,8 +157,8 @@ fun ArtistDetailScreen(
                 showAddToPlaylist = true
             },
             onToggleLike = { playerViewModel.toggleFavorite(song) },
-            onGoToAlbum = {},
-            onGoToArtist = {},
+            // This is already the artist (and albums are local collections here),
+            // so neither Go-to tile is offered rather than shown inert.
             onSongInfo = { showSongInfo = true },
             onDelete = { showDeleteConfirm = true }
         )
@@ -406,7 +407,7 @@ fun ArtistDetailScreen(
                             .clickableWithScale {
                                 if (artistSongs.isNotEmpty()) {
                                     val shuffled = artistSongs.shuffled()
-                                    playerViewModel.playSong(shuffled.first(), shuffled)
+                                    playerViewModel.playSong(shuffled.first(), shuffled, PlaybackOrigin.LIBRARY)
                                 }
                             },
                         contentAlignment = Alignment.Center
@@ -507,7 +508,7 @@ private fun ArtistAlbumGroup(
             }
             
             IconButton(
-                onClick = { playerViewModel.playSong(songs.first(), songs) },
+                onClick = { playerViewModel.playSong(songs.first(), songs, PlaybackOrigin.LIBRARY) },
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
@@ -538,7 +539,7 @@ private fun ArtistAlbumGroup(
                             .padding(vertical = 3.dp, horizontal = 4.dp)
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (isPlaying) GratiaTheme.colors.surfaceHover else Color.Transparent)
-                            .clickable { playerViewModel.playSong(song, songs) }
+                            .clickable { playerViewModel.playSong(song, songs, PlaybackOrigin.LIBRARY) }
                             .padding(horizontal = 12.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

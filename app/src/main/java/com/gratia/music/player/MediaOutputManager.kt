@@ -6,6 +6,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.mediarouter.media.MediaControlIntent
 import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
@@ -190,6 +191,17 @@ class MediaOutputManager(private val context: Context) {
 
         _availableRoutes.value = updatedRoutes
         _activeRoute.value = trueActiveRoute
+        // Debug-only output trace: the active device and the real media-stream        // volume range it is heard at (spec 116). One line per device change,        // not per read.
+        Log.d(
+            TAG,
+            "OUTPUT_DEVICE device=${trueActiveRoute.name} type=${trueActiveRoute.type} " +
+                "volume=${audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)} " +
+                "max=${audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)}",
+        )
+    }
+
+    private companion object {
+        private const val TAG = "MediaOutput"
     }
 
     private fun createFallbackPhoneRoute(): AudioRoute {

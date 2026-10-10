@@ -45,6 +45,8 @@ data class RemoteArtist(
     val name: String,
     val description: String? = null,
     val subscribers: String? = null,
+    /** "3.4M monthly listeners" — shown only when the catalogue actually supplies it. */
+    val monthlyListeners: String? = null,
     val artworkUrl: String? = null,
     val topSongs: List<RemoteTrack> = emptyList(),
     val albums: List<RemoteAlbumSummary> = emptyList(),
@@ -138,7 +140,14 @@ data class BrowseCategory(
     val id: String,
     val title: String,
     val browseId: String,
-    val params: String? = null
+    val params: String? = null,
+    /**
+     * Cover art for the Explore tile, when the taxonomy provides it. YouTube's
+     * mood/genre buttons generally do not, in which case a representative
+     * playlist or album image is resolved from the category page itself — see
+     * [ProviderManager.getCategoryArtwork]. Null only until that resolves.
+     */
+    val thumbnailUrl: String? = null
 )
 
 /**

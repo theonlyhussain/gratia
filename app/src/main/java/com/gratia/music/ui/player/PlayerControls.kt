@@ -64,7 +64,15 @@ fun PlayerControls(
     modifier: Modifier = Modifier,
     glowColor: Color = Color.White,
     canGoPrevious: Boolean = true,
-    canGoNext: Boolean = true
+    canGoNext: Boolean = true,
+    /**
+     * True while the selected track is being fetched — resolving a stream or
+     * buffering it. The hero control becomes a spinner for exactly that
+
+     * window, in the same 72dp footprint, so loading is communicated from the
+     * place the listener's eye already rests (spec 39–41).
+     */
+    isLoading: Boolean = false
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -88,7 +96,8 @@ fun PlayerControls(
         PlayPauseButton(
             isPlaying = isPlaying,
             onClick = onPlayPause,
-            glowColor = glowColor
+            glowColor = glowColor,
+            isLoading = isLoading
         )
 
         Spacer(Modifier.width(GratiaTheme.spacing.large)) // 32dp
@@ -115,7 +124,8 @@ fun PlayerControls(
 private fun PlayPauseButton(
     isPlaying: Boolean,
     onClick: () -> Unit,
-    glowColor: Color
+    glowColor: Color,
+    isLoading: Boolean = false
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -147,20 +157,25 @@ private fun PlayPauseButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        // Fast crossfade between Play and Pause icons (150ms for 120Hz responsiveness)
-        AnimatedContent(
-            targetState = isPlaying,
-            transitionSpec = {
-                (fadeIn(tween(motion.fast)) + scaleIn(tween(motion.fast), initialScale = 0.85f)) togetherWith
-                    (fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.85f))
-            },
-            label = "playPauseIcon"
-        ) { playing ->
-            GratiaIcon(
-                imageVector = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                contentDescription = if (playing) "Pause" else "Play",
+        // Loading owns the control while the chosen track is on its way.
+        // Same footprint, same place — the icon crossfade below simply does
+        // not run until a state that can play or pause exists.
+        if (isLoading) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(40.dp),
+                strokeWidth = 3.dp,
+                color = Color.White
+            )
+        } else {
+            // The shared glyph. Same component the mini player renders — the
+            // expanded surface differs only in size (48 vs 24), never in icon
+            // shape or animation, so expanding the player cannot change what
+            // the control looks like.
+            PlayPauseControl(
+                isPlaying = isPlaying,
+                isLoading = false, // loading is handled by the branch above
+                size = 48.dp,
                 tint = Color.White,
-                size = 48.dp
             )
         }
     }

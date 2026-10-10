@@ -17,6 +17,19 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlists WHERE id = :playlistId")
     fun getPlaylist(playlistId: String): Flow<PlaylistEntity?>
 
+    /** One-shot existence check used before adding a remote track to a playlist. */
+    @Query("SELECT * FROM songs WHERE id = :songId LIMIT 1")
+    suspend fun getSongByIdOnce(songId: String): SongEntity?
+
+    /**
+     * Ensures a song row exists before a playlist cross-ref is written.
+     * Remote tracks have no row until something persists them; without this,
+     * the cross-ref insert is a silent no-op and "Add to playlist" does
+     * nothing for streamed songs.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPlaylistSong(song: SongEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlaylist(playlist: PlaylistEntity)
 

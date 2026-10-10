@@ -57,6 +57,19 @@ class GratiaPlayerEngine(
 ) {
     companion object {
         private const val TAG = "GratiaPlayerEngine"
+
+        /**
+         * Process-wide handle on the live engine, for components outside the
+         * service that must reach it synchronously — the only one is
+         * [com.gratia.music.player.PlayerManager] cancelling a scheduled
+         * crossfade the moment the listener manually picks a different track
+         * (old audio stops now; the pre-buffered cargo belongs to the replaced
+         * track). Set in [initialize]; absent before the service starts, and
+         * every caller tolerates that.
+         */
+        @Volatile
+        var hook: GratiaPlayerEngine? = null
+            private set
     }
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -68,6 +81,48 @@ class GratiaPlayerEngine(
     private lateinit var playerB: ExoPlayer
 
     private val onPlayerSwappedListeners = mutableListOf<(Player) -> Unit>()
+    private val onTrackTransitionedListeners = mutableListOf<(String) -> Unit>()
+
+    /**
+     * Supplies the media item that should crossfade in after the current one.
+     *
+     * The engine cannot work this out for itself. Gratia's playback keeps one
+     * MediaItem in the player at a time — [com.gratia.music.player.PlayerManager]
+     * resolves a stream and sets that track as it starts — so the player's own
+     * timeline has nothing after the current item, and every timeline-derived
+     * "next" is empty. Asking Gratia's queue is the only answer that is ever
+     * right.
+     *
+     * Implementation lives in the playback service so the engine stays free of
+     * app-layer dependencies. Returning null means "there is genuinely nothing
+     * next", which cancels the transition rather than guessing.
+     */
+    fun interface NextItemProvider {
+        suspend fun nextMediaItemAfter(currentMediaId: String): MediaItem?
+    }
+
+    private var nextItemProvider: NextItemProvider? = null
+
+    fun setNextItemProvider(provider: NextItemProvider?) {
+        nextItemProvider = provider
+    }
+
+    /** The next track, resolved and ready to hand to [prepareNext]. */
+    suspend fun resolveNextMediaItem(currentMediaId: String): MediaItem? =
+        nextItemProvider?.nextMediaItemAfter(currentMediaId)
+
+    /**
+     * Notified with the media id the engine has advanced onto. Gratia's queue
+     * state follows this, because a crossfade changes the track without the app
+     * ever issuing a play command.
+     */
+    fun addTrackTransitionedListener(listener: (String) -> Unit) {
+        onTrackTransitionedListeners.add(listener)
+    }
+
+    fun removeTrackTransitionedListener(listener: (String) -> Unit) {
+        onTrackTransitionedListeners.remove(listener)
+    }
 
     // Active Audio Session ID Flow — used for equalizer re-attachment
     private val _activeAudioSessionId = MutableStateFlow(0)
@@ -152,6 +207,7 @@ class GratiaPlayerEngine(
 
         playerA = buildPlayer(handleAudioFocus = false)
         playerB = buildPlayer(handleAudioFocus = false)
+        hook = this
 
         playerA.addListener(masterPlayerListener)
 
@@ -297,7 +353,12 @@ class GratiaPlayerEngine(
      */
     fun prepareNext(mediaItem: MediaItem, startPositionMs: Long = 0L) {
         try {
-            Log.d(TAG, "prepareNext called for ${mediaItem.mediaId}")
+            Log.d(
+                TAG,
+                "CROSSFADE_PREPARE next=${mediaItem.mediaId} " +
+                    "outgoing=${playerA.currentMediaItem?.mediaId ?: "none"} " +
+                    "playerAState=${playerA.playbackState} position=${playerA.currentPosition}"
+            )
             playerB.stop()
             playerB.clearMediaItems()
             playerB.playWhenReady = false
@@ -310,9 +371,9 @@ class GratiaPlayerEngine(
                 playerB.seekTo(0)
             }
             playerB.pause()
-            Log.d(TAG, "Player B prepared, paused, volume=0")
+            Log.d(TAG, "CROSSFADE_READY next=${mediaItem.mediaId} state=${playerB.playbackState} volume=0")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to prepare next player", e)
+            Log.e(TAG, "CROSSFADE_ERROR stage=prepare ${e.message}")
         }
     }
 
@@ -320,10 +381,12 @@ class GratiaPlayerEngine(
      * Cancels any pending transition and resets Player B.
      */
     fun cancelNext() {
+        val wasRunning = isTransitionRunning()
         transitionJob?.cancel()
         transitionRunning = false
+        if (wasRunning) Log.d(TAG, "CROSSFADE_CANCELLED")
         if (::playerB.isInitialized && playerB.mediaItemCount > 0) {
-            Log.d(TAG, "Cancelling next player")
+            Log.d(TAG, "CROSSFADE_CANCEL next=${playerB.currentMediaItem?.mediaId}")
             playerB.stop()
             playerB.clearMediaItems()
         }
@@ -343,14 +406,22 @@ class GratiaPlayerEngine(
             return
         }
 
+        Log.d(
+            TAG,
+            "CROSSFADE_TRIGGER durationMs=$durationMs " +
+                "outgoing=${playerA.currentMediaItem?.mediaId ?: "none"} " +
+                "incoming=${playerB.currentMediaItem?.mediaId ?: "none"} " +
+                "position=${playerA.currentPosition} trackDuration=${playerA.duration}",
+        )
+
         transitionRunning = true
         transitionJob = scope.launch {
             try {
                 performOverlapTransition(durationMs)
             } catch (_: CancellationException) {
-                Log.d(TAG, "Transition cancelled before completion.")
+                Log.d(TAG, "CROSSFADE_CANCELLED stage=fade")
             } catch (e: Exception) {
-                Log.e(TAG, "Error performing transition", e)
+                Log.e(TAG, "CROSSFADE_ERROR stage=fade ${e.message}")
                 playerA.volume = 1f
                 setPauseAtEndOfMediaItems(false)
                 playerB.stop()
@@ -371,10 +442,14 @@ class GratiaPlayerEngine(
      */
     private suspend fun performOverlapTransition(durationMs: Int) {
         if (playerB.mediaItemCount == 0) {
+            Log.w(TAG, "CROSSFADE_CANCEL reason=incoming_not_prepared")
             playerA.volume = 1f
             setPauseAtEndOfMediaItems(false)
             return
         }
+
+        val outgoingMediaId = playerA.currentMediaItem?.mediaId
+        val incomingMediaIdForLog = playerB.currentMediaItem?.mediaId
 
         val outgoingPlayer = playerA
         val incomingPlayer = playerB
@@ -434,6 +509,7 @@ class GratiaPlayerEngine(
 
         playerA = incomingPlayer
         playerB = outgoingPlayer
+        Log.d(TAG, "CROSSFADE_SWAP outgoing=$outgoingMediaId incoming=$incomingMediaIdForLog")
 
         playerB.pauseAtEndOfMediaItems = true
         playerA.pauseAtEndOfMediaItems = false
@@ -444,6 +520,16 @@ class GratiaPlayerEngine(
         }
 
         onPlayerSwappedListeners.forEach { it(playerA) }
+
+        // The app's queue has no idea it changed tracks: nothing asked it to.
+        // Reporting the incoming media id is how the mini player, the expanded
+        // player and AutoPlay follow a crossfade instead of describing the
+        // previous song until the next command.
+        incomingMediaIdForLog?.let { id ->
+            onTrackTransitionedListeners.forEach { listener ->
+                runCatching { listener(id) }
+            }
+        }
 
         _activeAudioSessionId.value = playerA.audioSessionId
 
@@ -489,10 +575,17 @@ class GratiaPlayerEngine(
             val stepMs = 16L
             val startTime = android.os.SystemClock.elapsedRealtime()
             var elapsed = 0L
+            var lastLoggedBucket = -1
+
+            Log.d(
+                TAG,
+                "CROSSFADE_START outgoing=$outgoingMediaId incoming=$incomingMediaIdForLog " +
+                    "duration=${duration}ms outgoingPlaying=${playerB.isPlaying} incomingPlaying=${playerA.isPlaying}",
+            )
 
             while (elapsed <= duration) {
                 val progress = (elapsed.toFloat() / duration).coerceIn(0f, 1f)
-                
+
                 // Equal-Power Crossfade Curve
                 // Using sine/cosine maintains constant acoustic energy: sin^2(x) + cos^2(x) = 1
                 val theta = progress * (Math.PI / 2.0)
@@ -502,7 +595,31 @@ class GratiaPlayerEngine(
                 playerA.volume = volIn
                 playerB.volume = volOut.coerceIn(0f, 1f)
 
+                // A few progress points, not one per frame: 60 log lines a
+                // second is its own performance problem.
+                val bucket = (progress * 4).toInt()
+                if (bucket != lastLoggedBucket) {
+                    lastLoggedBucket = bucket
+                    Log.d(
+                        TAG,
+                        "CROSSFADE_PROGRESS ${(progress * 100).toInt()}% " +
+                            "in=$volIn out=$volOut outgoingPlaying=${playerB.isPlaying} incomingPlaying=${playerA.isPlaying}",
+                    )
+                    Log.d(TAG, "CROSSFADE_IN volume=$volIn incoming#$incomingMediaIdForLog")
+                    Log.d(TAG, "CROSSFADE_OUT volume=$volOut outgoing#$outgoingMediaId")
+                }
+
                 if (playerA.playbackState == Player.STATE_ENDED || playerB.playbackState == Player.STATE_ENDED) {
+                    Log.w(TAG, "CROSSFADE_SHORT track ended mid-fade; completing immediately")
+                    break
+                }
+
+                // The listener paused. Finish now and cut the outgoing audio,
+                // rather than leaving the previous song playing on underneath a
+                // paused screen — the old track fading out is only acceptable
+                // while something is meant to be heard.
+                if (!playerA.playWhenReady) {
+                    Log.d(TAG, "CROSSFADE_CANCELLED reason=paused_during_fade")
                     break
                 }
 
@@ -510,6 +627,7 @@ class GratiaPlayerEngine(
                 elapsed = android.os.SystemClock.elapsedRealtime() - startTime
             }
         } else {
+            Log.w(TAG, "CROSSFADE_DEGRADED reason=incoming_never_started — cutting over instead")
             playerA.volume = 1f
             if (playerA.playbackState == Player.STATE_READY) {
                 playerA.play()
@@ -524,6 +642,7 @@ class GratiaPlayerEngine(
         playerB.pause()
         playerB.stop()
         playerB.clearMediaItems()
+        Log.d(TAG, "CROSSFADE_COMPLETE now=${playerA.currentMediaItem?.mediaId} masterState=${playerA.playbackState}")
 
         try {
             playerB.seekTo(0)
@@ -546,6 +665,7 @@ class GratiaPlayerEngine(
             playerA.release()
         }
         if (::playerB.isInitialized) playerB.release()
+        if (hook === this) hook = null
         isReleased = true
         Log.d(TAG, "GratiaPlayerEngine released.")
     }

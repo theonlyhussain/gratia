@@ -37,6 +37,27 @@ interface SongDao {
     @Query("SELECT * FROM songs ORDER BY createdAt DESC LIMIT :limit")
     fun getLastAdded(limit: Int = 20): Flow<List<SongEntity>>
 
+    /**
+     * Genuine "recently added" events: tracks Gratia itself fetched.
+     *
+     * [getLastAdded] orders by `createdAt`, which for a scanned local file is
+     * simply when the scanner first saw it — discovery, not addition. Only a
+     * download is an event the user caused, so only downloads are eligible here,
+     * and `updatedAt` is when the download completed.
+     */
+    @Query("SELECT * FROM songs WHERE isDownloaded = 1 ORDER BY updatedAt DESC LIMIT :limit")
+    fun getRecentlyDownloaded(limit: Int = 20): Flow<List<SongEntity>>
+
+    /**
+     * Everything Gratia itself downloaded — the full list, not a preview.
+     *
+     * [getRecentlyDownloaded] is capped for a Home shelf; a downloads manager
+     * has to be able to show (and account for) every track, so this query has
+     * no limit. Ordered newest first, matching the shelf it feeds.
+     */
+    @Query("SELECT * FROM songs WHERE isDownloaded = 1 ORDER BY updatedAt DESC")
+    fun getDownloadedSongs(): Flow<List<SongEntity>>
+
     @Query("SELECT DISTINCT artist FROM songs WHERE lastPlayedAt IS NOT NULL ORDER BY lastPlayedAt DESC LIMIT :limit")
     fun getRecentArtists(limit: Int = 10): Flow<List<String>>
 

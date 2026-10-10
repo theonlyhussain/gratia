@@ -55,14 +55,16 @@ fun YouScreen(
     onNavigateToListeningHistory: () -> Unit,
     onNavigateToAppearance: () -> Unit,
     onNavigateToEqualizer: () -> Unit,
-    onNavigateToSmartUpdate: () -> Unit,
+    onNavigateToUpdate: () -> Unit,
     onNavigateToLibrarySettings: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToSongs: () -> Unit,
     onNavigateToAlbums: () -> Unit,
     onNavigateToArtists: () -> Unit,
     onNavigateToPlaylists: () -> Unit,
-    onNavigateToPlayback: () -> Unit
+    onNavigateToPlayback: () -> Unit,
+    onNavigateToLyrics: () -> Unit,
+    onNavigateToDownloads: () -> Unit
 ) {
     val context = LocalContext.current
     val hapticFeedback = LocalHapticFeedback.current
@@ -80,7 +82,6 @@ fun YouScreen(
 
     // Settings state
     val settingsDataStore = remember { com.gratia.music.data.SettingsDataStore(context) }
-    val smartUpdateEnabled by settingsDataStore.smartUpdateEnabledFlow.collectAsState(initial = false)
     val onlineDataEnabled by settingsDataStore.onlineDataEnabledFlow.collectAsState(initial = true)
     val updateState by GratiaApp.instance.updateManager.state.collectAsState()
     val coroutineScope = rememberCoroutineScope()
@@ -389,11 +390,39 @@ fun YouScreen(
 
         Spacer(Modifier.height(8.dp))
 
+        // Grouped by what the settings are *about*, not by where their screens
+        // happened to be when they were written. Seven sections, in the order a
+        // listener meets them. Every row has the same shape, icon size, padding
+        // and divider; each second line says what the row actually does.
+
+        // APPEARANCE
+        SectionTitle("APPEARANCE")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.Palette, iconBg = Color(0xFFFF9500), title = "Appearance", subtitle = "Theme and OLED black", onClick = onNavigateToAppearance)
+        }
+        Spacer(Modifier.height(28.dp))
+
+        // PLAYBACK
+        SectionTitle("PLAYBACK")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.Speaker, iconBg = Color(0xFF007AFF), title = "Playback", subtitle = "Crossfade, streaming quality and sources", onClick = onNavigateToPlayback)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.GraphicEq, iconBg = Color(0xFFFF2D55), title = "Equalizer", subtitle = "Adjust frequency bands for this device", onClick = onNavigateToEqualizer)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.BarChart, iconBg = Color(0xFF007AFF), title = "Listening History", subtitle = "Everything you've played, and when", onClick = onNavigateToListeningHistory)
+        }
+        Spacer(Modifier.height(28.dp))
+
+        // LYRICS
+        SectionTitle("LYRICS")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.Subtitles, iconBg = Color(0xFFAF52DE), title = "Lyrics", subtitle = "Word animation, motion and focus blur", onClick = onNavigateToLyrics)
+        }
+        Spacer(Modifier.height(28.dp))
+
         // LIBRARY
         SectionTitle("LIBRARY")
         SectionCard {
-            SettingsRow(icon = Icons.Default.Storage, iconBg = Color(0xFF8E8E93), title = "Storage", subtitle = "Local Device", onClick = onNavigateToStorage)
-            SettingsDivider()
             SettingsRow(icon = Icons.Default.LibraryMusic, iconBg = Color(0xFF5856D6), title = "Songs", subtitle = "$songCount tracks", onClick = onNavigateToSongs)
             SettingsDivider()
             SettingsRow(icon = Icons.Default.Album, iconBg = Color(0xFFFF2D55), title = "Albums", subtitle = "$albumCount albums", onClick = onNavigateToAlbums)
@@ -401,55 +430,45 @@ fun YouScreen(
             SettingsRow(icon = Icons.Default.Person, iconBg = Color(0xFFFF9500), title = "Artists", subtitle = "$artistCount artists", onClick = onNavigateToArtists)
             SettingsDivider()
             SettingsRow(icon = Icons.Default.QueueMusic, iconBg = Color(0xFF34C759), title = "Playlists", subtitle = "${playlists.size} playlists", onClick = onNavigateToPlaylists)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.Sync, iconBg = Color(0xFF5856D6), title = "Local Files & Sync", subtitle = "Folders Gratia is allowed to scan", onClick = onNavigateToLibrarySettings)
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(28.dp))
 
-        // PLAYBACK
-        SectionTitle("PLAYBACK")
+        // DOWNLOADS
+        SectionTitle("DOWNLOADS")
+        SectionCard {
+            SettingsRow(icon = Icons.Default.Download, iconBg = Color(0xFF34C759), title = "Downloads", subtitle = "Tracks saved for offline listening", onClick = onNavigateToDownloads)
+            SettingsDivider()
+            SettingsRow(icon = Icons.Default.Storage, iconBg = Color(0xFF8E8E93), title = "Storage & Cache", subtitle = "What Gratia keeps on this device", onClick = onNavigateToStorage)
+        }
+        Spacer(Modifier.height(28.dp))
+
+        // UPDATES
+        SectionTitle("UPDATES")
         SectionCard {
             SettingsRow(
-                icon = Icons.Default.Speaker,
-                iconBg = Color(0xFF007AFF),
-                title = "Playback",
-                subtitle = "Crossfade",
-                onClick = onNavigateToPlayback
+                icon = Icons.Default.Update,
+                iconBg = Color(0xFF34C759),
+                title = "Check for Updates",
+                subtitle = updateStatusSubtitle(updateState),
+                onClick = onNavigateToUpdate,
+                showDot = updateState is com.gratia.music.updater.UpdateState.UpdateAvailable ||
+                    updateState is com.gratia.music.updater.UpdateState.ReadyToInstall
             )
-            SettingsDivider()
-            SettingsRow(icon = Icons.Default.BarChart, iconBg = Color(0xFF007AFF), title = "Listening History", subtitle = "Your listening statistics", onClick = onNavigateToListeningHistory)
         }
-        Spacer(Modifier.height(20.dp))
-
-        // SETTINGS
-        SectionTitle("SETTINGS")
-        SectionCard {
-            SettingsRow(icon = Icons.Default.Palette, iconBg = Color(0xFFFF9500), title = "Appearance", subtitle = "Theme, OLED", onClick = onNavigateToAppearance)
-            SettingsDivider()
-            SettingsRow(icon = Icons.Default.GraphicEq, iconBg = Color(0xFFFF2D55), title = "Equalizer", subtitle = "Audio effects & frequencies", onClick = onNavigateToEqualizer)
-            SettingsDivider()
-            SettingsRow(
-                icon = Icons.Default.Update, 
-                iconBg = Color(0xFF34C759), 
-                title = "Smart Update", 
-                subtitle = if (smartUpdateEnabled) "Enabled" else "Disabled", 
-                onClick = onNavigateToSmartUpdate,
-                badge = if (!smartUpdateEnabled) "Recommended" else null,
-                showDot = updateState is com.gratia.music.updater.UpdateState.UpdateAvailable || updateState is com.gratia.music.updater.UpdateState.ReadyToInstall
-            )
-            SettingsDivider()
-            SettingsRow(icon = Icons.Default.Sync, iconBg = Color(0xFF5856D6), title = "Library", subtitle = "Local files & sync", onClick = onNavigateToLibrarySettings)
-        }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(28.dp))
 
         // ABOUT
         SectionTitle("ABOUT")
         SectionCard {
-            SettingsRow(icon = Icons.Default.PrivacyTip, iconBg = Color(0xFF8E8E93), title = "Privacy", subtitle = "All data stays on your device", onClick = {}, showChevron = false)
+            SettingsRow(icon = Icons.Default.PrivacyTip, iconBg = Color(0xFF8E8E93), title = "Privacy", subtitle = "Your library and history stay on this device", onClick = {}, showChevron = false)
             SettingsDivider()
             SettingsRow(
                 icon = Icons.Default.CloudQueue, 
                 iconBg = Color(0xFF32ADE6), 
                 title = "Online Data", 
-                subtitle = if (onlineDataEnabled) "Enabled (APIs active)" else "Disabled (Local only)", 
+                subtitle = if (onlineDataEnabled) "Artwork, artist info and lyrics are fetched" else "Off — nothing is fetched", 
                 onClick = { 
                     if (onlineDataEnabled) {
                         showOnlineDataWarning = true
@@ -493,6 +512,21 @@ fun YouScreen(
             containerColor = GratiaTheme.colors.surface
         )
     }
+}
+
+/**
+ * One status line describing what a check for updates would find right now.
+ * Deliberately the same vocabulary as the updater screen, so the row and the
+ * screen it opens never disagree about what is happening.
+ */
+private fun updateStatusSubtitle(state: com.gratia.music.updater.UpdateState): String = when (state) {
+    is com.gratia.music.updater.UpdateState.Checking -> "Checking for updates…"
+    is com.gratia.music.updater.UpdateState.UpToDate -> "You're up to date"
+    is com.gratia.music.updater.UpdateState.UpdateAvailable -> "Version ${state.version} is available"
+    is com.gratia.music.updater.UpdateState.Downloading -> "Downloading update…"
+    is com.gratia.music.updater.UpdateState.ReadyToInstall -> "Ready to install"
+    is com.gratia.music.updater.UpdateState.Error -> "Couldn't check — tap to try again"
+    is com.gratia.music.updater.UpdateState.Idle -> "Gratia checks only when you ask"
 }
 
 @Composable

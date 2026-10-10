@@ -34,8 +34,6 @@ import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Locale
 
 /**
  * Full page Artist Information Screen displayed over the ExpandedPlayer.
@@ -193,11 +191,20 @@ fun ArtistInfoScreen(
                             }
                         }
                     }
-                    if (artistInfo != null) {
+                    // The metric is rendered as what it is: Deezer's follower
+                    // count, labelled with its type and source (artist spec
+                    // 2/3). It was previously headed "Monthly Listeners" — a
+                    // different metric from a different platform. When the
+                    // count is unknown it is omitted, never substituted.
+                    if (artistInfo?.fanCount != null && artistInfo.fanCount > 0) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        val formattedFans = NumberFormat.getNumberInstance(Locale.getDefault()).format(artistInfo.fanCount)
+                        val metric = com.gratia.music.data.model.ArtistMetric(
+                            value = artistInfo.fanCount.toLong(),
+                            type = com.gratia.music.data.model.ArtistMetricType.FOLLOWERS,
+                            source = "Deezer",
+                        )
                         Text(
-                            text = "$formattedFans Monthly Listeners",
+                            text = metric.label,
                             fontFamily = Inter,
                             fontWeight = FontWeight.Medium,
                             fontSize = 15.sp,

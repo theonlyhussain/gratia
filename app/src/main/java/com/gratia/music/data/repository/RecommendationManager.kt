@@ -1,8 +1,11 @@
 package com.gratia.music.data.repository
 
 import com.gratia.music.data.dao.ListeningEventDao
+import com.gratia.music.data.dao.PlaybackHistoryDao
 import com.gratia.music.data.dao.SongDao
+import com.gratia.music.data.model.PlaybackHistoryEntity
 import com.gratia.music.data.model.SongEntity
+import com.gratia.music.data.model.toSongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.log2
@@ -10,67 +13,69 @@ import kotlin.math.max
 
 class RecommendationManager(
     private val songDao: SongDao,
-    private val listeningEventDao: ListeningEventDao
+    private val listeningEventDao: ListeningEventDao,
+    private val playbackHistoryDao: PlaybackHistoryDao
 ) {
+    /**
+     * The Daily Mix, built from the playback timeline rather than from the
+     * songs table's lifetime aggregates.
+     *
+     * Every play in the recent [HISTORY_WINDOW] of history is a
+     * dated, measured signal — how recently it played and how much of it was
+     * heard. [DailyMixScoring] decays those signals, so the shelf reflects
+     * what the listener is listening to *now*, not what they listened to most
+     * in total. A remote track that was streamed and never saved is rebuilt
+     * from its own history snapshot, so it can appear in the mix too.
+     */
     suspend fun getDailyMix(allSongs: List<SongEntity>, limit: Int = 20, excludeIds: Set<String> = emptySet()): List<SongEntity> = withContext(Dispatchers.IO) {
-        if (allSongs.isEmpty()) return@withContext emptyList()
+        val recentPlays = playbackHistoryDao.recentOnce(HISTORY_WINDOW)
+        val signals = recentPlays.map {
+            DailyMixSignal(
+                songId = it.songId,
+                artist = it.artist,
+                playedAt = it.playedAt,
+                listenedSeconds = it.listenedSeconds,
+                completed = it.completed,
+            )
+        }
 
-        val now = System.currentTimeMillis()
-        val candidates = allSongs.filter { it.id !in excludeIds }
+        val candidates = mergeCandidates(allSongs, recentPlays)
         if (candidates.isEmpty()) return@withContext emptyList()
 
-        val artistScores = mutableMapOf<String, Float>()
-        
-        val scoredSongs = candidates.map { song ->
-            val score = calculateScore(song, now)
-            val artist = song.artist
-            if (artist.isNotBlank() && artist != "<unknown>") {
-                artistScores[artist] = (artistScores[artist] ?: 0f) + max(0f, score)
-            }
-            song to score
-        }
-
-        // Apply artist affinity and exploration, then sort
-        val mixedScores = scoredSongs.map { (song, rawScore) ->
-            val artistAffinity = if (song.artist.isNotBlank() && song.artist != "<unknown>") {
-                artistScores[song.artist] ?: 0f
-            } else 0f
-            
-            // Random exploration boost
-            val seed = (Math.random() * 100).toInt()
-            val randomExplorationBoost = seed / 2f
-            
-            val finalScore = rawScore + (artistAffinity * 0.1f) + randomExplorationBoost
-            song to finalScore
-        }.sortedByDescending { it.second }
-
-        // Enforce diversity: max 3 songs per artist in the generated mix
-        val result = mutableListOf<SongEntity>()
-        val artistCounts = mutableMapOf<String, Int>()
-        
-        for ((song, _) in mixedScores) {
-            val artist = song.artist
-            val count = artistCounts[artist] ?: 0
-            if (count < 3) {
-                result.add(song)
-                artistCounts[artist] = count + 1
-            }
-            if (result.size >= limit) break
-        }
-        
-        // If we still need more songs, just take the best remaining ones
-        if (result.size < limit) {
-            for ((song, _) in mixedScores) {
-                if (song !in result) {
-                    result.add(song)
-                    if (result.size >= limit) break
-                }
-            }
-        }
-        
-        result.shuffle() // Shuffle so it feels like a mix rather than an ordered top list
-        return@withContext result
+        DailyMixScoring.rank(
+            candidates = candidates,
+            signals = signals,
+            now = System.currentTimeMillis(),
+            limit = limit,
+            excludeIds = excludeIds,
+            idOf = { it.id },
+            artistOf = { it.artist },
+        )
     }
+
+    /**
+     * The mix's candidate pool: every track the device knows, plus any track
+     * that only ever existed as a play. A streamed-but-unsaved track is still
+     * something the listener chose to hear, and its history row carries enough
+     * to play it again — dropping it here would make the mix blind to exactly
+     * the listening that never reached the songs table.
+     */
+    private fun mergeCandidates(
+        allSongs: List<SongEntity>,
+        recentPlays: List<PlaybackHistoryEntity>,
+    ): List<SongEntity> {
+        val byId = LinkedHashMap<String, SongEntity>(allSongs.size * 2)
+        for (song in allSongs) {
+            if (song.id.isNotBlank() && song.title.isNotBlank()) byId[song.id] = song
+        }
+        for (play in recentPlays) {
+            if (play.songId.isBlank() || play.songId in byId) continue
+            if (play.title.isBlank()) continue
+            byId[play.songId] = play.toSongEntity()
+        }
+        return byId.values.toList()
+    }
+
     /**
      * Calculates the best recommended song based on the user's actual listening behavior.
      * Uses a multi-signal scoring model.
@@ -172,5 +177,11 @@ class RecommendationManager(
         }
 
         return listendDurationScore + completionScore + repeatPlayScore + recencyScore - skipPenalty
+    }
+
+    private companion object {
+        /** How much of the timeline the Daily Mix reads — deep enough to learn
+         *  an artist's rotation, bounded so a huge library cannot stall startup. */
+        const val HISTORY_WINDOW = 1000
     }
 }

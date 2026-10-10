@@ -12,9 +12,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -172,16 +174,22 @@ val InstagramIcon: ImageVector
         }
     }.build()
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AboutScreen(
     playerViewModel: PlayerViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToLicenses: () -> Unit
+    onNavigateToLicenses: () -> Unit,
+    onNavigateToDiagnostics: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val packageInfo = remember(context) { context.packageManager.getPackageInfo(context.packageName, 0) }
     val appVersion = remember(packageInfo) { packageInfo.versionName ?: "Unknown" }
+
+    val settings = remember { com.gratia.music.data.SettingsDataStore(context) }
+    val developerMode by settings.developerModeFlow.collectAsState(initial = false)
+    val scope = rememberCoroutineScope()
 
     val state = remember { MutableTransitionState(false).apply { targetState = true } }
 
@@ -380,6 +388,32 @@ fun AboutScreen(
                 }
             }
             
+            // Developer tools — hidden until developer mode is switched on by
+            // long-pressing the version line below. Playback diagnostics are
+            // facts about the audio, and facts about the audio are useful to a
+            // developer and noise to everyone else.
+            if (developerMode) {
+                AnimatedVisibility(
+                    visibleState = state,
+                    enter = fadeIn(animationSpec = tween(400, delayMillis = 200, easing = EaseOut)) +
+                            slideInVertically(animationSpec = tween(400, delayMillis = 200, easing = EaseOut)) { 50 }
+                ) {
+                    AboutCard(title = "Developer") {
+                        AboutActionRow(
+                            title = "Playback diagnostics",
+                            subtitle = "Recording identity, source, real codec and bitrate, download and lyric state",
+                            onClick = onNavigateToDiagnostics
+                        )
+                        HorizontalDivider(color = GratiaTheme.colors.glassBorder, modifier = Modifier.padding(vertical = 4.dp))
+                        AboutActionRow(
+                            title = "Turn off developer mode",
+                            subtitle = "Hide the diagnostics entry",
+                            onClick = { scope.launch { settings.setDeveloperMode(false) } }
+                        )
+                    }
+                }
+            }
+
             // Licenses
             AnimatedVisibility(
                 visibleState = state,
@@ -436,7 +470,24 @@ fun AboutScreen(
                         text = "Version $appVersion ($buildNumber)",
                         fontFamily = Inter,
                         fontSize = 13.sp,
-                        color = GratiaTheme.colors.textSecondary
+                        color = GratiaTheme.colors.textSecondary,
+                        // Long-press the version to toggle developer mode — the
+                        // conventional hidden switch, and harmless if found by
+                        // accident.
+                        modifier = Modifier.combinedClickable(
+                            onClick = {},
+                            onLongClick = {
+                                scope.launch {
+                                    val next = !developerMode
+                                    settings.setDeveloperMode(next)
+                                    Toast.makeText(
+                                        context,
+                                        if (next) "Developer mode enabled" else "Developer mode disabled",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        )
                     )
                     Text(
                         text = context.packageName,

@@ -156,6 +156,106 @@ class LyricsParserTest {
         assertEquals(5000L, lines[0].endMs)
     }
 
+    @Test
+    fun testStandardLrcWithBareStampBreak() {
+        // A stamp with nothing after it is the file saying "instrumental here".
+        val input = """
+            [00:10.00] Line one
+            [00:20.00] Line two
+            [02:15.00]
+            [02:30.00] Line three
+        """.trimIndent()
+
+        val doc = LyricsParser.parse(input)
+        assertTrue("Expected LineSynced lyrics mode", doc is LyricsDocument.LineSynced)
+        val lines = (doc as LyricsDocument.LineSynced).lines
+        assertEquals(4, lines.size)
+
+        assertTrue(lines[2].isGap)
+        assertEquals(135_000L, lines[2].startMs)
+        // Stamped to the line after it, like every other line here, so the
+        // break is current until the singing comes back.
+        assertEquals(150_000L, lines[2].endMs)
+    }
+
+    @Test
+    fun testBareStampBreakSurvivesTheSavedFile() {
+        // The download path writes what it parsed back out as LRC
+        // (List<LyricLine>.toLrc), so a break has to survive the round trip or
+        // it is lost the moment the song is saved.
+        val input = "[00:10.00] Line one\n[00:20.00] Line two\n[02:15.00]\n[02:30.00] Line three"
+        val lines = (LyricsParser.parse(input) as LyricsDocument.LineSynced).lines
+
+        val saved = lines.toLrc()
+        assertTrue(
+            "The break goes out as a bare stamp, which is what reads back as one",
+            saved.lines().contains("[02:15.00]")
+        )
+
+        val reparsed = (LyricsParser.parse(saved) as LyricsDocument.LineSynced).lines
+        assertEquals(4, reparsed.size)
+        assertTrue(reparsed[2].isGap)
+        assertEquals(135_000L, reparsed[2].startMs)
+    }
+
+    @Test
+    fun testStandardLrcLeavesUnmarkedBreaksUnmarked() {
+        // Nothing in this file says when line two's singing stopped, so nothing
+        // here can say a break happened — see LyricGaps.
+        val input = """
+            [00:10.00] Line one
+            [00:20.00] Line two
+            [00:35.00] Line three
+        """.trimIndent()
+
+        val doc = LyricsParser.parse(input)
+        val lines = (doc as LyricsDocument.LineSynced).lines
+        assertEquals(3, lines.size)
+        assertTrue(lines.none { it.isGap })
+    }
+
+    @Test
+    fun testStretchesNamedInTheText() {
+        // No empty stamp, so the file says it in the line: a glyph for the
+        // music, or a bracketed note naming the stretch.
+        val markers = listOf(
+            "♪", "♪ ♪ ♪", "♫", "🎵🎶", "(instrumental)", "[Instrumental]",
+            "(Instrumental Break)", "(music)", "[interlude]", "(solo)",
+            "(guitar solo)", "（間奏）", "(间奏)"
+        )
+
+        markers.forEach { marker ->
+            val input = "[00:10.00] Line one\n[02:15.00] $marker\n[02:30.00] Line two"
+            val lines = (LyricsParser.parse(input) as LyricsDocument.LineSynced).lines
+
+            assertEquals("$marker should read as a break", 3, lines.size)
+            assertTrue("$marker should read as a break", lines[1].isGap)
+            // Its own stamps either way: the break runs to the line it waits for.
+            assertEquals("$marker keeps its stamp", 135_000L, lines[1].startMs)
+            assertEquals(150_000L, lines[1].endMs)
+        }
+    }
+
+    @Test
+    fun testALineThatMentionsABreakIsStillALine() {
+        val input = """
+            [00:10.00] This instrumental is a song of mine
+            [00:20.00] And the note ♪ is in the middle of it
+            [00:30.00] (instrumental, guitar solo)
+            [00:40.00] Break it down now
+        """.trimIndent()
+
+        val doc = LyricsParser.parse(input)
+        val lines = (doc as LyricsDocument.LineSynced).lines
+
+        assertFalse(lines[0].isGap)
+        assertFalse(lines[1].isGap)
+        // A note with a word after it is a line about the stretch, not the
+        // stretch itself.
+        assertFalse(lines[2].isGap)
+        assertFalse(lines[3].isGap)
+    }
+
     // ─── Enhanced LRC ────────────────────────────────────────────
 
     @Test
@@ -360,6 +460,42 @@ class LyricsParserTest {
         
         assertEquals("world", words[1].text)
         assertEquals(12_000L, words[1].startMs)
+    }
+
+    @Test
+    fun testANamedBreakIsMergedIntoTheSilenceItSitsIn() {
+        // A TTML that states when its lines end *and* names the stretch in the
+        // text. The named row lands inside a silence that already has a row of
+        // its own, so the two count as one break — from where the singing
+        // stopped to the next line that is sung — rather than two that each
+        // fill from empty.
+        val ttml = """
+            <tt><body><div>
+                <p begin="00:00:10.000" end="00:00:15.000">Singing here</p>
+                <p begin="00:00:20.000" end="00:00:25.000">♪</p>
+                <p begin="00:00:30.000" end="00:00:35.000">More singing</p>
+            </div></body></tt>
+        """.trimIndent()
+
+        val lines = when (val doc = LyricsParser.parse(ttml)) {
+            is LyricsDocument.WordSynced -> doc.lines
+            is LyricsDocument.LineSynced -> doc.lines
+            is LyricsDocument.Plain -> emptyList()
+        }
+
+        // The run-up counts as a break too: nothing is written before the
+        // first stamp, and it waits ten seconds.
+        assertEquals(4, lines.size)
+        assertTrue(lines[0].isGap)
+        assertEquals(0L, lines[0].startMs)
+
+        assertEquals("Singing here", lines[1].text)
+
+        // One row for the whole stretch, starting where the singing stopped.
+        assertTrue(lines[2].isGap)
+        assertEquals(15_000L, lines[2].startMs)
+
+        assertEquals("More singing", lines[3].text)
     }
 
     @Test

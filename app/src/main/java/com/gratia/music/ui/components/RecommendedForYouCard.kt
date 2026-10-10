@@ -85,7 +85,16 @@ fun RecommendedForYouCard(
                             .clip(RoundedCornerShape(32.dp))
                     )
                 } else {
-                    val distinctCovers = songs.mapNotNull { it.coverArtPath }.distinct().take(4)
+                    // The mix has no canonical artwork of its own, so its visual
+                    // identity is composed from the tracks actually in it. The
+                    // cover paths are whatever those tracks carry — local file
+                    // paths for library tracks, http URLs for streamed ones —
+                    // and CoverArtImage routes both through the one artwork
+                    // request, so a remote-heavy mix is a collage of real
+                    // covers rather than a grey box. Distant covers are
+                    // dropped, not padded: two real covers beat four slots
+                    // with blanks in them.
+                    val distinctCovers = songs.mapNotNull { it.coverArtPath?.takeIf { p -> p.isNotBlank() } }.distinct().take(4)
                     if (distinctCovers.size >= 4) {
                         Column(
                             modifier = Modifier.size(180.dp).clip(RoundedCornerShape(32.dp))

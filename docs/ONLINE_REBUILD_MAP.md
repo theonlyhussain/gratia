@@ -183,5 +183,139 @@ Home's On Device row now opens **Local Music** rather than all Songs.
 - **Search** does not yet mark remote results unavailable offline.
 - **Playback**: a non-downloaded remote track still walks the resolver offline
   and fails; `NetworkMonitor` could short-circuit it with a clearer message.
-- The catalog cache is **in-memory only**, so a cold start offline has nothing
-  cached; a disk/database cache (Phase 29) is still to do.
+- The Home/Explore *page* caches are **in-memory only**, so a cold start offline
+  has nothing cached. Explore's per-category **artwork** index is now on disk
+  (see §9); the shelves themselves are not.
+
+## 8. AutoPlay is a radio, not a "next" button (this change)
+
+The reported bug: enable Infinity Play on a remote song and the next track was
+the next row of the search results. AutoPlay was implemented as "when the queue
+runs out, generate one more track" — the radio endpoint was never asked, and the
+seed was the queue's next item rather than the track being heard.
+
+- **`RadioQueue`** holds the rules as pure functions, so they are unit-testable
+  without a player, a network or a database (`player/RadioQueueTest.kt`).
+- **Seed** is always the *currently playing* remote track's `videoId`; the
+  remote answer is YouTube Music's own watch queue (`next` / `RDAMVM<videoId>`) —
+  already present as `Innertube.next`, now actually used as the continuation.
+- **Filtering** drops the seed itself, anything already queued, anything already
+  suggested, anything played recently, and *every* local file (a local track
+  cannot continue a radio).
+- **Queue separation.** The queue reads `… context … | current | explicit tracks
+  | AutoPlay suggestions | rest of the context …`. Tracks the listener queued by
+  hand (`playNext` / `addToQueue`) always precede suggestions; a list a song was
+  played *from* (search results, a shelf) is a context, not a queue, so a
+  suggestion follows the track being heard and the rest of the search results do
+  not jump ahead of it. This is the `§101` acceptance test.
+- **Refill happens early** — while three suggestions are still ahead — so the
+  next batch is fetched behind the music rather than in the silence after it.
+- **Dedup** is session-level: `autoplayPlayedIds` is every id AutoPlay has ever
+  offered, `autoplayQueuedIds` is the same set restricted to what is in the queue.
+- A **local** playback seed falls back to the existing local generator, and its
+  output never mixes into a remote chain.
+- Development logging: `AUTOPLAY_ENABLED`, `AUTOPLAY_SEED_CHANGED`,
+  `AUTOPLAY_RADIO_REQUEST`, `AUTOPLAY_RESULTS`, `AUTOPLAY_FILTERED_SEED`,
+  `AUTOPLAY_FILTERED_DUPLICATES`, `AUTOPLAY_APPENDED`, `AUTOPLAY_FETCH_MORE`,
+  `AUTOPLAY_REFILL_SKIPPED`, `AUTOPLAY_EXHAUSTED`, `AUTOPLAY_ERROR`.
+
+## 9. Explore artwork: cache first, refresh later (this change)
+
+- The per-category cover index (`category id → url → fetchedAt`) is persisted in
+  `SettingsDataStore` (`explore_category_artwork`, 7-day TTL) and warmed into
+  `ProviderManager` once per process (`primeCategoryArtwork`).
+- Explore seeds its cover map from that index **before** rendering, so a return
+  visit draws real artwork on the first frame and refreshes behind it.
+- The first eight covers are preloaded into Coil as they resolve — several
+  screenfuls of lead, not a download queue.
+- Coil disk keys are normalized to **the asset, not the drawn size**
+  (`artworkCacheKey`), so the row-size and header-size requests of one cover
+  share one download. Memory keys stay size-aware.
+- Logging: `EXPLORE_CACHE_HIT/MISS/REFRESH`,
+  `CATEGORY_ARTWORK_CACHE_HIT/LOAD/FAIL`.
+
+## 10. Smart Update removed; updates are manual (this change)
+
+- The feature is gone end-to-end: `SmartUpdateScreen`, `SmartUpdateSheets`,
+  `UpdateBanner`, the `smartUpdate` route, the settings row, and both DataStore
+  keys (deleted once, on first launch of this build).
+- `GratiaApp.scheduleUpdateCheck()` — which enqueued a 24-hour periodic update
+  check on **every cold start** — is replaced by
+  `UpdateCheckWorker.cancelLegacySchedule()`, so an install that already had the
+  work on disk has it cancelled. A run that fires before that lands does nothing.
+- `UpdateScreen` replaces it: current version, latest version from the server,
+  release notes, download size and real byte progress, and a message for each
+  way it can fail (offline, HTTP, invalid release, storage, unverified APK,
+  installer unavailable, permission needed).
+
+## 11. Crossfade: why it never fired (this change)
+
+Root cause: `TransitionController` found the next track by reading the
+**player's own timeline** — `timeline.getNextWindowIndex(...)` — but
+`PlayerManager` keeps exactly one `MediaItem` in the player at a time
+(`controller.setMediaItem` per track). That call always returned
+`C.INDEX_UNSET`, `nextMediaItem` was always null, and the scheduler returned at
+its "No next track" branch on every track. The fade code was never reached.
+
+Fix: the next track is a question about the queue, so it is asked of the queue.
+`GratiaPlayerEngine.setNextItemProvider` is set by `PlaybackService` to
+`PlayerManager.resolveNextMediaItemForCrossfade`, which resolves the next row
+(downloaded file → local URI → remote stream, in that order of preference) into
+a ready `MediaItem` without touching playback. `addTrackTransitionedListener`
+reports the incoming media id back so the queue index, now-playing state and the
+AutoPlay seed follow a crossfade — previously the app would have described the
+song that had already faded out.
+
+Also here: crossfade duration `0` returns **before** resolving anything (a
+stream fetched for a transition that will not happen is a wasted round trip);
+the fade loop aborts when the listener pauses, so the outgoing track cannot keep
+playing under a paused screen; and `CROSSFADE_PREPARE / READY / NEXT_PREPARE /
+TRIGGER / START / PROGRESS / IN / OUT / SWAP / COMPLETE / CANCEL / CANCELLED /
+DEGRADED / ERROR` make each stage verifiable in logcat.
+
+Not verified on a device: the audible overlap. See "Remaining limitations".
+
+## 12. Home pull-to-refresh (this change)
+
+- `GratiaPullToRefresh` wraps Material3's `PullToRefreshBox` with Gratia's
+owner indicator colours — the platform gesture, so the drag physics and the
+threshold are the ones users already know.
+- Cached shelves stay on screen while the indicator turns; the refresh is
+feedback, not a loading screen, and the scroll position is untouched.
+- A request **generation** guards the write: if a pull lands while an earlier
+fetch is running, the older result is discarded rather than allowed to overwrite
+the newer one. A pull also forces a real network refresh (`forceRefresh`).
+- `HomeScreen`'s Top Picks effect is keyed on the **seed artist list** rather
+than on `mostPlayed`, so a play-count write no longer restarts a catalogue
+search per seed artist.
+
+## 13. Daily Mix: history signals with recency decay (this change)
+
+Root cause: the Daily Mix was scored from **lifetime aggregates on the `songs`
+row** — `playCount`, `totalListenTime`, `completedCount`, `skipCount`. Those are
+running totals with no decay, so a track with hundreds of plays two years ago
+outranked the track played this morning; the mix was a lifetime top-ten wearing
+a "Daily" label. It also shuffled with `Math.random()`, so the same listener
+never got the same mix twice and the ranking could not be tested at all.
+
+Fix: the Daily Mix now reads the **playback timeline** (`playback_history`),
+where every row is one real play with a `playedAt` and a `listenedSeconds`.
+
+- `data/repository/DailyMixScoring.kt` — the pure model. Each play's weight is
+  its measured engagement (a completed listen counts full; a partial one scales
+  with how much was heard) multiplied by an exponential **decay** with a 14-day
+  half-life. Signals roll up into per-track and per-artist affinity; an unplayed
+  track by a returning artist earns a discovery bonus; the most recent play of a
+  track adds a small freshness nudge.
+- `RecommendationManager.getDailyMix` reads the newest 1000 plays, maps them to
+  `DailyMixSignal`s, and ranks. Candidates are the songs table **plus** tracks
+  that only ever existed as a play (rebuilt from the history row's own snapshot),
+  so a streamed-but-unsaved track can appear in the mix instead of being invisible.
+- Ordering interleaves by artist and caps each artist at 3 slots, replacing the
+  old shuffle — deterministic, so it is unit-testable and so a listener sees a
+  stable mix within a day.
+- No clock of its own: `now` is passed in, which is what makes the decay testable.
+
+Pinned by `DailyMixScoringTest` (decay curve, recency beating lifetime counts,
+completion weighting, artist discovery, per-artist cap, alternation, exclusions,
+determinism).

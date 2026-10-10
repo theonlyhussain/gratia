@@ -18,6 +18,11 @@ enum class LyricsSource(
     // Declaration order is the default priority — [AppSettings.lyricsSourceOrder]
     // and [AppSettings.lyricsSources] both fall back to [LyricsSource.entries]
     // verbatim, so this list *is* the out-of-the-box experience.
+    BINI_LYRICS(
+        label = "BiniLyrics",
+        detail = "Matched by recording, not by name — the only one that knows the ISRC",
+        wordSynced = true,
+    ),
     LYRICS_PLUS(
         label = "LyricsPlus",
         detail = "Syllable by syllable, on community mirrors",

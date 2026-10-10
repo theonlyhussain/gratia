@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.repository.SongRepository
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.components.EmptyStateView
 import com.gratia.music.ui.components.SongRow
 import com.gratia.music.ui.theme.GratiaTheme
@@ -112,7 +113,7 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
                             Button(
                                 onClick = { 
                                     haptics.light(view)
-                                    playerViewModel.playSong(favorites.first(), favorites) 
+                                    playerViewModel.playSong(favorites.first(), favorites, PlaybackOrigin.FAVORITES) 
                                 },
                                 modifier = Modifier.weight(1f).height(50.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -131,7 +132,7 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
                                     haptics.light(view)
                                     if (favorites.isNotEmpty()) {
                                         playerViewModel.toggleShuffle()
-                                        playerViewModel.playSong(favorites.random(), favorites)
+                                        playerViewModel.playSong(favorites.random(), favorites, PlaybackOrigin.FAVORITES)
                                     }
                                 },
                                 modifier = Modifier.weight(1f).height(50.dp),
@@ -155,7 +156,7 @@ fun FavoritesScreen(playerViewModel: PlayerViewModel) {
                         index = index,
                         isActive = currentSong?.id == song.id,
                         isPlaying = currentSong?.id == song.id && isPlaying,
-                        onClick = { playerViewModel.playSong(song, favorites) },
+                        onClick = { playerViewModel.playSong(song, favorites, PlaybackOrigin.FAVORITES) },
                         modifier = Modifier.padding(horizontal = 24.dp)
                     )
                 }

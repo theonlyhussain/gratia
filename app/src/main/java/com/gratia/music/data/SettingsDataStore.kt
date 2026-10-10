@@ -95,16 +95,22 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    /**
+     * Preferences left behind by the retired Smart Update feature.
+     *
+     * The feature is gone — its screen, its route, its switch and the periodic
+     * check it drove. These two keys are the only trace it leaves on an existing
+     * install, and they are deleted rather than merely unread: a stored
+     * `smart_update_enabled = true` that nothing consults is dead state, and a
+     * stored value that something *did* consult would be worse.
+     */
     private val SMART_UPDATE_ENABLED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("smart_update_enabled")
-    
-    val smartUpdateEnabledFlow: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[SMART_UPDATE_ENABLED_KEY] ?: false
-        }
+    private val SMART_UPDATE_ONBOARDING_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("smart_update_onboarding_shown")
 
-    suspend fun setSmartUpdateEnabled(enabled: Boolean) {
+    suspend fun clearObsoleteUpdatePreferences() {
         context.dataStore.edit { preferences ->
-            preferences[SMART_UPDATE_ENABLED_KEY] = enabled
+            preferences.remove(SMART_UPDATE_ENABLED_KEY)
+            preferences.remove(SMART_UPDATE_ONBOARDING_KEY)
         }
     }
 
@@ -134,19 +140,6 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
-    private val SMART_UPDATE_ONBOARDING_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("smart_update_onboarding_shown")
-    
-    val smartUpdateOnboardingShownFlow: Flow<Boolean> = context.dataStore.data
-        .map { preferences ->
-            preferences[SMART_UPDATE_ONBOARDING_KEY] ?: false
-        }
-
-    suspend fun setSmartUpdateOnboardingShown(shown: Boolean = true) {
-        context.dataStore.edit { preferences ->
-            preferences[SMART_UPDATE_ONBOARDING_KEY] = shown
-        }
-    }
-
     private val ONLINE_DATA_ENABLED_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("online_data_enabled")
     val onlineDataEnabledFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -156,6 +149,28 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setOnlineDataEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[ONLINE_DATA_ENABLED_KEY] = enabled
+        }
+    }
+
+    /**
+     * The AutoPlay default, persisted (spec 16/93).
+     *
+     * ON by default for remote playback: the Infinity button is not something
+     * the listener should have to re-enable every session. The queue's pill
+     * controls the current session; this is what a new session starts from.
+     * Local-only playback never applies it — a local collection is not to be
+     * silently replaced by remote radio.
+     */
+    private val AUTOPLAY_DEFAULT_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("autoplay_default_enabled")
+
+    val autoplayDefaultFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[AUTOPLAY_DEFAULT_KEY] ?: true
+        }
+
+    suspend fun setAutoplayDefault(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTOPLAY_DEFAULT_KEY] = enabled
         }
     }
 
@@ -189,10 +204,23 @@ class SettingsDataStore(private val context: Context) {
     }
 
     // Playback State Persistence
-    private val SAVED_QUEUE_IDS_KEY = stringPreferencesKey("saved_queue_ids") // comma separated
-    private val SAVED_CURRENT_SONG_ID_KEY = stringPreferencesKey("saved_current_song_id")
-    private val SAVED_CURRENT_TIME_MS_KEY = androidx.datastore.preferences.core.longPreferencesKey("saved_current_time_ms")
+    //
+    // The full snapshot (current song, queue, position, origin, autoplay
+    // tier) is one serialized document. The older id-only keys are kept
+    // readable for exactly one thing: migrating an install that last saved
+    // under the old scheme. New writes never touch them, and they are
+    // removed as soon as a new-format snapshot exists.
+    private val SAVED_SNAPSHOT_KEY = stringPreferencesKey("playback_snapshot_v1")
+    private val SAVED_QUEUE_IDS_KEY = stringPreferencesKey("saved_queue_ids") // legacy, comma separated
+    private val SAVED_CURRENT_SONG_ID_KEY = stringPreferencesKey("saved_current_song_id") // legacy
+    private val SAVED_CURRENT_TIME_MS_KEY = androidx.datastore.preferences.core.longPreferencesKey("saved_current_time_ms") // legacy
 
+    /** The raw serialized [com.gratia.music.player.PlaybackSnapshot], or null when nothing is persisted. */
+    val savedPlaybackSnapshotJsonFlow: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[SAVED_SNAPSHOT_KEY]
+    }
+
+    /** Legacy id-based state, for migrating installs that saved under the old scheme. */
     val savedQueueIdsFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
         val str = preferences[SAVED_QUEUE_IDS_KEY] ?: ""
         if (str.isEmpty()) emptyList() else str.split(",")
@@ -206,15 +234,35 @@ class SettingsDataStore(private val context: Context) {
         preferences[SAVED_CURRENT_TIME_MS_KEY] ?: 0L
     }
 
-    suspend fun savePlaybackState(queueIds: List<String>, currentSongId: String?, currentTimeMs: Long) {
+    /**
+     * Persists the complete playback snapshot.
+     *
+     * DataStore writes only when the value actually changed, so the periodic
+     * position tick costs nothing when the listener is paused and a plain
+     * single-key rewrite when they are playing.
+     */
+    suspend fun savePlaybackSnapshot(snapshotJson: String) {
         context.dataStore.edit { preferences ->
-            preferences[SAVED_QUEUE_IDS_KEY] = queueIds.joinToString(",")
-            if (currentSongId != null) {
-                preferences[SAVED_CURRENT_SONG_ID_KEY] = currentSongId
-            } else {
-                preferences.remove(SAVED_CURRENT_SONG_ID_KEY)
-            }
-            preferences[SAVED_CURRENT_TIME_MS_KEY] = currentTimeMs
+            preferences[SAVED_SNAPSHOT_KEY] = snapshotJson
+            // The new document replaces the id-only state outright.
+            preferences.remove(SAVED_QUEUE_IDS_KEY)
+            preferences.remove(SAVED_CURRENT_SONG_ID_KEY)
+            preferences.remove(SAVED_CURRENT_TIME_MS_KEY)
+        }
+    }
+
+    /**
+     * Drops the persisted playback snapshot. Used when the saved source is
+     * validated at startup and found gone: a snapshot pointing at a file
+     * that no longer exists must not be restored, and must not linger to
+     * point at nothing again next time.
+     */
+    suspend fun clearPlaybackSnapshot() {
+        context.dataStore.edit { preferences ->
+            preferences.remove(SAVED_SNAPSHOT_KEY)
+            preferences.remove(SAVED_QUEUE_IDS_KEY)
+            preferences.remove(SAVED_CURRENT_SONG_ID_KEY)
+            preferences.remove(SAVED_CURRENT_TIME_MS_KEY)
         }
     }
 
@@ -263,6 +311,26 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    // --- Blur unfocused lyrics ---
+    // Visual only, and separate from every other lyrics setting: it decides
+    // whether lyrics away from the line being sung soften as they fall away.
+    // Switching it off keeps the brightness hierarchy — the active line is
+    // still the brightest — and stops only the blur, so sync, word animation
+    // and auto-scroll are untouched either way.
+    private val BLUR_UNFOCUSED_LYRICS_KEY =
+        androidx.datastore.preferences.core.booleanPreferencesKey("blur_unfocused_lyrics")
+
+    val blurUnfocusedLyricsFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[BLUR_UNFOCUSED_LYRICS_KEY] ?: true // ON by default
+        }
+
+    suspend fun setBlurUnfocusedLyrics(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[BLUR_UNFOCUSED_LYRICS_KEY] = enabled
+        }
+    }
+
     // --- Lyrics Scroll Debug ---
     // Draws the auto-scroll's own view of the page over the lyrics: the band the
     // followed group is kept inside, the rows counted as being sung, and the move
@@ -282,6 +350,25 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    // --- Developer mode ---
+    // Gates the playback diagnostics surface. Nothing here changes playback; it
+    // only decides whether the developer-facing screens are reachable, so a
+    // normal install never sees them and a developer can turn them on in one
+    // long-press instead of a rebuild.
+    private val DEVELOPER_MODE_KEY =
+        androidx.datastore.preferences.core.booleanPreferencesKey("developer_mode")
+
+    val developerModeFlow: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[DEVELOPER_MODE_KEY] ?: false // OFF by default
+        }
+
+    suspend fun setDeveloperMode(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DEVELOPER_MODE_KEY] = enabled
+        }
+    }
+
     private val AUDIO_QUALITY_KEY = stringPreferencesKey("audio_quality")
 
     val audioQualityFlow: Flow<String> = context.dataStore.data.map { preferences ->
@@ -291,6 +378,22 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setAudioQuality(quality: String) {
         context.dataStore.edit { preferences ->
             preferences[AUDIO_QUALITY_KEY] = quality
+        }
+    }
+
+    // --- Download constraints (spec 37) -----------------------------------
+    // Whether downloads wait for an unmetered network. Honoured at enqueue
+    // time as a WorkManager constraint, so a queued download on mobile data
+    // simply waits rather than silently burning the user's plan.
+    private val WIFI_ONLY_DOWNLOADS_KEY = androidx.datastore.preferences.core.booleanPreferencesKey("downloads_wifi_only")
+
+    val wifiOnlyDownloadsFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[WIFI_ONLY_DOWNLOADS_KEY] ?: false
+    }
+
+    suspend fun setWifiOnlyDownloads(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[WIFI_ONLY_DOWNLOADS_KEY] = enabled
         }
     }
 
@@ -328,6 +431,58 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setJioSaavnEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences -> preferences[JIOSAAVN_ENABLED_KEY] = enabled }
+    }
+
+    // --- Explore category artwork -------------------------------------------
+    //
+    // YouTube's mood/genre buttons carry no image of their own, so a category's
+    // tile is drawn from the first cover the category's own page happens to
+    // hold. That lookup is a full browse request, and paying it again on every
+    // cold start is what made Explore arrive as a wall of gradients. The result
+    // is small (an id, a URL and when it was found) and changes slowly, so it is
+    // kept on disk; the image bytes are Coil's business, not ours.
+
+    private val CATEGORY_ARTWORK_KEY = stringSetPreferencesKey("explore_category_artwork")
+
+    /** One entry per category: `id\turl\tfetchedAtMs`. */
+    data class CachedCategoryArtwork(val url: String, val fetchedAtMs: Long)
+
+    val categoryArtworkFlow: Flow<Map<String, CachedCategoryArtwork>> = context.dataStore.data
+        .map { preferences ->
+            (preferences[CATEGORY_ARTWORK_KEY] ?: emptySet()).mapNotNull { entry ->
+                val parts = entry.split('\t')
+                if (parts.size < 3) return@mapNotNull null
+                val at = parts[2].toLongOrNull() ?: return@mapNotNull null
+                if (parts[0].isBlank() || parts[1].isBlank()) return@mapNotNull null
+                parts[0] to CachedCategoryArtwork(parts[1], at)
+            }.toMap()
+        }
+
+    /**
+     * Writes the given resolutions, and drops entries for categories that are no
+     * longer in the taxonomy — a removed mood should not keep a row on disk
+     * forever.
+     */
+    suspend fun putCategoryArtwork(
+        resolved: Map<String, CachedCategoryArtwork>,
+        liveCategoryIds: Set<String>? = null,
+    ) {
+        if (resolved.isEmpty()) return
+        context.dataStore.edit { preferences ->
+            val existing = (preferences[CATEGORY_ARTWORK_KEY] ?: emptySet()).mapNotNull { entry ->
+                val parts = entry.split('\t')
+                if (parts.size < 3) return@mapNotNull null
+                parts[0] to entry
+            }.toMap().toMutableMap()
+
+            resolved.forEach { (id, value) ->
+                existing[id] = "$id\t${value.url}\t${value.fetchedAtMs}"
+            }
+            if (liveCategoryIds != null) {
+                existing.keys.retainAll(liveCategoryIds)
+            }
+            preferences[CATEGORY_ARTWORK_KEY] = existing.values.toSet()
+        }
     }
 }
 

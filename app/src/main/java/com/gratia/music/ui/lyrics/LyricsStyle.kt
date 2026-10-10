@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.sp
 internal const val LYRIC_FONT_SIZE = 34f
 internal const val LYRIC_LINE_HEIGHT = 41f
 
-/** Unsynced lines: same face, a step down, tighter leading. */
+/** Plain lines: same face, a step down, tighter leading. Unreached today. */
 internal const val LYRIC_UNSYNCED_FONT_SIZE = 30f
 internal const val LYRIC_UNSYNCED_LINE_HEIGHT = 38f
 
@@ -68,6 +68,12 @@ internal fun rememberLyricFontWeight(): FontWeight {
 /**
  * The style a lyric line is drawn in.
  *
+ * [synced] is whether the page's lines carry timings, and reach for the larger
+ * scale because of it. Line-level timings count: a line-synced page is followed
+ * while it is sung, not read the way a book is. Only a plain page takes the
+ * step down, and a plain document does not reach this view at all — every line
+ * that arrives here is timed.
+ *
  * [fontScale] is the user's own lyrics size setting; the rest of the scale is
  * fixed so that every line of a song measures the same way and the sweep's
  * character boxes stay in step with the text being clipped.
@@ -107,41 +113,91 @@ internal val LYRIC_EASING: Easing = CubicBezierEasing(0.41f, 0f, 0.12f, 0.99f)
 /** How long the page takes to settle on a new line. */
 internal const val LYRIC_SETTLE_MS = 400
 
-/** Where a line that isn't being sung is held, as a share of full brightness. */
-internal const val UNSUNG_ALPHA = 0.45f
+/**
+ * Where the unsung part of a line that *is* being sung is held, as a share of
+ * full brightness.
+ *
+ * The words ahead of the sweep. They are dimmer than the words just sung, which
+ * is what gives the highlight something to arrive from, but they are still the
+ * line being read along with — so they stay at the bottom of the readable range
+ * rather than fading out of it.
+ */
+internal const val UNSUNG_ALPHA = 0.6f
 
 /** The one-line strip is read at a glance, so it gets slightly more. */
 internal const val UNSUNG_ALPHA_STRIP = 0.55f
 
-/** What a line reads at while the list is being scrolled by hand. */
-internal const val BROWSING_ALPHA = 0.8f
+/** What the rest of the page drops to while the list is being scrolled by hand. */
+internal const val BROWSING_ALPHA = 0.7f
 
-/** The playing line sits at 1; the rest sit fractionally back from it. */
-internal const val INACTIVE_SCALE = 0.98f
+/** The playing line sits at 1; the rest step back from it. */
+internal const val INACTIVE_SCALE = 0.96f
 
 /** A line under a finger dips, the way a button does. */
-internal const val PRESSED_SCALE = 0.96f
+internal const val PRESSED_SCALE = 0.94f
 
 /**
- * How the stack falls away either side of the line being sung, indexed by
+ * How bright the page falls away either side of the line being sung, indexed by
  * distance from it.
  *
- * Far subtler than a linear ramp: the two lines around the playing one stay
- * legible so you can read ahead and behind, and only past that does the page
- * let go. The last entry stands for everything further out, which is most of
- * the list.
+ * Split by which side of the singing a row is on, because the two sides are
+ * read differently and have to be told apart on sight.
+ *
+ * **Sung rows** have been read. They stay legible as the page moves on — the
+ * line above is where an eye that lost its place goes back to, and dropping it
+ * into the blur made the page look like it was deleting itself as it went.
+ *
+ * **Upcoming rows** have not been read, and are held a step further back, so
+ * that on a song whose lines change one at a time the line being sung is
+ * unmistakable.
+ *
+ * Both ladders are floors, not fades to nothing. These rows are on screen: they
+ * *are* the page, and a reader looking ahead or back is reading them. Held at
+ * what the far rungs used to be — 0.16 to 0.26 of white over dark artwork, with
+ * a blur on top of it, which is most of a verse at once — the surrounding lines
+ * read as missing rather than as de-emphasised, which is the opposite of what a
+ * lyrics page is for. The near rows sit in the 0.6–0.75 the emphasis should
+ * leave them at, and the falloff from there is a step or two of brightness
+ * rather than a disappearance.
+ *
+ * The last entry stands for everything further out, which is most of the list.
  */
-internal val LINE_FALLOFF_ALPHA = floatArrayOf(1f, 0.8f, 0.7f, 0.58f, 0.46f)
+internal val SUNG_ALPHA = floatArrayOf(1f, 0.74f, 0.62f, 0.5f, 0.4f)
+internal val UPCOMING_ALPHA = floatArrayOf(1f, 0.62f, 0.5f, 0.4f, 0.32f)
 
 /**
- * The blur half of the same ladder.
- *
- * Nothing for the line being sung or the two around it: those are the rows
- * people actually read, and a blur that softens them is a blur that costs an
- * offscreen layer per row for no visible gain. It only starts once the stack is
- * genuinely falling away, which is also where almost nothing is on screen.
+ * The brightness a row is held at, given which side of the singing it is on and
+ * how far from it. The active row is always the brightest thing on the page.
  */
-internal val LINE_FALLOFF_BLUR = arrayOf(0.dp, 0.dp, 0.8.dp, 1.6.dp, 2.4.dp)
+internal fun lyricRowAlpha(side: LyricFocusSide, distance: Int): Float = when (side) {
+    LyricFocusSide.Active -> 1f
+    LyricFocusSide.Sung -> SUNG_ALPHA[distance.coerceIn(0, SUNG_ALPHA.lastIndex)]
+    LyricFocusSide.Upcoming -> UPCOMING_ALPHA[distance.coerceIn(0, UPCOMING_ALPHA.lastIndex)]
+}
+
+/**
+ * The blur half of the same falloff, on distance alone.
+ *
+ * Nothing for the line being sung or the two rows around it: those are the rows
+ * people actually read along with, and softening them costs an offscreen layer
+ * per row to make the words being read harder. It only starts once the stack is
+ * genuinely falling away, and it stays light — a hard blur is not a fade, it is
+ * an erasure, and it is what made a line that had just been sung look gone. At
+ * the far end it is under a pixel and a half: enough to sit behind the reading
+ * line, never enough to eat a letter of a row that is still on screen.
+ */
+internal val LINE_FALLOFF_BLUR = arrayOf(0.dp, 0.dp, 0.dp, 1.dp, 1.4.dp)
+
+/**
+ * How long the line being sung takes to arrive, against [LYRIC_SETTLE_MS] for
+ * everything letting go.
+ *
+ * Asymmetric on purpose. Two rows crossfading over the same span are at the same
+ * brightness in the middle of the handover, and a page where four rows are all
+ * sitting at about 0.7 is a page with no line being pointed at. The line taking
+ * over arrives almost at once; whatever it displaced eases away behind it.
+ */
+internal const val LYRIC_ACTIVATE_MS = 160
 
 /** Whether this device can blur at all — RenderEffect landed in API 31. */
 internal val CAN_BLUR: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -155,16 +211,19 @@ internal val CAN_BLUR: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CO
  *
  * Kept well under half strength: the halo is drawn from the same white as the
  * text, so at full alpha it stops reading as light and starts reading as a
- * second, badly printed copy of the words.
+ * second, badly printed copy of the words. It is also masked to the word being
+ * held — see [SweptLyricsLine] — so it can only ever be that word's own light;
+ * at anything more than this it reads as the word itself going soft.
  */
-internal const val GLOW_ALPHA = 0.62f
+internal const val GLOW_ALPHA = 0.5f
 
 /**
  * How far the bloom spreads off a letter. Tight, because it belongs to a word's
  * worth of light: a wide radius on something this small is a smudge behind the
- * text instead of a glow coming off it.
+ * text instead of a glow coming off it, and the word being sung has to stay the
+ * crispest thing on the page.
  */
-internal val GLOW_RADIUS = 6.dp
+internal val GLOW_RADIUS = 5.dp
 
 /** How far the word being sung lifts off its line. About two pixels. */
 internal val WORD_RISE = 2.dp

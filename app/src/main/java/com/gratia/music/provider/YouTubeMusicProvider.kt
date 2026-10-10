@@ -54,7 +54,16 @@ class YouTubeMusicProvider : MusicProvider {
         // navigation instead of flattening everything into song rows.
         val artists = results.filterIsInstance<SearchResult.Browse>()
             .filter { it.item.type == BrowseType.ARTIST && !it.item.browseId.isBlankId() }
-            .map { RemoteArtistRef(id = it.item.browseId, name = it.item.title) }
+            // Carry the search row's own thumbnail through: the artist circle
+            // has real imagery available here, and dropping it forced the UI to
+            // fall back to initials even though the picture was in hand.
+            .map {
+                RemoteArtistRef(
+                    id = it.item.browseId,
+                    name = it.item.title,
+                    artworkUrl = it.item.thumbnailUrl
+                )
+            }
             .distinctBy { it.id }
             .take(limit)
 
@@ -115,11 +124,25 @@ class YouTubeMusicProvider : MusicProvider {
         return try {
             val response = Innertube.browse(artistId)
             val artistPage = InnertubeParser.parseArtistPage(response)
+            // A response that carries none of name, picture, songs or sections is
+            // a partial/failed header parse, not an artist. Returning null keeps
+            // the screen's known-good data instead of overwriting it with a
+            // placeholder — the root of the "Radiohead becomes Unknown Artist"
+            // degradation (spec C/N/O).
+            if (!RemoteDetailMerge.isRealName(artistPage.name) &&
+                artistPage.thumbnailUrl.isNullOrBlank() &&
+                artistPage.songs.isEmpty() &&
+                artistPage.sections.isEmpty()
+            ) {
+                Log.w(TAG, "getArtist($artistId): empty/partial page; keeping existing data")
+                return null
+            }
             RemoteArtist(
                 id = artistId,
-                name = artistPage.name ?: "Unknown Artist",
+                name = artistPage.name?.takeIf { RemoteDetailMerge.isRealName(it) } ?: "Unknown Artist",
                 description = artistPage.description,
                 subscribers = artistPage.subscriberCountText,
+                monthlyListeners = artistPage.monthlyListenerCount,
                 artworkUrl = artistPage.thumbnailUrl,
                 topSongs = artistPage.songs.map { it.toRemoteTrack() },
                 albums = artistPage.sections
@@ -224,10 +247,25 @@ class YouTubeMusicProvider : MusicProvider {
             val subtitle = header.subtitle
             RemoteAlbum(
                 id = albumId,
-                title = header.title,
-                artists = artistRefsFromSubtitle(subtitle),
+                // Title, credit and cover each fall back to what the tracks
+                // themselves carry, so a header that parsed only partially still
+                // yields a usable album instead of a blank page (spec E/F).
+                title = header.title.takeIf { it.isNotBlank() }
+                    ?: songs.firstOrNull()?.albumName?.takeIf { it.isNotBlank() }
+                    ?: "",
+                artists = artistRefsFromSubtitle(subtitle).ifEmpty {
+                    songs.firstOrNull()?.let {
+                        listOf(RemoteArtistRef(id = it.artistId, name = it.artist))
+                    }.orEmpty()
+                },
                 year = subtitle.yearFromSubtitle(),
-                artworkUrl = header.thumbnailUrl,
+                // The page's own cover is preferred; when the header did not
+                // carry one, the tracks' thumbnail is the same album art at a
+                // resolvable URL — this is why albums used to open with no
+                // artwork at all (spec E).
+                artworkUrl = header.thumbnailUrl?.takeIf { it.isNotBlank() }
+                    ?: songs.firstNotNullOfOrNull { it.thumbnailUrl?.takeIf { t -> t.isNotBlank() } },
+                trackCount = songs.size.takeIf { it > 0 },
                 tracks = songs.map { it.toRemoteTrack() }
             )
         } catch (e: Exception) {
@@ -276,13 +314,28 @@ class YouTubeMusicProvider : MusicProvider {
     override suspend fun getHome(limit: Int): List<RemoteHomeSection> {
         return try {
             val response = Innertube.browse("FEmusic_home")
-            InnertubeParser.parseHome(response).map { shelf ->
+            val shelves = InnertubeParser.parseHome(response).map { shelf ->
                 RemoteHomeSection(
                     title = shelf.title,
                     tracks = shelf.items.filter { !it.videoId.isNullOrBlank() }.map { it.toRemoteTrackFallback() },
                     collections = shelf.items.filter { !it.browseId.isNullOrBlank() }.map { it.toRemotePlaylistSummary() }
                 )
-            }.take(limit)
+            }
+            // `take(limit)` applied to the flat list dropped whichever shelves
+            // YouTube had appended last — and the personalized shelves
+            // ("Quick picks", the Daily Mixes) are precisely the ones that sit
+            // deep in the response, so they were the ones vanishing run to run:
+            // an "intermittently missing" shelf that was actually a truncation
+            // artifact. Sorting named-but-empty shelves out and only then
+            // limiting keeps the head of the feed bounded without making the
+            // tail a coin flip.
+            shelves
+                .filter { it.tracks.isNotEmpty() || it.collections.isNotEmpty() }
+                .take(limit)
+                .also { result ->
+                    Log.d(TAG, "HOME_SHELVES parsed=${shelves.size} kept=${result.size} " +
+                        "titles=${result.joinToString("|") { it.title.take(24) }}")
+                }
         } catch (e: Exception) {
             Log.w(TAG, "getHome failed: ${e.message}")
             emptyList()

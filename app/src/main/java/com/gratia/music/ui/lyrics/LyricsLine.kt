@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,18 +42,24 @@ private const val SUB_LINE_SWAP_MS = 380
 /**
  * A single lyrics line within the synced scroll list.
  *
- * Visual behaviour, all of it driven off the line's distance from the one being
- * sung ([focusDistance]) rather than from a binary active/not-active flag:
+ * Visual behaviour, all of it driven off where the line sits relative to the one
+ * being sung ([focusSide]) and how far from it ([focusDistance]), rather than
+ * from a binary active/not-active flag:
  *
- * - **The line being sung:** full brightness, no blur, sitting fractionally
+ * - **The line being sung:** the brightest thing on the page, arriving almost
+ *   at once (see [LYRIC_ACTIVATE_MS]), never blurred, sitting fractionally
  *   forward of the stack.
- * - **The line either side of it:** still legible, so you can read ahead and
- *   behind without the page appearing to switch off.
- * - **Everything past that:** dimmed and very slightly blurred, on a ladder that
- *   flattens out rather than running to zero.
- * - **While the list is being scrolled by hand** ([isBrowsing]): the stack
- *   flattens to one brightness, because reading the page by hand is not
- *   following along and no row should be pointed at.
+ * - **Lines already sung:** still legible, and only softly behind the playing
+ *   one. They are where an eye that lost its place goes back to, so they are
+ *   never dimmed out of reading range.
+ * - **Lines not yet reached:** held well back, and the further out the further
+ *   back. Nothing near the playing line shares its brightness, which is what
+ *   makes the line being sung readable as *the* line being sung on a song whose
+ *   lyrics change a line at a time.
+ * - **While the list is being scrolled by hand** ([isBrowsing]): the rest of the
+ *   page flattens to one brightness, because reading by hand is not following
+ *   along — but the playing line keeps its own. Losing your place the moment you
+ *   touch the page is the one thing a lyrics view must not do.
  *
  * When [animateWordFill] is on and the line carries word-level timing, the text
  * is drawn by [SweptLyricsLine] — the progressive sweep, the bloom on a carried
@@ -68,16 +75,19 @@ private const val SUB_LINE_SWAP_MS = 380
  * Instrumental breaks are delegated to [MusicLine].
  */
 @Composable
-fun LyricsLine(
+internal fun LyricsLine(
     line: LyricLine,
     isActiveLine: Boolean,
     nextLineStartMs: Long?,
     clock: State<Long>,
     onSeek: ((Long) -> Unit)? = null,
     focusDistance: Int = 0,
+    focusSide: LyricFocusSide,
     isBrowsing: Boolean = false,
     animateWordFill: Boolean = true,
     reduceAnimation: Boolean = false,
+    /** Whether lyrics away from the line being sung soften as they fall away. */
+    blurUnfocused: Boolean = true,
     fontScale: Float = 1f,
     textAlign: TextAlign = TextAlign.Start
 ) {
@@ -94,24 +104,40 @@ fun LyricsLine(
         return
     }
 
-    val step = focusDistance.coerceIn(0, LINE_FALLOFF_ALPHA.lastIndex)
+    val step = focusDistance.coerceIn(0, LINE_FALLOFF_BLUR.lastIndex)
 
+    // The line being sung is the brightest thing on the page, always — including
+    // while the list is being read by hand, when the rest of the page flattens
+    // but the pointer stays put.
     val alpha by animateFloatAsState(
         targetValue = when {
+            isActiveLine -> 1f
             isBrowsing -> BROWSING_ALPHA
-            isActiveLine -> LINE_FALLOFF_ALPHA[0]
-            else -> LINE_FALLOFF_ALPHA[step]
+            else -> lyricRowAlpha(focusSide, focusDistance)
         },
-        animationSpec = if (reduceAnimation) snap() else tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
+        animationSpec = if (reduceAnimation) {
+            snap()
+        } else {
+            // Arrive almost at once, let go slowly. See [LYRIC_ACTIVATE_MS].
+            tween(
+                durationMillis = if (isActiveLine || isBrowsing) {
+                    LYRIC_ACTIVATE_MS
+                } else {
+                    LYRIC_SETTLE_MS
+                },
+                easing = LYRIC_EASING
+            )
+        },
         label = "LineAlpha"
     )
 
     // Blur follows the same ladder, but only where it can be drawn at all and
     // only for the rows genuinely out of focus: the playing line is never
-    // blurred, and neither is a page being read by hand.
+    // blurred, and neither are the two rows around it or a page being read by
+    // hand.
     val blurRadius by animateDpAsState(
         targetValue = when {
-            !CAN_BLUR || reduceAnimation || isBrowsing || isActiveLine -> 0.dp
+            !CAN_BLUR || reduceAnimation || isBrowsing || isActiveLine || !blurUnfocused -> 0.dp
             else -> LINE_FALLOFF_BLUR[step]
         },
         animationSpec = if (reduceAnimation) snap() else tween(LYRIC_SETTLE_MS, easing = LYRIC_EASING),
@@ -130,6 +156,20 @@ fun LyricsLine(
         label = "LineScale"
     )
 
+    // The larger scale belongs to a page that is followed rather than read —
+    // which is this one, whatever the provider stamped. Keying it off word-level
+    // timings instead set every line-synced song a step down, and with it the
+    // answering vocal measured against it.
+    val style = lyricTextStyle(
+        synced = true,
+        fontScale = fontScale,
+        textAlign = textAlign
+    )
+
+    // The lead line and its transient overlays share a box. The overlays are
+    // drawn inside it rather than as rows, so they change nothing's height
+    // (spec 19).
+    Box(modifier = Modifier.fillMaxWidth()) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -150,18 +190,19 @@ fun LyricsLine(
             ) { onSeek?.invoke(line.startMs) }
             .padding(bottom = 32.dp)
     ) {
-        val style = lyricTextStyle(
-            synced = line.isWordSynced,
-            fontScale = fontScale,
-            textAlign = textAlign
-        )
-
         if (animateWordFill && line.isWordSynced) {
             SweptLyricsLine(
                 line = line,
                 clock = clock,
                 style = style,
-                dimAlpha = UNSUNG_ALPHA,
+                // The unsung words of the line being *sung* are held back so the
+                // sweep has somewhere to arrive from. A row that is not being
+                // sung yet is not halfway through anything, so it draws whole
+                // and lets the focus falloff be the only thing dimming it —
+                // otherwise an upcoming line carried the sweep's own dimming
+                // *and* the falloff's, and came out at a fraction of the
+                // brightness of an equivalent line-synced row.
+                dimAlpha = if (isActiveLine) UNSUNG_ALPHA else 1f,
                 textAlign = textAlign
             )
         } else {
@@ -169,25 +210,6 @@ fun LyricsLine(
                 text = line.text,
                 style = style,
                 color = Color.White,
-                textAlign = textAlign
-            )
-        }
-
-        // The answering vocal, drawn underneath the lead and a shade behind it,
-        // the way Apple Music hangs a backing line under the one it answers.
-        val backing = line.background
-        if (backing != null && backing.text.isNotBlank()) {
-            Spacer(Modifier.height(4.dp))
-            SweptLyricsLine(
-                line = backing,
-                clock = clock,
-                style = style.copy(
-                    fontSize = (style.fontSize.value * (BACKING_FONT_SIZE / LYRIC_FONT_SIZE)).sp,
-                    lineHeight = (style.lineHeight.value * (BACKING_LINE_HEIGHT / LYRIC_LINE_HEIGHT)).sp
-                ),
-                modifier = Modifier.graphicsLayer { this.alpha = BACKING_ALPHA },
-                dimAlpha = UNSUNG_ALPHA,
-                rise = false,
                 textAlign = textAlign
             )
         }
@@ -214,6 +236,24 @@ fun LyricsLine(
             ) { rendered ->
                 SubLinesBlock(rendered, textAlign)
             }
+        }
+    }
+
+        // The answering vocal, as a transient overlay rather than a second row.
+        // It appears only inside its own timing window, highlights across its
+        // own words, and gets out of the way (spec 2/8/22). Drawn inside the
+        // lead line's box — over the padding at its foot — so it adds no height,
+        // no list item and no scroll, and steals no gestures (spec 10/19/20).
+        val backing = line.background
+        if (backing != null && backing.text.isNotBlank()) {
+            TransientLyricOverlay(
+                line = backing,
+                clock = clock,
+                style = style,
+                reduceAnimation = reduceAnimation,
+                textAlign = textAlign,
+                modifier = Modifier.matchParentSize(),
+            )
         }
     }
 }

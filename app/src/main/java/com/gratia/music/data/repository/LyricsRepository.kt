@@ -21,6 +21,10 @@ class LyricsRepository(
 ) {
     private val ytmLyricsProvider = com.gratia.music.lyrics.YouTubeMusicLyricsProvider()
     private val providers: List<LyricsProvider> = listOf(
+        // BiniLyrics leads: it resolves the recording (and reports its ISRC)
+        // before fetching, so it is the least likely of the sources to return
+        // the wrong edit under the right title.
+        com.gratia.music.lyrics.BiniLyrics,
         com.gratia.music.lyrics.BetterLyrics,
         com.gratia.music.lyrics.LyricsPlus,
         com.gratia.music.lyrics.SimpMusicLyrics,
@@ -33,6 +37,7 @@ class LyricsRepository(
 
     // Used as a tie-breaker if SyncLevel, matchConfidence, and duration difference are all equal
     private val providerPreferenceOrder = mapOf(
+        "BiniLyrics" to 100,
         "BetterLyrics" to 70,
         "Lyricsify" to 65,
         "LyricsPlus" to 60,
@@ -67,8 +72,19 @@ class LyricsRepository(
         }
 
         val videoId = song.providerTrackId ?: (if (song.storageProvider == "youtube_music") song.id.removePrefix("ytm_") else null)
-        
-        // Concurrently fetch from all providers
+
+        // Every provider is asked at once, but the answer is returned as soon
+        // as one is *good enough* rather than when the slowest has spoken. The
+        // full race used to gate every return on all nine providers finishing
+        // (or an 8s ceiling) — which is the difference between lyrics appearing
+        // in under a second and the panel sitting on its skeleton for the
+        // ceiling. Grading is [quality] — word-synced beats line-synced beats
+        // unsynced — so an early word-synced result is taken over a line-synced
+        // one still in flight, but an early plain-text hit does not stop the
+        // search for something better. Remaining providers keep running in the
+        // background: their best answer is still graded, still written to the
+        // cache, and still shown on the next visit — the race is only exited
+        // early, never narrowed.
         val deferredResults = providers.map { provider ->
             async {
                 try {
@@ -79,24 +95,41 @@ class LyricsRepository(
                 }
             }
         }
-        
-        // Await all with a hard timeout of 8 seconds to prevent indefinite hangs
-        val results: List<com.gratia.music.lyrics.LyricsResult> = withTimeoutOrNull(8000L) {
-            deferredResults.awaitAll()
-        }?.filterNotNull() ?: emptyList()
 
-        if (results.isEmpty()) return@withContext activeLyrics
+        fun grade(result: com.gratia.music.lyrics.LyricsResult): Int =
+            when {
+                result.durationDifferenceMs > 15000L -> -1 // Reject wildly wrong durations
+                else -> result.syncLevel.priority
+            }
 
-        // Filter and sort results
-        val bestResult = results
-            .filter { it.durationDifferenceMs <= 15000L } // Reject wildly wrong durations
-            .sortedWith(
-                compareByDescending<com.gratia.music.lyrics.LyricsResult> { it.syncLevel.priority }
-                    .thenByDescending { it.matchConfidence }
-                    .thenBy { it.durationDifferenceMs }
-                    .thenByDescending { providerPreferenceOrder[it.providerName] ?: 0 }
-            ).firstOrNull()
-            
+        suspend fun bestOf(collected: List<com.gratia.music.lyrics.LyricsResult>): com.gratia.music.lyrics.LyricsResult? =
+            collected.filter { grade(it) >= 0 }
+                .sortedWith(
+                    compareByDescending<com.gratia.music.lyrics.LyricsResult> { it.syncLevel.priority }
+                        .thenByDescending { it.matchConfidence }
+                        .thenBy { it.durationDifferenceMs }
+                        .thenByDescending { providerPreferenceOrder[it.providerName] ?: 0 }
+                ).firstOrNull()
+
+        val collected = mutableListOf<com.gratia.music.lyrics.LyricsResult>()
+        var bestResult: com.gratia.music.lyrics.LyricsResult? = null
+        withTimeoutOrNull(PROVIDER_RACE_TIMEOUT_MS) {
+            for (deferred in deferredResults) {
+                val result = deferred.await()
+                if (result != null) collected.add(result)
+                val best = bestOf(collected)
+                if (best != null) {
+                    bestResult = best
+                    // Word-synced from any provider is the ceiling: no line
+                    // worth waiting for behind it.
+                    if (best.syncLevel.priority >= WORD_SYNC_PRIORITY) return@withTimeoutOrNull
+                }
+            }
+        }
+        // Whatever the exit — early, ceiling, or every provider answered — the
+        // best answer seen so far stands.
+        if (bestResult == null) bestResult = bestOf(collected)
+
         if (bestResult != null) {
             // Re-parse the content to determine actual sync level from content
             // rather than trusting provider metadata
@@ -107,6 +140,9 @@ class LyricsRepository(
                 text = bestResult.text,
                 isSynced = doc !is com.gratia.music.lyrics.LyricsDocument.Plain,
                 provider = "automatic",
+                // The provider that actually answered — the UI credits this,
+                // never the "automatic" slot it is stored under.
+                providerName = bestResult.providerName,
                 offsetMs = existingOffset,
                 isManuallyEdited = false,
                 isWordLevel = doc is com.gratia.music.lyrics.LyricsDocument.WordSynced,
@@ -117,6 +153,18 @@ class LyricsRepository(
         }
 
         return@withContext activeLyrics
+    }
+
+    /**
+     * How long the whole provider race may run. Generous enough for the slow
+     * catalogue-backed provider to answer, short enough that a dead network
+     * fails inside a beat rather than a hang.
+     */
+    private companion object {
+        const val PROVIDER_RACE_TIMEOUT_MS = 8000L
+
+        /** [com.gratia.music.lyrics.SyncLevel.WORD]'s priority — the ceiling grade. */
+        const val WORD_SYNC_PRIORITY = 3
     }
 
     /**

@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,17 +37,19 @@ import com.gratia.music.lyrics.LyricLine
  *
  * The three copies, bottom to top:
  *
- * 1. **The unsung line**, held at [dimAlpha]. This is the whole of the line
- *    before the singing reaches it, and the tail of it afterwards.
- * 2. **The lit line**, clipped to the character the voice has reached. Both
- *    copies lay out identically, so the bright one lands exactly on top of the
- *    dim one and the boundary is a wipe rather than a step. Colouring an
- *    `AnnotatedString` word by word can only change a whole word at a time,
- *    which turns the sweep into a flicker.
- * 3. **The bloom**, a third copy blurred and then masked down to the word being
- *    held. Blurring *after* the mask is what makes the halo bleed out past the
+ * 1. **The bloom**, a copy masked down to the word being held and then blurred.
+ *    Masking *before* the blur is what makes the halo bleed out past the
  *    letters it belongs to, which is the part that reads as light coming off a
- *    carried note rather than a drop shadow under the line.
+ *    carried note rather than a drop shadow under the line. It sits at the
+ *    bottom so the light is only ever what escapes around the letters: drawn on
+ *    top it would haze the word being sung instead of glowing off it.
+ * 2. **The unsung line**, held at [dimAlpha]. This is the whole of the line
+ *    before the singing reaches it, and the tail of it afterwards.
+ * 3. **The lit line**, clipped to the character the voice has reached, and so
+ *    the copy that is actually read. All three lay out identically, so the
+ *    bright one lands exactly on top of the dim one and the boundary is a wipe
+ *    rather than a step. Colouring an `AnnotatedString` word by word can only
+ *    change a whole word at a time, which turns the sweep into a flicker.
  *
  * The word being sung also lifts a hair ([WORD_RISE]) and eases back down, on
  * the same envelope as its bloom — see [glowIntensity][LyricLine.glowIntensity].
@@ -114,33 +115,12 @@ fun SweptLyricsLine(
         modifier = modifier,
         contentAlignment = if (textAlign == TextAlign.End) Alignment.TopEnd else Alignment.TopStart
     ) {
-        // 1. The unsung line. Its layout is the one the other two are measured
-        //    against, so it is always the copy that reports it.
-        Text(
-            text = line.text,
-            style = style,
-            color = Color.White.copy(alpha = dimAlpha),
-            maxLines = maxLines,
-            overflow = overflow,
-            textAlign = textAlign,
-            onTextLayout = { layout = it },
-            modifier = lift
-        )
-
-        // 2. The lit line, revealed up to wherever the voice has got to.
-        Text(
-            text = line.text,
-            style = style,
-            color = Color.White,
-            maxLines = maxLines,
-            overflow = overflow,
-            textAlign = textAlign,
-            modifier = lift.then(sweep)
-        )
-
-        // 3. The bloom. Left off entirely on devices that cannot blur, and on
-        //    any line whose words are never held long enough to earn one.
-        if (CAN_BLUR && glowAlpha > 0.01f) {
+        // 1. The bloom, underneath both text copies. Left off entirely on
+        //    devices that cannot blur, on any line whose words are never held
+        //    long enough to earn one, and on a line carrying no word timings —
+        //    nothing there is ever held, so the copy could only ever be an
+        //    invisible blurred layer on every row of a line-synced page.
+        if (CAN_BLUR && glowAlpha > 0.01f && line.isWordSynced) {
             Text(
                 text = line.text,
                 style = style,
@@ -163,22 +143,52 @@ fun SweptLyricsLine(
                         // being held. Most lines draw nothing here at all, which
                         // is the whole difference between this and a halo
                         // travelling along under the highlight.
+                        //
+                        // Nothing is drawn unless that word could actually be
+                        // placed in the line's own text. The word cannot be
+                        // placed between words, before the line's first word,
+                        // while the copy the sweep measures is still unmeasured
+                        // (which is every line for a frame after a handover),
+                        // or when a provider's word timing does not spell itself
+                        // out in the text it belongs to. Drawing the copy whole
+                        // in any of those cases is a blur laid over the entire
+                        // line — which is what made the line being sung the
+                        // blurriest thing on the page.
                         val measured = layout
-                        val position = clock.value
-                        if (measured == null) {
+                        val word = measured?.let { line.heldWordSpan(clock.value) }
+                        if (measured != null && word != null) {
                             drawContent()
-                        } else {
-                            val word = line.heldWordSpan(position)
-                            if (word == null) {
-                                drawContent()
-                            } else {
-                                drawContent()
-                                maskToWord(measured, word)
-                            }
+                            eraseOutsideWord(measured, word)
                         }
                     }
             )
         }
+
+        // 2. The unsung line. Its layout is the one the other two are measured
+        //    against, so it is always the copy that reports it.
+        Text(
+            text = line.text,
+            style = style,
+            color = Color.White.copy(alpha = dimAlpha),
+            maxLines = maxLines,
+            overflow = overflow,
+            textAlign = textAlign,
+            onTextLayout = { layout = it },
+            modifier = lift
+        )
+
+        // 3. The lit line, revealed up to wherever the voice has got to. Last,
+        //    so the sung words are drawn from the sharp copy rather than from
+        //    underneath a blurred one.
+        Text(
+            text = line.text,
+            style = style,
+            color = Color.White,
+            maxLines = maxLines,
+            overflow = overflow,
+            textAlign = textAlign,
+            modifier = lift.then(sweep)
+        )
     }
 }
 
@@ -253,20 +263,66 @@ private fun ContentDrawScope.drawWithWordLift(
  * Erases everything the bloom has drawn except the letters of [span], so the
  * halo belongs to the word being held rather than to the sweep's leading edge.
  *
- * Rectangle-by-rectangle over the word's own characters rather than one box
- * around the word, so a short word inside a long one does not drag a slab of
- * light along with it.
+ * Done by erasing the word's *surroundings*, not by painting the word. A blend
+ * mode only applies where the drawing itself lands, so painting the word's boxes
+ * with `DstIn` keeps the word — and leaves everything around it untouched, which
+ * is the whole line still sitting in the layer. Since this runs inside the
+ * layer the blur is applied to, the bloom that came out was the entire line
+ * hazed, not one word lit: the line being sung was the blurriest thing on the
+ * page. Turning it around — a rect either side of the word and the bands above
+ * and below its own line, cleared out — leaves the word alone in the layer, and
+ * the blur then bleeds off its letters the way it is meant to.
+ *
+ * Rectangles rather than one box around the word, so a short word does not drag
+ * a slab of light along with it, and so a word that wraps keeps both halves.
  */
-private fun ContentDrawScope.maskToWord(layout: TextLayoutResult, span: IntRange) {
-    val chars = layout.layoutInput.text.length
-    for (index in span) {
-        if (index < 0 || index >= chars) continue
-        val box: Rect = layout.getBoundingBox(index)
-        if (box.width <= 0f || box.height <= 0f) continue
-        clipRect(box.left, box.top, box.right, box.bottom) {
-            drawRect(color = Color.White, blendMode = BlendMode.DstIn)
+private fun ContentDrawScope.eraseOutsideWord(layout: TextLayoutResult, span: IntRange) {
+    val erase = { left: Float, top: Float, right: Float, bottom: Float ->
+        if (right > left && bottom > top) {
+            clipRect(left, top, right, bottom) {
+                // Opaque, so `DstOut` takes the layer to nothing wherever this
+                // lands: the source is discarded and only what it covers goes.
+                drawRect(color = Color.White, blendMode = BlendMode.DstOut)
+            }
         }
     }
+
+    var keptTop = Float.MAX_VALUE
+    var keptBottom = 0f
+    for (visualLine in 0 until layout.lineCount) {
+        val start = layout.getLineStart(visualLine)
+        val end = layout.getLineEnd(visualLine, visibleEnd = true)
+        if (end <= start) continue
+        val top = layout.getLineTop(visualLine)
+        val bottom = layout.getLineBottom(visualLine)
+        val left = layout.getLineLeft(visualLine)
+        val right = layout.getLineRight(visualLine)
+
+        val heldStart = maxOf(span.first, start)
+        val heldEnd = minOf(span.last, end - 1)
+        // None of the held word is on this line: all of it goes.
+        if (heldStart > heldEnd) {
+            erase(left, top, right, bottom)
+            continue
+        }
+
+        val heldLeft = layout.getHorizontalPosition(heldStart, true)
+        val heldRight = layout.getHorizontalPosition(heldEnd, false)
+        erase(left, top, heldLeft, bottom)
+        erase(heldRight, top, right, bottom)
+        keptTop = minOf(keptTop, top)
+        keptBottom = maxOf(keptBottom, bottom)
+    }
+
+    // Nothing kept — the word could not be placed in the line at all — so there
+    // is nothing for a bloom to come off, and the layer goes rather than
+    // brightening the whole line.
+    if (keptTop > keptBottom) {
+        erase(0f, 0f, size.width, size.height)
+        return
+    }
+    erase(0f, 0f, size.width, keptTop)
+    erase(0f, keptBottom, size.width, size.height)
 }
 
 /**

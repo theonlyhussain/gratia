@@ -17,7 +17,12 @@ import com.gratia.music.ui.theme.GratiaTheme
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        // One splash, and it is the system's: the Gratia-branded launch screen
+        // (Theme.Gratia.Splash) is held until the app is actually ready to draw
+        // its first frame. There is no second, in-app logo overlay any more.
+        val splashScreen = installSplashScreen()
+        var appReady = false
+        splashScreen.setKeepOnScreenCondition { !appReady }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
@@ -34,7 +39,7 @@ class MainActivity : FragmentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    GratiaAppRoot()
+                    GratiaAppRoot(onReady = { appReady = true })
                 }
             }
         }

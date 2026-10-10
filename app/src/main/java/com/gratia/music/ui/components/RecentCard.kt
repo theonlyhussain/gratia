@@ -15,7 +15,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.ui.theme.GratiaTheme
-import java.io.File
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
@@ -29,8 +28,14 @@ fun RecentCard(
     song: SongEntity,
     onClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    val hasCover = !song.coverArtPath.isNullOrBlank() && File(song.coverArtPath).exists()
+    // The shared artwork request at the card's drawn size. The old gate —
+    // `File(coverArtPath).exists()` — is a *local-file* check: for a liked
+    // remote track the path is an http URL, `File.exists()` is false for
+    // those, and every liked song therefore fell to the colour-gradient
+    // placeholder even though its artwork URL was in hand. rememberArtworkRequest
+    // handles files, http URLs and sizing in one place, so the shelf no
+    // longer needs to know which kind of path it is holding.
+    val artRequest = rememberArtworkRequest(song.coverArtPath, sizePx = 480)
 
     Box(
         modifier = Modifier
@@ -38,12 +43,9 @@ fun RecentCard(
             .clip(RoundedCornerShape(8.dp))
             .bounceClick(onClick = onClick)
     ) {
-        if (hasCover) {
+        if (artRequest != null) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(File(song.coverArtPath!!))
-                    .crossfade(300)
-                    .build(),
+                model = artRequest,
                 contentDescription = "${song.title} cover art",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

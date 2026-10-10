@@ -207,7 +207,7 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { playerViewModel.setExpandedPlayerOpen(true) }
+                    .clickable { playerViewModel.expandPlayer() }
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -281,21 +281,20 @@ fun MiniPlayer(playerViewModel: PlayerViewModel) {
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    AnimatedContent(
-                        targetState = isPlaying,
-                        transitionSpec = {
-                            (scaleIn(animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f)) + fadeIn(tween(150))) togetherWith
-                            (scaleOut(animationSpec = spring(dampingRatio = 0.6f, stiffness = 800f)) + fadeOut(tween(150)))
-                        },
-                        label = "miniPlayPause"
-                    ) { playing ->
-                        androidx.compose.material3.Icon(
-                            imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (playing) "Pause" else "Play",
-                            tint = GratiaTheme.colors.textPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    // The shared control: same rounded glyph, same crossfade
+                    // and same loading behaviour the expanded player uses, so
+                    // the icon no longer changes shape when the player expands
+                    // and loading is judged identically on both surfaces.
+                    PlayPauseControl(
+                        isPlaying = isPlaying,
+                        // Loading only when THIS displayed track is the one
+                        // being fetched — a background resolution for a
+                        // different track must not turn this button into a
+                        // spinner.
+                        isLoading = isResolvingRemote && pageSong.id == currentSong?.id,
+                        size = 24.dp,
+                        tint = GratiaTheme.colors.textPrimary,
+                    )
                 }
 
                 // Sleep Timer Countdown

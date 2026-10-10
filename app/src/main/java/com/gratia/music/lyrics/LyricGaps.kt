@@ -30,5 +30,17 @@ internal fun List<LyricLine>.withInstrumentalGaps(): List<LyricLine> {
         // top of the line it belongs to and the words would never light up.
         if (silence >= MIN_GAP_MS && line.computedEndMs > line.timeMs) out += LyricLine(line.computedEndMs, "")
     }
-    return out
+
+    // Two break rows in a row are one break said twice: nothing is sung between
+    // them, so nothing separates them. The earlier of the two is the one to
+    // keep — it is the row that knows where the singing stopped, and the ruler
+    // it counts out runs on to the next row that is actually sung, which is
+    // past the row being let go. That is what happens when a file names the
+    // stretch in its text (`♪`, `(instrumental)`) as well as stating when the
+    // line before it ended: the named row lands inside the silence that already
+    // has a row of its own, and the two become one count-down rather than two
+    // that each fill from empty.
+    return out.filterIndexed { index, line ->
+        index == 0 || !(line.isGap && out[index - 1].isGap)
+    }
 }

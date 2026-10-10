@@ -14,6 +14,7 @@ object LyricsDiagnosticManager {
 
     suspend fun testAllProviders(title: String, artist: String, album: String?, durationMs: Long?, videoId: String?) = withContext(Dispatchers.IO) {
         val providers = listOf(
+            BiniLyrics,
             BetterLyrics,
             LyricsPlus,
             SimpMusicLyrics,

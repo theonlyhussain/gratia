@@ -291,6 +291,106 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
+/**
+ * Room migration from v11 to v12.
+ * Adds the real provider name alongside the "automatic" slot, so the lyrics
+ * screen can credit the source that actually answered instead of the slot name.
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE lyrics ADD COLUMN providerName TEXT DEFAULT NULL")
+    }
+}
+
+/**
+ * Room migration from v12 to v13.
+ * Adds the saved_artists table — the local follow list for remote artists.
+ * Safe additive migration; local artists live in the existing artists table
+ * and the two are never merged.
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS saved_artists (
+                remoteId TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                artworkUrl TEXT DEFAULT NULL,
+                source TEXT NOT NULL DEFAULT 'youtube_music',
+                savedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+    }
+}
+
+/**
+ * Room migration from v13 to v14.
+ * Adds the unified playback_history table — one row per actual playback,
+ * source-aware, carrying a metadata snapshot so streamed tracks appear in the
+ * timeline even when they were never persisted to `songs`.
+ */
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS playback_history (
+                id TEXT NOT NULL PRIMARY KEY,
+                songId TEXT NOT NULL,
+                videoId TEXT DEFAULT NULL,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                album TEXT DEFAULT NULL,
+                artworkUrl TEXT DEFAULT NULL,
+                source TEXT NOT NULL,
+                playedAt INTEGER NOT NULL,
+                listenedSeconds INTEGER NOT NULL DEFAULT 0,
+                completed INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_playback_history_playedAt ON playback_history(playedAt)")
+    }
+}
+
+/**
+ * Room migration from v14 to v15.
+ * Adds the saved_albums table — the remote-album follow list, alongside the
+ * saved_artists table added in v13. Safe additive migration; local albums live
+ * in the existing albums table and the two identities are never merged.
+ */
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS saved_albums (
+                remoteId TEXT NOT NULL PRIMARY KEY,
+                title TEXT NOT NULL,
+                artistName TEXT DEFAULT NULL,
+                artistId TEXT DEFAULT NULL,
+                artworkUrl TEXT DEFAULT NULL,
+                year TEXT DEFAULT NULL,
+                source TEXT NOT NULL DEFAULT 'youtube_music',
+                savedAt INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+    }
+}
+
+/**
+ * Room migration from v15 to v16.
+ * Adds the canonical identity snapshot columns to `listening_events`, so a
+ * recorded play is self-contained and the Stats/Replay aggregates no longer
+ * depend on a `songs` row existing for the track (spec 12/13/58–60). Additive
+ * and default-valued, so existing rows migrate without a rewrite.
+ */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN artist TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN artistId TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN album TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN albumId TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN artworkUrl TEXT DEFAULT NULL")
+        db.execSQL("ALTER TABLE listening_events ADD COLUMN durationMs INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         SongEntity::class,
@@ -305,8 +405,11 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
         AlbumEntity::class,
         ArtworkEntity::class,
         SyncQueueEntity::class,
+        com.gratia.music.data.model.SavedArtistEntity::class,
+        com.gratia.music.data.model.SavedAlbumEntity::class,
+        com.gratia.music.data.model.PlaybackHistoryEntity::class,
     ],
-    version = 11,
+    version = 16,
     exportSchema = false
 )
 abstract class GratiaDatabase : RoomDatabase() {
@@ -321,6 +424,9 @@ abstract class GratiaDatabase : RoomDatabase() {
     abstract fun albumDao(): AlbumDao
     abstract fun artworkDao(): ArtworkDao
     abstract fun syncQueueDao(): SyncQueueDao
+    abstract fun savedArtistDao(): com.gratia.music.data.dao.SavedArtistDao
+    abstract fun savedAlbumDao(): com.gratia.music.data.dao.SavedAlbumDao
+    abstract fun playbackHistoryDao(): com.gratia.music.data.dao.PlaybackHistoryDao
 
     companion object {
         @Volatile
@@ -343,7 +449,12 @@ abstract class GratiaDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_8_9,
                         MIGRATION_9_10,
-                        MIGRATION_10_11
+                        MIGRATION_10_11,
+                        MIGRATION_11_12,
+                        MIGRATION_12_13,
+                        MIGRATION_13_14,
+                        MIGRATION_14_15,
+                        MIGRATION_15_16
                     )
                     .build()
                 INSTANCE = instance

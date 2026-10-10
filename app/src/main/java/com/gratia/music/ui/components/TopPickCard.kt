@@ -30,8 +30,12 @@ fun TopPickCard(
     song: SongEntity,
     onClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    val hasCover = !song.coverArtPath.isNullOrBlank() && File(song.coverArtPath).exists()
+    // Remote artwork is an http(s) URL in coverArtPath — a File.exists() gate
+    // answered false for every catalogue pick and the card fell back to
+    // initials. The one artwork pipeline decides what the path is (file,
+    // URL, or nothing); the card only chooses between artwork and fallback.
+    val hasCover = !song.coverArtPath.isNullOrBlank() &&
+        (song.coverArtPath!!.startsWith("http") || File(song.coverArtPath).exists())
 
     Box(
         modifier = Modifier
@@ -42,10 +46,7 @@ fun TopPickCard(
     ) {
         if (hasCover) {
             AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(File(song.coverArtPath!!))
-                    .crossfade(300)
-                    .build(),
+                model = rememberArtworkRequest(song.coverArtPath, 480, crossfadeMs = 300),
                 contentDescription = "${song.title} cover art",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

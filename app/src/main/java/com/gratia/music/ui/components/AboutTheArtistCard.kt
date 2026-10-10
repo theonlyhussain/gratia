@@ -30,8 +30,6 @@ import com.gratia.music.data.repository.ArtistInfo
 import com.gratia.music.ui.theme.GratiaTheme
 import com.gratia.music.ui.theme.Inter
 import com.gratia.music.ui.theme.SpaceGrotesk
-import java.text.NumberFormat
-import java.util.Locale
 import com.gratia.music.GratiaApp
 import com.gratia.music.data.SettingsDataStore
 import kotlinx.coroutines.launch
@@ -166,22 +164,31 @@ fun AboutTheArtistCard(
                     }
 
                     if (info != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        val formattedFans = NumberFormat.getNumberInstance(Locale.getDefault()).format(info.fanCount)
-                        Text(
-                            text = "$formattedFans listeners",
-                            fontFamily = Inter,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp,
-                            color = Color.White.copy(alpha = 0.9f),
-                            style = androidx.compose.ui.text.TextStyle(
-                                shadow = androidx.compose.ui.graphics.Shadow(
-                                    color = Color.Black.copy(alpha = 0.6f),
-                                    offset = androidx.compose.ui.geometry.Offset(0f, 2f),
-                                    blurRadius = 8f
+                        // Labelled as what Deezer actually counts — followers —
+                        // not "listeners" (artist spec 2/3). Omitted when the
+                        // catalogue stated nothing.
+                        info.fanCount?.takeIf { it > 0 }?.let { fans ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val metric = com.gratia.music.data.model.ArtistMetric(
+                                value = fans.toLong(),
+                                type = com.gratia.music.data.model.ArtistMetricType.FOLLOWERS,
+                                source = "Deezer",
+                            )
+                            Text(
+                                text = metric.label,
+                                fontFamily = Inter,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp,
+                                color = Color.White.copy(alpha = 0.9f),
+                                style = androidx.compose.ui.text.TextStyle(
+                                    shadow = androidx.compose.ui.graphics.Shadow(
+                                        color = Color.Black.copy(alpha = 0.6f),
+                                        offset = androidx.compose.ui.geometry.Offset(0f, 2f),
+                                        blurRadius = 8f
+                                    )
                                 )
                             )
-                        )
+                        }
                         
                         if (!onlineDataEnabled) {
                             Text(

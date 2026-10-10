@@ -35,6 +35,7 @@ import com.gratia.music.GratiaApp
 import com.gratia.music.data.model.PlaylistEntity
 import com.gratia.music.data.model.SongEntity
 import com.gratia.music.player.PlayerViewModel
+import com.gratia.music.player.PlaybackOrigin
 import com.gratia.music.ui.components.CollageArtwork
 import com.gratia.music.ui.components.EmptyStateView
 import com.gratia.music.ui.components.GratiaText
@@ -67,6 +68,7 @@ import androidx.compose.material.icons.filled.CameraAlt
 @Composable
 fun PlaylistDetailScreen(
     playlistId: String,
+    autoOpenAddMusic: Boolean = false,
     playerViewModel: PlayerViewModel,
     onBack: () -> Unit
 ) {
@@ -87,7 +89,9 @@ fun PlaylistDetailScreen(
     var showMenu by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showAddMusic by remember { mutableStateOf(false) }
+    // Arriving from the create flow (playlist spec 16), Add Music is already
+    // open — the question "what now?" is answered by the screen itself.
+    var showAddMusic by remember { mutableStateOf(autoOpenAddMusic) }
 
     val playlist = playlistFlow ?: return
 
@@ -180,7 +184,12 @@ fun PlaylistDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
-            contentPadding = PaddingValues(bottom = GratiaTheme.spacing.heroLarge)
+            // The shared inset already carries the navigation bar and the mini
+            // player (insets spec 25) — the last row stays reachable above both,
+            // at every screen height and with either navigation mode.
+            contentPadding = PaddingValues(
+                bottom = com.gratia.music.ui.LocalBottomPadding.current + GratiaTheme.spacing.heroLarge
+            )
         ) {
             item {
                 Column(
@@ -262,7 +271,7 @@ fun PlaylistDetailScreen(
                         GratiaButton(
                             text = "Play",
                             icon = Icons.Default.PlayArrow,
-                            onClick = { if (playlistSongs.isNotEmpty()) playerViewModel.playSong(playlistSongs.first(), playlistSongs) },
+                            onClick = { if (playlistSongs.isNotEmpty()) playerViewModel.playSong(playlistSongs.first(), playlistSongs, PlaybackOrigin.PLAYLIST) },
                             modifier = Modifier.weight(1f),
                             backgroundColor = GratiaTheme.colors.surface,
                             contentColor = GratiaTheme.colors.textPrimary
@@ -274,7 +283,7 @@ fun PlaylistDetailScreen(
                             onClick = { 
                                 if (playlistSongs.isNotEmpty()) {
                                     playerViewModel.toggleShuffle()
-                                    playerViewModel.playSong(playlistSongs.random(), playlistSongs)
+                                    playerViewModel.playSong(playlistSongs.random(), playlistSongs, PlaybackOrigin.PLAYLIST)
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -304,7 +313,7 @@ fun PlaylistDetailScreen(
                         isPlaying = currentSong?.id == song.id && isPlaying,
                         isSelectionMode = isSelectionMode,
                         isSelected = selectedIds.contains(song.id),
-                        onPlay = { playerViewModel.playSong(song, playlistSongs) },
+                        onPlay = { playerViewModel.playSong(song, playlistSongs, PlaybackOrigin.PLAYLIST) },
                         onLongPress = { selectionManager.startSelection(song.id) },
                         onToggleSelection = { selectionManager.toggle(song.id) },
                         modifier = Modifier.padding(horizontal = GratiaTheme.spacing.large)
@@ -423,6 +432,7 @@ fun PlaylistDetailScreen(
     if (showAddMusic) {
         com.gratia.music.ui.components.AddMusicSheet(
             playlistId = playlist.id,
+            playlistName = playlist.name,
             onDismiss = { showAddMusic = false }
         )
     }

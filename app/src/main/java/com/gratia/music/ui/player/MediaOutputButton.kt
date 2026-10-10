@@ -24,25 +24,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gratia.music.player.AudioRoute
 import com.gratia.music.player.MediaOutputManager
+import com.gratia.music.ui.LocalPlayerViewModel
 import com.gratia.music.ui.theme.Inter
 
 @Composable
 fun MediaOutputButton(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    
+
     // Create and track MediaOutputManager
     val mediaOutputManager = remember { MediaOutputManager(context) }
-    
+
+    // The player's measured audio facts, for the sheet's pipeline line. Composed
+    // from the decoder-reported format only — never a resolver's claims. The
+    // button lives inside the expanded player, so the local is always provided.
+    val playerViewModel = LocalPlayerViewModel.current
+    val audioFormat = playerViewModel.audioFormat.collectAsState().value
+    val isUpgraded = playerViewModel.isUpgradedStream.collectAsState().value
+    val sourceLabel = remember(audioFormat, isUpgraded) {
+        audioFormat?.let { fmt ->
+            val codec = when (fmt.mimeType) {
+                "audio/flac" -> "FLAC"
+                "audio/alac" -> "ALAC"
+                "audio/mp4a-latm" -> "AAC"
+                "audio/mpeg" -> "MP3"
+                "audio/ogg", "audio/vorbis" -> "OGG"
+                "audio/opus" -> "Opus"
+                "audio/x-wav" -> "WAV"
+                else -> fmt.mimeType?.substringAfter("audio/")?.uppercase() ?: "Audio"
+            }
+            val khz = fmt.sampleRate / 1000f
+            val rate = if (fmt.sampleRate > 0) " · ${if (khz % 1 == 0f) "${khz.toInt()}" else "$khz"} kHz" else ""
+            val bits = if (fmt.bitDepth > 0) " · ${fmt.bitDepth}-bit" else ""
+            "$codec$bits$rate"
+        }
+    }
+
     DisposableEffect(mediaOutputManager) {
         mediaOutputManager.startTracking()
         onDispose {
             mediaOutputManager.stopTracking()
         }
     }
-    
+
     val activeRoute by mediaOutputManager.activeRoute.collectAsState()
     val availableRoutes by mediaOutputManager.availableRoutes.collectAsState()
-    
+
     var showBottomSheet by remember { mutableStateOf(false) }
 
     val icon = when (activeRoute.type) {
@@ -58,7 +84,7 @@ fun MediaOutputButton(modifier: Modifier = Modifier) {
         modifier = modifier
             .clip(RoundedCornerShape(32.dp))
             .background(Color.White.copy(alpha = 0.15f))
-            .clickable { 
+            .clickable {
                 showBottomSheet = true
             }
             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -71,9 +97,9 @@ fun MediaOutputButton(modifier: Modifier = Modifier) {
             tint = Color.White.copy(alpha = 0.8f),
             modifier = Modifier.size(20.dp)
         )
-        
+
         Spacer(modifier = Modifier.width(8.dp))
-        
+
         Text(
             text = activeRoute.name,
             color = Color.White.copy(alpha = 0.9f),
@@ -85,14 +111,19 @@ fun MediaOutputButton(modifier: Modifier = Modifier) {
             modifier = Modifier.weight(1f, fill = false)
         )
     }
-    
+
     if (showBottomSheet) {
+        // The pipeline line is composed in the expanded player's own terms —
+        // measured codec and sample rate, and the upgrade flag only when the
+        // player really swapped streams.
         MediaOutputBottomSheet(
             routes = availableRoutes,
             onRouteSelected = { route ->
                 mediaOutputManager.selectRoute(route)
             },
-            onDismiss = { showBottomSheet = false }
+            onDismiss = { showBottomSheet = false },
+            pipelineSummary = sourceLabel,
+            upgraded = isUpgraded,
         )
     }
 }

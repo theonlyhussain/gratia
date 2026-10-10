@@ -100,6 +100,64 @@ fun SettingsPlaybackScreen(
             }
         }
 
+        // --- AUTOPLAY (the session default) ---
+        item {
+            Spacer(Modifier.height(24.dp))
+
+            GratiaText(
+                text = "AUTOPLAY",
+                style = GratiaTheme.typography.caption,
+                color = GratiaTheme.colors.textSecondary,
+                modifier = Modifier.padding(start = 32.dp, bottom = 8.dp)
+            )
+
+            val autoplayDefault by settingsDataStore.autoplayDefaultFlow.collectAsState(initial = true)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(GratiaTheme.colors.surface)
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        GratiaText(
+                            text = "AutoPlay",
+                            style = GratiaTheme.typography.body,
+                            color = GratiaTheme.colors.textPrimary
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        GratiaText(
+                            text = "Automatically play similar music after the queue, when playback starts from a remote source. The ∞ button in the player controls the current session; this is the default it starts from.",
+                            style = GratiaTheme.typography.caption,
+                            color = GratiaTheme.colors.textSecondary
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = autoplayDefault,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                settingsDataStore.setAutoplayDefault(enabled)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = GratiaTheme.colors.background,
+                            checkedTrackColor = GratiaTheme.colors.accent,
+                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
+                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
+                        )
+                    )
+                }
+            }
+        }
+
         // --- STREAMING QUALITY (the original per-network model) ---
         item {
             Spacer(Modifier.height(24.dp))
@@ -206,139 +264,6 @@ fun SettingsPlaybackScreen(
             }
         }
 
-        // --- LYRICS ---
-        item {
-            Spacer(Modifier.height(24.dp))
-
-            GratiaText(
-                text = "LYRICS",
-                style = GratiaTheme.typography.caption,
-                color = GratiaTheme.colors.textSecondary,
-                modifier = Modifier.padding(start = 32.dp, bottom = 8.dp)
-            )
-
-            val animatedWordLyrics by settingsDataStore.animatedWordLyricsFlow.collectAsState(initial = true)
-            val reduceAnimation by settingsDataStore.reduceAnimationFlow.collectAsState(initial = false)
-            val lyricsScrollDebug by settingsDataStore.lyricsScrollDebugFlow.collectAsState(initial = false)
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GratiaTheme.colors.surface)
-                    .padding(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        GratiaText(
-                            text = "Animated word lyrics",
-                            style = GratiaTheme.typography.body,
-                            color = GratiaTheme.colors.textPrimary
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        GratiaText(
-                            text = "Animate word-synced lyrics as they are sung.",
-                            style = GratiaTheme.typography.caption,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = animatedWordLyrics,
-                        onCheckedChange = { enabled ->
-                            scope.launch {
-                                settingsDataStore.setAnimatedWordLyrics(enabled)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = GratiaTheme.colors.background,
-                            checkedTrackColor = GratiaTheme.colors.accent,
-                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
-                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
-                        )
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        GratiaText(
-                            text = "Reduce animation",
-                            style = GratiaTheme.typography.body,
-                            color = GratiaTheme.colors.textPrimary
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        GratiaText(
-                            text = "Hold lyrics still — no sweep, no bloom, and the page jumps to the line being sung.",
-                            style = GratiaTheme.typography.caption,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = reduceAnimation,
-                        onCheckedChange = { enabled ->
-                            scope.launch {
-                                settingsDataStore.setReduceAnimation(enabled)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = GratiaTheme.colors.background,
-                            checkedTrackColor = GratiaTheme.colors.accent,
-                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
-                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
-                        )
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        GratiaText(
-                            text = "Lyrics scroll debug",
-                            style = GratiaTheme.typography.body,
-                            color = GratiaTheme.colors.textPrimary
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        GratiaText(
-                            text = "Overlay the safe band, the lines being sung and the scroll the follow would make.",
-                            style = GratiaTheme.typography.caption,
-                            color = GratiaTheme.colors.textSecondary
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = lyricsScrollDebug,
-                        onCheckedChange = { enabled ->
-                            scope.launch {
-                                settingsDataStore.setLyricsScrollDebug(enabled)
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = GratiaTheme.colors.background,
-                            checkedTrackColor = GratiaTheme.colors.accent,
-                            uncheckedThumbColor = GratiaTheme.colors.textSecondary,
-                            uncheckedTrackColor = GratiaTheme.colors.surfaceHover
-                        )
-                    )
-                }
-            }
-        }
     }
 }
 
